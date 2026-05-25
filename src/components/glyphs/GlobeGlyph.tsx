@@ -4,7 +4,7 @@ export default function GlobeGlyph({ className = '' }: { className?: string }) {
     return { x: 32 + Math.cos(a) * 20, y: 32 + Math.sin(a) * 20 }
   })
   return (
-    <svg viewBox="0 0 64 64" className={className} fill="none">
+    <svg viewBox="0 0 64 64" className={className} fill="none" aria-hidden="true">
       <circle cx="32" cy="32" r="20" stroke="hsl(var(--line)/0.5)" strokeWidth="1" />
       <ellipse cx="32" cy="32" rx="20" ry="8" stroke="hsl(var(--line)/0.5)" strokeWidth="1" />
       {nodes.map((n, i) => (

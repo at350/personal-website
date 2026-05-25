@@ -3,7 +3,7 @@ import type { Project } from '../data/content'
 import { GLYPHS } from './glyphs'
 
 export default function ProjectCard({ project }: { project: Project }) {
-  const [imgOk, setImgOk] = useState(true)
+  const [imgOk, setImgOk] = useState(false)
   const Glyph = GLYPHS[project.glyph]
   const src = `${import.meta.env.BASE_URL}projects/${project.slug}.png`
   const hasLink = project.url !== '#'
@@ -11,13 +11,17 @@ export default function ProjectCard({ project }: { project: Project }) {
   return (
     <article className={`group relative overflow-hidden rounded-xl border border-stroke bg-surface ${project.span === 7 ? 'md:col-span-7' : 'md:col-span-5'}`}>
       <div className="relative aspect-[16/10] w-full">
-        {/* screenshot or placeholder gradient */}
-        {imgOk ? (
-          <img src={src} alt={project.title} loading="lazy" onError={() => setImgOk(false)}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--surface)),hsl(var(--bg)))]" />
-        )}
+        {/* code placeholder: always the base layer */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--surface)),hsl(var(--bg)))]" />
+        {/* screenshot fades in over the placeholder once it loads */}
+        <img
+          src={src}
+          alt={project.title}
+          loading="lazy"
+          onLoad={() => setImgOk(true)}
+          onError={() => setImgOk(false)}
+          className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${imgOk ? 'opacity-100' : 'opacity-0'}`}
+        />
         {/* blueprint halftone + grid overlay */}
         <div className="pointer-events-none absolute inset-0 opacity-15 mix-blend-overlay"
           style={{ backgroundImage: 'radial-gradient(circle, hsl(var(--line)) 1px, transparent 1px)', backgroundSize: '4px 4px' }} />
@@ -34,7 +38,7 @@ export default function ProjectCard({ project }: { project: Project }) {
         </div>
 
         {/* hover wash + pill */}
-        <div className="absolute inset-0 grid place-items-center bg-bg/70 opacity-0 backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100">
+        <div className="absolute inset-0 grid place-items-center bg-bg/70 opacity-0 backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100">
           {hasLink ? (
             <a href={project.url} target="_blank" rel="noopener noreferrer" className="group/pill relative rounded-full">
               <span className="gradient-ring absolute -inset-[2px] rounded-full" />

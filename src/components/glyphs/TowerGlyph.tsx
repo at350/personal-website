@@ -1,7 +1,7 @@
 export default function TowerGlyph({ className = '' }: { className?: string }) {
   const plates = [[32, 50, 24, 10], [32, 38, 19, 8], [32, 27, 14, 6], [32, 17, 9, 4]] as const
   return (
-    <svg viewBox="0 0 64 64" className={className} fill="none">
+    <svg viewBox="0 0 64 64" className={className} fill="none" aria-hidden="true">
       {plates.map(([cx, cy, rx, ry], i) => (
         <path key={i} d={`M${cx},${cy - ry} L${cx - rx},${cy} L${cx},${cy + ry} L${cx + rx},${cy} Z`}
           stroke="hsl(var(--accent))" strokeWidth="1" />
