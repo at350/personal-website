@@ -35,7 +35,7 @@ export default function StructureStage() {
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
       tl.fromTo('.ss-plate, .ss-edge',
-        { strokeDashoffset: (i, el) => (el as SVGPathElement).getTotalLength() },
+        { strokeDashoffset: (_i, el) => (el as SVGPathElement).getTotalLength() },
         { strokeDashoffset: 0, duration: 1.4, stagger: 0.12 }, 0.3)
         .fromTo('.ss-node', { scale: 0, opacity: 0, transformOrigin: 'center' },
           { scale: 1, opacity: 1, duration: 0.4, stagger: 0.05 }, '-=1.0')
