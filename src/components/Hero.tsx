@@ -47,7 +47,7 @@ export default function Hero() {
             building in Cupertino, California.
           </p>
           <p className="blur-in mb-8 max-w-md font-body text-sm text-muted md:text-base">
-            I design software the way an architect designs a building — load-bearing parts, clean joints, and a plan you can actually read.
+            I've been building software since middle school. Now I'm studying at Northwestern, and I just want to make things that work.
           </p>
           <div className="inline-flex flex-wrap gap-4">
             <button onClick={() => scrollToId('structures')}
