@@ -1,10 +1,35 @@
+import { useEffect, useState } from 'react'
+import { useReducedMotion } from './lib/useReducedMotion'
+import { initSmoothScroll } from './lib/smoothScroll'
+import CornerTicks from './components/CornerTicks'
+import LoadingScreen from './components/LoadingScreen'
+import Navbar from './components/Navbar'
+import Hero from './components/Hero'
+import SelectedStructures from './components/SelectedStructures'
+import Capabilities from './components/Capabilities'
+import Log from './components/Log'
+import Explorations from './components/Explorations'
+import ContactFooter from './components/ContactFooter'
+
 export default function App() {
+  const reduced = useReducedMotion()
+  const [isLoading, setIsLoading] = useState(!reduced)
+
+  useEffect(() => initSmoothScroll(reduced), [reduced])
+
   return (
-    <main className="min-h-screen p-10 space-y-4">
-      <h1 className="font-display text-6xl font-extrabold">Alan Tai</h1>
-      <p className="font-mono text-accent uppercase tracking-[0.3em] text-xs">// system check</p>
-      <p className="font-body text-muted max-w-md">Readable body copy in Archivo.</p>
-      <div className="accent-gradient h-2 w-40 rounded-full" />
-    </main>
+    <>
+      {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
+      <CornerTicks />
+      <Navbar />
+      <main>
+        <Hero />
+        <SelectedStructures />
+        <Capabilities />
+        <Log />
+        <Explorations />
+      </main>
+      <ContactFooter />
+    </>
   )
 }
