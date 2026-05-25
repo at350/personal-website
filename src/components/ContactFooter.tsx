@@ -20,7 +20,7 @@ export default function ContactFooter() {
     <footer id="contact" className="overflow-hidden bg-bg pb-8 pt-16 md:pt-20">
       {/* marquee */}
       <div ref={marqueeRef} className="select-none overflow-hidden whitespace-nowrap">
-        <div className="marquee-track inline-block">
+        <div className="marquee-track inline-block whitespace-nowrap">
           <span className="font-display text-[10vw] leading-none text-text-primary/10">{phrase.repeat(10)}</span>
           <span className="font-display text-[10vw] leading-none text-text-primary/10">{phrase.repeat(10)}</span>
         </div>
