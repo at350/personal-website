@@ -64,6 +64,9 @@ html.lenis, html.lenis body { height: auto; }
 .animate-node-pulse { animation: node-pulse 2.8s ease-in-out infinite; }
 .animate-grid-fade-in { animation: grid-fade-in 0.8s ease-out; }
 
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* gradient border ring helper (used by hover rings + pills) */
 .gradient-ring {
   background-image: linear-gradient(90deg, #63d4c2 0%, #3fa896 50%, #63d4c2 100%);

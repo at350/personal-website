@@ -36,7 +36,7 @@ export default function Navbar() {
 
   return (
     <nav className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4 md:pt-6">
-      <div className={`inline-flex items-center rounded-full border border-stroke bg-surface px-2 py-2 backdrop-blur-md transition-shadow ${scrolled ? 'shadow-md shadow-black/20' : ''}`}>
+      <div className={`inline-flex max-w-[calc(100vw-1rem)] items-center overflow-x-auto rounded-full border border-stroke bg-surface px-2 py-2 backdrop-blur-md transition-shadow no-scrollbar [&>*]:shrink-0 ${scrolled ? 'shadow-md shadow-black/20' : ''}`}>
         {/* logo node */}
         <button onClick={() => scrollToId('top')} className="group relative mx-1 grid h-9 w-9 place-items-center transition-transform hover:scale-110" aria-label="Top">
           <span className="accent-gradient absolute inset-0 rounded-full transition-transform duration-500 group-hover:[transform:rotate(-180deg)]" />
