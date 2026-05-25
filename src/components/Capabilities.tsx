@@ -5,13 +5,19 @@ export default function Capabilities() {
   return (
     <section id="toolkit" className="bg-bg py-16 md:py-24">
       <div className="mx-auto max-w-[1100px] px-6 md:px-10 lg:px-16">
-        <div className="mb-10">
+        <motion.div
+          className="mb-10"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1 }}
+        >
           <div className="mb-4 flex items-center gap-3">
             <span className="h-px w-8 bg-stroke" />
             <span className="font-mono text-xs uppercase tracking-[0.3em] text-muted">Capabilities</span>
           </div>
           <h2 className="font-display text-4xl md:text-5xl">The <span className="text-accent">toolkit</span></h2>
-        </div>
+        </motion.div>
 
         <div className="border-t border-stroke">
           {capabilities.map((group, i) => (

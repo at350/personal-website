@@ -59,10 +59,10 @@ export default function Navbar() {
 
         <span className="mx-1 hidden h-5 w-px bg-stroke sm:block" />
 
-        <button onClick={() => scrollToId('contact')} className="group relative mx-1 rounded-full px-3 py-1.5 sm:px-4">
+        <button aria-label="Say hi" onClick={() => scrollToId('contact')} className="group relative mx-1 rounded-full px-3 py-1.5 sm:px-4">
           <span className="gradient-ring absolute -inset-[2px] rounded-full opacity-0 transition-opacity group-hover:opacity-100" />
           <span className="relative grid place-items-center rounded-full bg-surface px-2 py-0.5 font-mono text-xs uppercase tracking-wider backdrop-blur-md sm:text-sm">
-            Say hi ↗
+            Say hi <span aria-hidden="true">↗</span>
           </span>
         </button>
       </div>
