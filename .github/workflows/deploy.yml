@@ -3,6 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: '0 6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -24,6 +26,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: node scripts/fetch-github.mjs
+        env:
+          GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
       - run: npm run build
         # For a custom domain (alantai.org) set base to root instead:
         #   VITE_BASE: "/"
