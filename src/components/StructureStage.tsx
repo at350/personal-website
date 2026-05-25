@@ -2,62 +2,132 @@ import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 import { useReducedMotion } from '../lib/useReducedMotion'
 
-interface Plate { cx: number; cy: number; rx: number; ry: number }
+/* ------------------------------------------------------------------ *
+ * Isometric "data tower": a vertically-aligned stack of extruded glass
+ * slabs that taper to a glowing apex, joined by slim pillars. True 2:1
+ * isometric projection so every floor reads as the same clean object.
+ * ------------------------------------------------------------------ */
 
-// bottom (i=0) wide & low, narrowing & rising to apex
-const PLATES: Plate[] = [
-  { cx: 268, cy: 470, rx: 150, ry: 75 },
-  { cx: 276, cy: 388, rx: 128, ry: 64 },
-  { cx: 262, cy: 312, rx: 108, ry: 54 },
-  { cx: 280, cy: 244, rx: 84, ry: 42 },
-  { cx: 270, cy: 186, rx: 60, ry: 30 },
+const ISO = Math.cos(Math.PI / 6) // ≈ 0.866
+const CX = 256 // structure centre x (shifted slightly left to leave room for labels)
+const CY = 360 // structure centre y
+const T = 15 // slab thickness (extrusion depth)
+const APEX_RISE = 48 // antenna height above the top slab
+
+type Pt = { x: number; y: number }
+
+// project a 3-D point (x east, y up, z south) into the 2-D isometric plane
+const iso = (x: number, y: number, z: number): Pt => ({
+  x: CX + (x - z) * ISO,
+  y: CY + (x + z) * 0.5 - y,
+})
+
+// base → top: half-extent shrinks for a clean ziggurat taper, height climbs evenly
+const FLOORS = [
+  { s: 110, y: 0 },
+  { s: 92, y: 72 },
+  { s: 74, y: 144 },
+  { s: 56, y: 216 },
 ]
+const TOP = FLOORS.length - 1
 
-const platePath = (p: Plate) =>
-  `M${p.cx},${p.cy - p.ry} L${p.cx - p.rx},${p.cy} L${p.cx},${p.cy + p.ry} L${p.cx + p.rx},${p.cy} Z`
+type Corners = Record<'back' | 'right' | 'front' | 'left', Pt>
+const cornersAt = (s: number, y: number): Corners => ({
+  back: iso(-s, y, -s),
+  right: iso(s, y, -s),
+  front: iso(s, y, s),
+  left: iso(-s, y, s),
+})
 
-// 4 corners of a plate: top, left, bottom, right
-const corners = (p: Plate) => [
-  { x: p.cx, y: p.cy - p.ry },
-  { x: p.cx - p.rx, y: p.cy },
-  { x: p.cx, y: p.cy + p.ry },
-  { x: p.cx + p.rx, y: p.cy },
-]
+const fmt = (p: Pt) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`
+const polygon = (...ps: Pt[]) => `M${ps.map(fmt).join('L')}Z`
+
+interface FloorGeometry {
+  topFace: string
+  rightFace: string
+  leftFace: string
+  top: Corners
+  accent: boolean
+}
+
+const floors: FloorGeometry[] = FLOORS.map((f, i) => {
+  const top = cornersAt(f.s, f.y)
+  const bot = cornersAt(f.s, f.y - T)
+  return {
+    topFace: polygon(top.back, top.right, top.front, top.left),
+    rightFace: polygon(top.right, top.front, bot.front, bot.right),
+    leftFace: polygon(top.left, top.front, bot.front, bot.left),
+    top,
+    accent: i === TOP,
+  }
+})
+
+// slim pillars sitting in the gap between each pair of slabs
+const STRUT_KEYS: (keyof Corners)[] = ['back', 'right', 'front', 'left']
+const struts: { d: string; back: boolean }[] = []
+for (let i = 0; i < TOP; i++) {
+  const lowTop = cornersAt(FLOORS[i].s, FLOORS[i].y)
+  const highBot = cornersAt(FLOORS[i + 1].s, FLOORS[i + 1].y - T)
+  for (const k of STRUT_KEYS) {
+    struts.push({ d: `M${fmt(lowTop[k])}L${fmt(highBot[k])}`, back: k === 'back' })
+  }
+}
+
+const apex = iso(0, FLOORS[TOP].y + APEX_RISE, 0)
+const topCentre = iso(0, FLOORS[TOP].y, 0)
+const baseCentre = iso(0, FLOORS[0].y, 0)
+
+// glowing nodes: the apex crown + the four corners of the top slab only
+const topCorners = Object.values(floors[TOP].top)
+
+// annotation leaders → short labels on the right, one per layer
+const annotations = [
+  { from: floors[TOP].top.right, label: 'AGENTS' },
+  { from: floors[1].top.right, label: 'API' },
+  { from: floors[0].top.right, label: 'DATA' },
+].map((a) => ({ ...a, endX: a.from.x + 46 }))
+
+// rising data path (central spine, base → apex)
+const spinePath = `M${fmt(baseCentre)}L${fmt(apex)}`
 
 export default function StructureStage() {
   const reduced = useReducedMotion()
-  const groupRef = useRef<SVGGElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const groupRef = useRef<SVGGElement>(null)
 
-  // assembly: set dash arrays first so stroke-dashoffset draws, then run the timeline
+  // assembly on load: slabs stack bottom→top, pillars draw, nodes pop, labels fade
   useEffect(() => {
     if (reduced) return
-    groupRef.current?.querySelectorAll<SVGPathElement>('.ss-plate, .ss-edge').forEach((el) => {
-      const len = el.getTotalLength()
-      el.style.strokeDasharray = String(len)
-      el.style.strokeDashoffset = String(len)
-    })
     const ctx = gsap.context(() => {
+      // pillars draw via stroke-dashoffset — set dash arrays BEFORE the timeline reads them
+      groupRef.current?.querySelectorAll<SVGPathElement>('.ss-strut, .ss-apex-line').forEach((el) => {
+        const len = el.getTotalLength()
+        el.style.strokeDasharray = String(len)
+        el.style.strokeDashoffset = String(len)
+      })
+
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
-      tl.fromTo('.ss-plate, .ss-edge',
-        { strokeDashoffset: (_i, el) => (el as SVGPathElement).getTotalLength() },
-        { strokeDashoffset: 0, duration: 1.4, stagger: 0.12 }, 0.3)
-        .fromTo('.ss-node', { scale: 0, opacity: 0, transformOrigin: 'center' },
-          { scale: 1, opacity: 1, duration: 0.4, stagger: 0.05 }, '-=1.0')
-        .fromTo('.ss-anno', { opacity: 0 }, { opacity: 1, duration: 0.6, stagger: 0.1 }, '-=0.2')
+      tl.from('.ss-floor', { y: 36, opacity: 0, duration: 0.7, stagger: 0.16 }, 0.2)
+        .to('.ss-strut', { strokeDashoffset: 0, duration: 0.5, stagger: 0.04 }, '-=0.9')
+        .to('.ss-apex-line', { strokeDashoffset: 0, duration: 0.4 }, '-=0.2')
+        .fromTo(
+          '.ss-node',
+          { scale: 0, opacity: 0, transformOrigin: 'center' },
+          { scale: 1, opacity: 1, duration: 0.4, stagger: 0.06 },
+          '-=0.3',
+        )
+        .fromTo('.ss-anno', { opacity: 0 }, { opacity: 1, duration: 0.6, stagger: 0.1 }, '-=0.1')
     }, groupRef)
     return () => ctx.revert()
   }, [reduced])
 
-  // mouse parallax
+  // subtle mouse parallax for depth
   useEffect(() => {
     if (reduced) return
-    const root = rootRef.current
-    if (!root) return
     const onMove = (e: MouseEvent) => {
-      const dx = (e.clientX / window.innerWidth - 0.5)
-      const dy = (e.clientY / window.innerHeight - 0.5)
-      gsap.to(groupRef.current, { x: dx * 14, y: dy * 14, scale: 1.03, duration: 0.6, ease: 'power2.out' })
+      const dx = e.clientX / window.innerWidth - 0.5
+      const dy = e.clientY / window.innerHeight - 0.5
+      gsap.to(groupRef.current, { x: dx * 16, y: dy * 12, duration: 0.7, ease: 'power2.out' })
     }
     window.addEventListener('mousemove', onMove)
     return () => {
@@ -66,71 +136,111 @@ export default function StructureStage() {
     }
   }, [reduced])
 
-  const annotations = [
-    { node: corners(PLATES[4])[0], label: '[ TOP ] AGENT LAYER', dir: 1 },
-    { node: corners(PLATES[2])[3], label: '[ MID ] API · NODE', dir: 1 },
-    { node: corners(PLATES[0])[1], label: '[ BASE ] DATA · PG', dir: -1 },
-  ]
-
   return (
     <div ref={rootRef} className="relative w-full">
-      <svg viewBox="0 0 540 600" aria-hidden="true" className="w-full overflow-visible" style={{ filter: 'drop-shadow(0 0 1px rgba(99,212,194,0.1))' }}>
+      <svg viewBox="0 0 540 600" aria-hidden="true" className="w-full overflow-visible">
+        <defs>
+          <linearGradient id="ss-top" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="hsl(var(--accent) / 0.22)" />
+            <stop offset="100%" stopColor="hsl(var(--accent) / 0.05)" />
+          </linearGradient>
+          <filter id="ss-glow" x="-120%" y="-120%" width="340%" height="340%">
+            <feGaussianBlur stdDeviation="3.2" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
         <g ref={groupRef}>
-          {/* columns: connect corresponding corners between adjacent plates */}
-          {PLATES.slice(0, -1).map((p, i) => {
-            const a = corners(p), b = corners(PLATES[i + 1])
-            return a.map((c, k) => (
-              <path key={`col-${i}-${k}`} className="ss-edge" d={`M${c.x},${c.y} L${b[k].x},${b[k].y}`}
-                fill="none" stroke="hsl(var(--line)/0.5)" strokeWidth="1" />
-            ))
-          })}
-          {/* central spine */}
-          <path className="ss-edge" d={`M${PLATES[0].cx},${PLATES[0].cy} L${PLATES[4].cx},${PLATES[4].cy - PLATES[4].ry}`}
-            fill="none" stroke="hsl(var(--accent)/0.6)" strokeWidth="1" id="ss-spine" />
-          {/* plates */}
-          {PLATES.map((p, i) => (
-            <path key={`plate-${i}`} className="ss-plate" d={platePath(p)} fill="hsl(var(--surface)/0.25)"
-              stroke="hsl(var(--line)/0.85)" strokeWidth="1.25" />
+          {/* pillars (behind the slabs) */}
+          {struts.map((s, i) => (
+            <path
+              key={`strut-${i}`}
+              className="ss-strut"
+              d={s.d}
+              fill="none"
+              stroke={s.back ? 'hsl(var(--line) / 0.22)' : 'hsl(var(--line) / 0.5)'}
+              strokeWidth="1"
+            />
           ))}
-          {/* nodes */}
-          {PLATES.flatMap((p, i) =>
-            corners(p).map((c, k) => (
-              <circle key={`node-${i}-${k}`} className="ss-node animate-node-pulse" cx={c.x} cy={c.y} r="4"
-                fill="hsl(var(--accent))" style={{ filter: 'drop-shadow(0 0 4px hsl(var(--accent)))' }} />
-            )),
-          )}
-          <circle className="ss-node animate-node-pulse" cx={PLATES[4].cx} cy={PLATES[4].cy - PLATES[4].ry} r="5"
-            fill="hsl(var(--accent))" style={{ filter: 'drop-shadow(0 0 6px hsl(var(--accent)))' }} />
 
-          {/* annotation leaders + labels */}
-          {annotations.map((a, i) => {
-            const endX = a.node.x + a.dir * 90
-            return (
-              <g key={`anno-${i}`} className="ss-anno">
-                <line x1={a.node.x} y1={a.node.y} x2={endX} y2={a.node.y}
-                  stroke="hsl(var(--accent)/0.7)" strokeWidth="1" strokeDasharray="3 3" />
-                <text x={a.dir === 1 ? endX + 6 : endX - 6} y={a.node.y + 3}
-                  textAnchor={a.dir === 1 ? 'start' : 'end'}
-                  className="font-mono" fontSize="11" fill="hsl(var(--muted))" letterSpacing="1.5">
-                  {a.label}
-                </text>
-              </g>
-            )
-          })}
-
-          {/* data-flow dots */}
+          {/* central spine + rising data dots */}
+          <path className="ss-strut" d={spinePath} fill="none" stroke="hsl(var(--accent) / 0.28)" strokeWidth="1" />
           {!reduced && (
             <>
-              <circle r="3" fill="hsl(var(--accent))">
-                <animateMotion dur="3s" repeatCount="indefinite"
-                  path={`M${PLATES[0].cx},${PLATES[0].cy} L${PLATES[4].cx},${PLATES[4].cy - PLATES[4].ry}`} />
+              <circle r="3" fill="hsl(var(--accent))" filter="url(#ss-glow)">
+                <animateMotion dur="3.4s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" path={spinePath} />
               </circle>
-              <circle r="2.5" fill="hsl(var(--accent))">
-                <animateMotion dur="4s" repeatCount="indefinite"
-                  path={`M${corners(PLATES[0])[3].x},${corners(PLATES[0])[3].y} L${corners(PLATES[3])[3].x},${corners(PLATES[3])[3].y}`} />
+              <circle r="2" fill="hsl(var(--accent))" opacity="0.7">
+                <animateMotion dur="3.4s" begin="1.7s" repeatCount="indefinite" path={spinePath} />
               </circle>
             </>
           )}
+
+          {/* slabs: shaded sides + lit top, base → top */}
+          {floors.map((f, i) => (
+            <g className="ss-floor" key={`floor-${i}`}>
+              <path d={f.leftFace} fill="hsl(213 16% 12% / 0.85)" stroke="hsl(var(--line) / 0.45)" strokeWidth="1" />
+              <path d={f.rightFace} fill="hsl(216 17% 7% / 0.9)" stroke="hsl(var(--line) / 0.3)" strokeWidth="1" />
+              <path
+                d={f.topFace}
+                fill="url(#ss-top)"
+                stroke={f.accent ? 'hsl(var(--accent) / 0.85)' : 'hsl(var(--line) / 0.7)'}
+                strokeWidth={f.accent ? 1.5 : 1.25}
+              />
+            </g>
+          ))}
+
+          {/* apex antenna + crown node */}
+          <path
+            className="ss-apex-line"
+            d={`M${fmt(topCentre)}L${fmt(apex)}`}
+            fill="none"
+            stroke="hsl(var(--accent) / 0.6)"
+            strokeWidth="1.25"
+          />
+
+          {/* nodes: top-slab corners + apex crown (few, tight glow) */}
+          {topCorners.map((c, i) => (
+            <circle
+              key={`node-${i}`}
+              className="ss-node animate-node-pulse"
+              cx={c.x}
+              cy={c.y}
+              r="3.4"
+              fill="hsl(var(--accent))"
+              filter="url(#ss-glow)"
+            />
+          ))}
+          <circle className="ss-node" cx={apex.x} cy={apex.y} r="5" fill="hsl(var(--accent))" filter="url(#ss-glow)" />
+
+          {/* annotation leaders + labels */}
+          {annotations.map((a, i) => (
+            <g className="ss-anno" key={`anno-${i}`}>
+              <line
+                x1={a.from.x}
+                y1={a.from.y}
+                x2={a.endX}
+                y2={a.from.y}
+                stroke="hsl(var(--accent) / 0.55)"
+                strokeWidth="1"
+                strokeDasharray="2 3"
+              />
+              <circle cx={a.from.x} cy={a.from.y} r="1.6" fill="hsl(var(--accent))" />
+              <text
+                x={a.endX + 6}
+                y={a.from.y + 3.5}
+                className="font-mono"
+                fontSize="10.5"
+                letterSpacing="1.5"
+                fill="hsl(var(--muted))"
+              >
+                {a.label}
+              </text>
+            </g>
+          ))}
         </g>
       </svg>
     </div>
