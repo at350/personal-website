@@ -37,7 +37,7 @@ export default function Log() {
                     <span className="font-display text-xl transition-colors group-hover:text-accent md:text-2xl">{entry.title}</span>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-muted">
-                    <span>{new Date(entry.date).toLocaleDateString()} · {entry.readTime}</span>
+                    <span>{new Date(entry.date + 'T00:00:00').toLocaleDateString()} · {entry.readTime}</span>
                     <span className="transition-transform group-hover:translate-x-1">↗</span>
                   </div>
                 </motion.a>
