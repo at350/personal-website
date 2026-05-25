@@ -11,20 +11,27 @@ export default function LoadingScreen({ onComplete }: { onComplete: () => void }
 
   useEffect(() => {
     let raf = 0
+    let t1 = 0
+    let t2 = 0
     const step = (t: number) => {
       if (start.current === null) start.current = t
       const p = Math.min((t - start.current) / DURATION, 1)
       setCount(Math.round(p * 100))
       if (p < 1) raf = requestAnimationFrame(step)
       else {
-        setTimeout(() => {
+        t1 = window.setTimeout(() => {
           setExit(true)
-          setTimeout(onComplete, 500)
+          t2 = window.setTimeout(onComplete, 500)
         }, 400)
       }
     }
     raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(t1)
+      clearTimeout(t2)
+      start.current = null
+    }
   }, [onComplete])
 
   useEffect(() => {
@@ -48,7 +55,7 @@ export default function LoadingScreen({ onComplete }: { onComplete: () => void }
       {/* center mini wireframe + boot log */}
       <div className="absolute inset-0 grid place-items-center">
         <div className="flex flex-col items-center gap-5">
-          <svg width="120" height="150" viewBox="0 0 120 150" className="overflow-visible">
+          <svg width="120" height="150" viewBox="0 0 120 150" aria-hidden="true" className="overflow-visible">
             {[0, 1, 2].map((i) => {
               const cy = 110 - i * 36
               const rx = 44 - i * 8

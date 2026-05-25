@@ -29,9 +29,14 @@ export default function StructureStage() {
   const groupRef = useRef<SVGGElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
 
-  // GSAP assembly on load
+  // assembly: set dash arrays first so stroke-dashoffset draws, then run the timeline
   useEffect(() => {
     if (reduced) return
+    groupRef.current?.querySelectorAll<SVGPathElement>('.ss-plate, .ss-edge').forEach((el) => {
+      const len = el.getTotalLength()
+      el.style.strokeDasharray = String(len)
+      el.style.strokeDashoffset = String(len)
+    })
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
       tl.fromTo('.ss-plate, .ss-edge',
@@ -42,16 +47,6 @@ export default function StructureStage() {
         .fromTo('.ss-anno', { opacity: 0 }, { opacity: 1, duration: 0.6, stagger: 0.1 }, '-=0.2')
     }, groupRef)
     return () => ctx.revert()
-  }, [reduced])
-
-  // set dash arrays so lines can draw
-  useEffect(() => {
-    if (reduced) return
-    groupRef.current?.querySelectorAll<SVGPathElement>('.ss-plate, .ss-edge').forEach((el) => {
-      const len = el.getTotalLength()
-      el.style.strokeDasharray = String(len)
-      el.style.strokeDashoffset = String(len)
-    })
   }, [reduced])
 
   // mouse parallax
@@ -65,7 +60,10 @@ export default function StructureStage() {
       gsap.to(groupRef.current, { x: dx * 14, y: dy * 14, scale: 1.03, duration: 0.6, ease: 'power2.out' })
     }
     window.addEventListener('mousemove', onMove)
-    return () => window.removeEventListener('mousemove', onMove)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      gsap.killTweensOf(groupRef.current)
+    }
   }, [reduced])
 
   const annotations = [
@@ -76,7 +74,7 @@ export default function StructureStage() {
 
   return (
     <div ref={rootRef} className="relative w-full">
-      <svg viewBox="0 0 540 600" className="w-full overflow-visible" style={{ filter: 'drop-shadow(0 0 1px rgba(99,212,194,0.1))' }}>
+      <svg viewBox="0 0 540 600" aria-hidden="true" className="w-full overflow-visible" style={{ filter: 'drop-shadow(0 0 1px rgba(99,212,194,0.1))' }}>
         <g ref={groupRef}>
           {/* columns: connect corresponding corners between adjacent plates */}
           {PLATES.slice(0, -1).map((p, i) => {
