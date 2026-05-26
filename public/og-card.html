@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>OG card source</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Syne:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #13181e;
+        --text: #e9ece9;
+        --muted: #828a86;
+        --accent: #63d4c2;
+      }
+      * { margin: 0; box-sizing: border-box; }
+      html, body { width: 1200px; height: 630px; }
+      body {
+        position: relative;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Archivo', sans-serif;
+        background-image:
+          linear-gradient(rgba(207, 214, 208, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(207, 214, 208, 0.05) 1px, transparent 1px);
+        background-size: 40px 40px;
+      }
+      .frame { position: absolute; inset: 40px; border: 1px solid rgba(207, 214, 208, 0.13); border-radius: 16px; }
+      /* corner ticks echo the site */
+      .tick { position: absolute; width: 22px; height: 22px; border-color: rgba(207, 214, 208, 0.3); }
+      .tl { top: 40px; left: 40px; border-top: 1px solid; border-left: 1px solid; }
+      .tr { top: 40px; right: 40px; border-top: 1px solid; border-right: 1px solid; }
+      .bl { bottom: 40px; left: 40px; border-bottom: 1px solid; border-left: 1px solid; }
+      .br { bottom: 40px; right: 40px; border-bottom: 1px solid; border-right: 1px solid; }
+      .pad { position: absolute; inset: 0; padding: 86px 92px; }
+      .eyebrow {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 20px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--muted);
+      }
+      .name {
+        font-family: 'Syne', sans-serif; font-weight: 800; font-size: 104px; line-height: 0.92;
+        letter-spacing: -0.02em; margin-top: 26px;
+      }
+      .tagline { font-size: 29px; line-height: 1.45; color: var(--muted); margin-top: 34px; max-width: 520px; }
+      .tagline b { color: var(--text); font-weight: 500; }
+      .url {
+        position: absolute; left: 92px; bottom: 86px;
+        font-family: 'JetBrains Mono', monospace; font-size: 20px; letter-spacing: 0.05em; color: var(--muted);
+        display: flex; align-items: center; gap: 14px;
+      }
+      .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 16px var(--accent); }
+      .skyline { position: absolute; right: 92px; bottom: 120px; display: flex; align-items: flex-end; gap: 9px; height: 215px; }
+      .skyline i { width: 19px; border-radius: 3px 3px 0 0; background: linear-gradient(to top, #1b3b38, var(--accent)); display: block; }
+    </style>
+  </head>
+  <body>
+    <div class="frame"></div>
+    <div class="tick tl"></div>
+    <div class="tick tr"></div>
+    <div class="tick bl"></div>
+    <div class="tick br"></div>
+
+    <div class="pad">
+      <div class="eyebrow">// Portfolio</div>
+      <div class="name">Alan<br />Tai</div>
+      <div class="tagline">
+        <b>Full-Stack &amp; AI Engineer.</b> Building software the way an architect designs a building.
+      </div>
+    </div>
+
+    <div class="skyline" id="sky"></div>
+    <div class="url"><span class="dot"></span>at350.github.io/personal-website</div>
+
+    <script>
+      // mini skyline echoes the contribution-graph feature
+      const heights = [44, 78, 120, 96, 168, 116, 210, 140, 92, 176, 124, 220, 150, 104, 188, 132];
+      const sky = document.getElementById('sky');
+      heights.forEach((h) => {
+        const b = document.createElement('i');
+        b.style.height = h + 'px';
+        sky.appendChild(b);
+      });
+    </script>
+  </body>
+</html>
