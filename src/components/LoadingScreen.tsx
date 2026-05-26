@@ -49,7 +49,7 @@ export default function LoadingScreen({ onComplete }: { onComplete: () => void }
       }}
     >
       <div className="absolute left-6 top-6 font-mono text-xs uppercase tracking-[0.3em] text-muted">
-        // COMPUTATIONAL STUDIO
+        // PORTFOLIO
       </div>
 
       {/* center mini wireframe + boot log */}

@@ -1,6 +1,6 @@
 # personal-website
 
-Alan Tai's portfolio — "Computational Structures". React + Vite + Tailwind + GSAP.
+Alan Tai's portfolio. React + Vite + Tailwind + GSAP.
 
 ## Develop
 ```bash
