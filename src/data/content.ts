@@ -49,7 +49,7 @@ export const projects: Project[] = [
     blurb:
       'AI energy audits for commercial buildings. OCR ingests utility bills, benchmarks the building against 5,000 federal records, and returns a report with upgrade recommendations and payback estimates — alongside a Three.js + Mapbox model that simulates solar gain and heat loss, plus an ElevenLabs voice walkthrough. Compresses a $15K–$50K, months-long process into ten free minutes.',
     stack: ['Next.js', 'FastAPI', 'Three.js', 'scikit-learn', 'Gemini'],
-    url: '#', // TODO: paste Devpost URL
+    url: 'https://devpost.com/software/audit-kc5eiw',
   },
   {
     id: 'STR. 002',
@@ -60,7 +60,7 @@ export const projects: Project[] = [
     blurb:
       'Supply-chain sustainability scoring. A multi-agent research swarm (Dedalus + Claude) crawls manufacturer sustainability pages in parallel for certification signals, an XGBoost quantile model estimates emissions with uncertainty bands, and results land on a Three.js globe with animated shipping routes and a force-directed supply graph. Replaces ~$50K/yr ESG software with a free, minutes-long workflow.',
     stack: ['Multi-agent', 'Claude', 'XGBoost', 'Three.js'],
-    url: '#', // TODO: paste Devpost URL
+    url: 'https://devpost.com/software/greenchain-1xglhu',
   },
   {
     id: 'STR. 003',
@@ -100,5 +100,5 @@ export const SUBSTACK_URL = '' // e.g. 'https://alantai.substack.com'
 export const socials: SocialLink[] = [
   { label: 'GitHub', url: 'https://github.com/at350' },
   { label: 'LinkedIn', url: 'https://www.linkedin.com/in/alan-tai-nu' },
-  { label: 'X / Twitter', url: '#' }, // TODO: paste X URL
+  { label: 'X / Twitter', url: 'https://x.com/alan_tai1' },
 ]

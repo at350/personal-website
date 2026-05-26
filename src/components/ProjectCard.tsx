@@ -1,60 +1,78 @@
-import { useState } from 'react'
 import type { Project } from '../data/content'
 import { GLYPHS } from './glyphs'
 
 export default function ProjectCard({ project }: { project: Project }) {
-  const [imgOk, setImgOk] = useState(false)
   const Glyph = GLYPHS[project.glyph]
-  const src = `${import.meta.env.BASE_URL}projects/${project.slug}.png`
   const hasLink = project.url !== '#'
+  const num = project.id.replace(/\D/g, '') // "001" from "STR. 001"
 
-  return (
-    <article className={`group relative overflow-hidden rounded-xl border border-stroke bg-surface ${project.span === 7 ? 'md:col-span-7' : 'md:col-span-5'}`}>
-      <div className="relative aspect-[16/10] w-full">
-        {/* code placeholder: always the base layer */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--surface)),hsl(var(--bg)))]" />
-        {/* screenshot fades in over the placeholder once it loads */}
-        <img
-          src={src}
-          alt={project.title}
-          loading="lazy"
-          onLoad={() => setImgOk(true)}
-          onError={() => setImgOk(false)}
-          className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${imgOk ? 'opacity-100' : 'opacity-0'}`}
+  const cls = `group relative flex flex-col overflow-hidden rounded-xl border border-stroke bg-surface transition-colors duration-300 hover:border-[hsl(var(--accent)/0.45)] ${
+    project.span === 7 ? 'md:col-span-7' : 'md:col-span-5'
+  }`
+
+  const inner = (
+    <>
+      {/* diagram header — glyph as the hero, blueprint texture, drawing titleblock */}
+      <div className="relative aspect-[16/10] overflow-hidden border-b border-stroke">
+        {/* base wash */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,hsl(var(--surface)),hsl(var(--bg)))]" />
+        {/* halftone dots */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.12] mix-blend-overlay"
+          style={{ backgroundImage: 'radial-gradient(circle, hsl(var(--line)) 1px, transparent 1px)', backgroundSize: '4px 4px' }}
         />
-        {/* blueprint halftone + grid overlay */}
-        <div className="pointer-events-none absolute inset-0 opacity-15 mix-blend-overlay"
-          style={{ backgroundImage: 'radial-gradient(circle, hsl(var(--line)) 1px, transparent 1px)', backgroundSize: '4px 4px' }} />
-        <div className="pointer-events-none absolute inset-0"
-          style={{ backgroundImage: 'linear-gradient(hsl(var(--line)/0.06) 1px,transparent 1px),linear-gradient(90deg,hsl(var(--line)/0.06) 1px,transparent 1px)', backgroundSize: '30px 30px' }} />
+        {/* blueprint grid */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              'linear-gradient(hsl(var(--line)/0.06) 1px,transparent 1px),linear-gradient(90deg,hsl(var(--line)/0.06) 1px,transparent 1px)',
+            backgroundSize: '30px 30px',
+          }}
+        />
+        {/* giant faint drawing number */}
+        <span
+          className="pointer-events-none absolute -right-3 -top-10 select-none font-display text-[9rem] leading-none"
+          style={{ color: 'hsl(var(--line)/0.05)' }}
+        >
+          {num}
+        </span>
 
-        {/* glyph top-left */}
-        <Glyph className="absolute left-5 top-5 h-12 w-12" />
-
-        {/* default label */}
-        <div className="absolute bottom-5 left-5">
-          <p className="font-mono text-xs text-muted">{project.id}</p>
-          <h3 className="font-display text-2xl">{project.title}</h3>
+        {/* centered glyph */}
+        <div className="absolute inset-0 grid place-items-center">
+          <Glyph className="h-24 w-24 transition-transform duration-500 ease-out group-hover:scale-110" />
         </div>
 
-        {/* hover wash + pill */}
-        <div className="absolute inset-0 grid place-items-center bg-bg/70 opacity-0 backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100">
-          {hasLink ? (
-            <a href={project.url} target="_blank" rel="noopener noreferrer" className="group/pill relative rounded-full">
-              <span className="gradient-ring absolute -inset-[2px] rounded-full" />
-              <span className="relative block rounded-full bg-surface px-5 py-2.5 font-display text-lg">View — {project.title}</span>
-            </a>
-          ) : (
-            <span className="rounded-full border border-stroke bg-surface px-5 py-2.5 font-mono text-xs uppercase tracking-wider text-muted">Link soon</span>
-          )}
-        </div>
+        {/* titleblock */}
+        <p className="absolute left-5 top-5 font-mono text-xs text-muted">{project.id}</p>
+        {hasLink && (
+          <span className="absolute right-5 top-5 font-mono text-xs text-accent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+            Open ↗
+          </span>
+        )}
+        <h3 className="absolute bottom-5 left-5 font-display text-2xl">{project.title}</h3>
       </div>
 
-      {/* schedule footer */}
+      {/* blurb — the substance, previously unused */}
+      <p className="flex-1 p-5 font-body text-sm leading-relaxed text-muted">{project.blurb}</p>
+
+      {/* stack footer */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-stroke px-5 py-3 font-mono text-[11px] text-muted">
         <span>STACK ·</span>
-        {project.stack.map((t) => (<span key={t} className="text-accent">{t}</span>))}
+        {project.stack.map((t) => (
+          <span key={t} className="text-accent">
+            {t}
+          </span>
+        ))}
       </div>
-    </article>
+    </>
+  )
+
+  return hasLink ? (
+    <a href={project.url} target="_blank" rel="noopener noreferrer" className={cls}>
+      {inner}
+    </a>
+  ) : (
+    <article className={cls}>{inner}</article>
   )
 }
