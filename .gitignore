@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# scroll-world generation workspace (raw stills, rendered legs, extracted frames)
+.assets-work/
