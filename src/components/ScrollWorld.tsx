@@ -37,7 +37,7 @@ export default function ScrollWorld() {
           id: 'architec',
           label: 'Architec',
           still: world('still2.webp'),
-          // clip: world('leg2.mp4'), // TODO: enable once the leg renders
+          clip: world('leg2.mp4'),
           accent: '#C08E3B',
           linger: 0.3,
           eyebrow: 'STR. 001 — Architec',
@@ -50,7 +50,7 @@ export default function ScrollWorld() {
           id: 'greenchain',
           label: 'GreenChain',
           still: world('still3.webp'),
-          // clip: world('leg3.mp4'), // TODO: enable once the leg renders
+          clip: world('leg3.mp4'),
           accent: '#6E9A68',
           linger: 0.3,
           eyebrow: 'STR. 002 — GreenChain',
@@ -63,7 +63,7 @@ export default function ScrollWorld() {
           id: 'prophis',
           label: 'Prophis',
           still: world('still4.webp'),
-          // clip: world('leg4.mp4'), // TODO: enable once the leg renders
+          clip: world('leg4.mp4'),
           accent: '#C56A5B',
           linger: 0.3,
           eyebrow: 'STR. 003 — Prophis',
@@ -76,7 +76,7 @@ export default function ScrollWorld() {
           id: 'legal',
           label: 'Legal LLM',
           still: world('still5.webp'),
-          // clip: world('leg5.mp4'), // TODO: enable once the leg renders
+          clip: world('leg5.mp4'),
           accent: '#7C6CA8',
           linger: 0.3,
           eyebrow: 'STR. 004 — Legal LLM Benchmarking',
@@ -89,7 +89,7 @@ export default function ScrollWorld() {
           id: 'contact',
           label: 'Contact',
           still: world('still6.webp'),
-          // clip: world('leg6.mp4'), // TODO: enable once the leg renders
+          clip: world('leg6.mp4'),
           accent: '#5E93A6',
           scroll: 1.7,
           linger: 0.45,
