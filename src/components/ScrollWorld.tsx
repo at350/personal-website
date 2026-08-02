@@ -24,7 +24,7 @@ export default function ScrollWorld() {
           id: 'studio',
           label: 'Studio',
           still: world('still1.webp'),
-          // clip: world('leg1.mp4'), // TODO: enable once the leg renders
+          clip: world('leg1.mp4'),
           accent: '#7A5C3E',
           scroll: 1.5,
           linger: 0.35,
