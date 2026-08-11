@@ -1,0 +1,152 @@
+/* THE PROFILE — pages 06–07. About part 2, the Gentlewoman treatment.
+   Verso: grotesk headline bled off the fore-edge, jibang ledger, contact sheet.
+   Recto: full-bleed hutong photo. Zero vermilion on this spread by design. */
+
+.profile {
+  position: absolute;
+  inset: 0;
+  background: var(--washi);
+  overflow: hidden;
+}
+
+/* ————— Verso (p.06) ————— */
+
+.profile[data-face="verso"] {
+  display: flex;
+  flex-direction: column;
+  padding: 7.5cqh 7cqw 7cqh;
+}
+
+/* Runs to the fore-edge and is trimmed at the page cut — yugen, the cut
+   invites the turn. (The bleed is this spread's one grid break.) */
+.profile__headline {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: clamp(21px, 6.4cqw, 46px);
+  line-height: 1.02;
+  letter-spacing: -0.012em;
+  color: var(--sumi);
+  margin-left: calc(-7cqw - 1.1cqw);
+}
+
+.profile__headline-line {
+  display: block;
+}
+
+/* Q&A as ledger: numbered entries stepped right; emptiness holds the left. */
+.profile__ledger {
+  margin-top: 3.2cqh;
+  margin-left: 18cqw;
+  font-feature-settings: "lnum" 1;
+}
+
+.profile__entry {
+  display: grid;
+  grid-template-columns: 5cqw 1fr;
+  column-gap: 2cqw;
+  align-items: baseline;
+  padding: 1.3cqh 0 1.5cqh;
+  border-top: 1px solid var(--hairline);
+}
+
+.profile__entry:last-child {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.profile__entry-num {
+  font-family: var(--font-mono);
+  font-size: max(9px, 1.7cqw);
+  letter-spacing: 0.08em;
+  color: var(--gray-warm);
+}
+
+.profile__entry-label {
+  font-size: max(9px, 1.7cqw);
+  color: var(--sumi);
+}
+
+.profile__entry-text {
+  grid-column: 2;
+  margin-top: 0.7cqh;
+  font-family: var(--font-body);
+  font-size: clamp(11.5px, 2.2cqw, 15px);
+  line-height: 1.5;
+  color: var(--sumi-2);
+}
+
+/* Contact-sheet strip: three prints laid on the desk, not quite square. */
+.profile__sheet {
+  margin-top: auto;
+  padding-top: 2.6cqh;
+  display: flex;
+  align-items: flex-start;
+  gap: 2.6cqw;
+}
+
+.profile__frame {
+  width: 17cqw;
+  margin: 0;
+}
+
+.profile__frame:nth-child(odd) {
+  transform: rotate(-0.5deg);
+}
+
+.profile__frame:nth-child(even) {
+  transform: rotate(0.5deg);
+}
+
+.profile__frame img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border: 1px solid var(--hairline);
+  background: var(--washi-deep);
+}
+
+.profile__frame figcaption {
+  margin-top: 0.9cqh;
+  font-family: var(--font-mono);
+  font-size: max(9px, 1.6cqw);
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+  color: var(--gray-warm);
+}
+
+/* ————— Recto (p.07): the photo is the statement ————— */
+
+.profile__bleed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile__plate {
+  position: absolute;
+  left: 6cqw;
+  bottom: 6cqh;
+  max-width: 46cqw;
+  padding: 1.2cqw 1.8cqw;
+  background: var(--washi-hi);
+  color: var(--sumi-2);
+  font-size: max(9px, 1.7cqw);
+  line-height: 1.6;
+}
+
+/* 散歩 — a stroll, standing quietly in the lantern light. */
+.profile__tategaki {
+  position: absolute;
+  top: 9cqh;
+  right: 3.2cqw;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-family: var(--font-jp);
+  font-weight: 500;
+  font-size: clamp(14px, 3cqw, 22px);
+  letter-spacing: 0.55em;
+  color: var(--washi-hi);
+  mix-blend-mode: soft-light;
+}

@@ -1,0 +1,170 @@
+/* Contents spread — verso: the TOC as a designed object; recto: the masthead. */
+
+.contents {
+  position: absolute;
+  inset: 0;
+  background: var(--washi);
+  display: flex;
+  flex-direction: column;
+  padding: 9cqh 8cqw 11cqh;
+}
+
+.contents__eyebrow {
+  color: var(--sumi-2);
+  font-size: clamp(8px, 1.9cqw, 12px);
+}
+
+/* ————— Verso: table of contents ————— */
+
+.contents__features {
+  margin-top: 4.5cqh;
+}
+
+.contents__feature {
+  display: grid;
+  grid-template-columns: 13cqw 1fr;
+  column-gap: 3.5cqw;
+  align-items: baseline;
+  width: 100%;
+  padding: 2.1cqh 0;
+  text-align: left;
+}
+
+/* The oversized folio number: this page's one vermilion moment lives here. */
+.contents__feature-page {
+  justify-self: end;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(26px, 7cqw, 50px);
+  line-height: 1;
+  color: var(--sumi);
+  font-feature-settings: "lnum" 1;
+  transition: color var(--dur-swap) var(--ease-settle);
+}
+
+.contents__feature-title {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: clamp(12px, 3.2cqw, 20px);
+  line-height: 1.25;
+  color: var(--sumi);
+}
+
+.contents__feature-dek {
+  display: block;
+  margin-top: 0.6cqh;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(10px, 2.2cqw, 14px);
+  line-height: 1.45;
+  max-width: 38ch;
+  color: var(--gray-warm);
+}
+
+.contents__feature:hover .contents__feature-page,
+.contents__feature:focus-visible .contents__feature-page {
+  color: var(--shu);
+}
+
+/* Departments: the tight secondary column below a hairline. */
+.contents__departments {
+  margin-top: auto;
+  border-top: 1px solid var(--hairline);
+  padding-top: 2.4cqh;
+}
+
+.contents__dept-head {
+  color: var(--gray-warm);
+  font-size: clamp(7px, 1.6cqw, 10px);
+}
+
+.contents__dept-list {
+  margin-top: 1.8cqh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.4cqh 5cqw;
+}
+
+.contents__dept {
+  display: flex;
+  align-items: baseline;
+  gap: 2cqw;
+  text-align: left;
+}
+
+.contents__dept-page {
+  font-family: var(--font-mono);
+  font-size: max(9px, 1.7cqw);
+  color: var(--gray-warm);
+  font-feature-settings: "lnum" 1;
+}
+
+.contents__dept-title {
+  font-family: var(--font-ui);
+  font-size: clamp(10px, 2cqw, 13px);
+  color: var(--sumi);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur-swap) var(--ease-settle);
+}
+
+.contents__dept:hover .contents__dept-title,
+.contents__dept:focus-visible .contents__dept-title {
+  border-bottom-color: var(--sumi);
+}
+
+/* ————— Recto: the masthead ledger ————— */
+
+.contents__masthead {
+  margin-top: 4.5cqh;
+  border-top: 1px solid var(--hairline);
+}
+
+.contents__masthead-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 3cqw;
+  padding: 1.5cqh 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.contents__masthead-role {
+  font-family: var(--font-mono);
+  font-size: max(9px, 1.7cqw);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gray-warm);
+  font-feature-settings: "lnum" 1;
+}
+
+.contents__masthead-name {
+  font-family: var(--font-mono);
+  font-size: max(9px, 1.7cqw);
+  color: var(--sumi);
+}
+
+.contents__imprint {
+  margin-top: 2.6cqh;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(11px, 2.2cqw, 15px);
+  color: var(--sumi-2);
+}
+
+/* The issue dek, offset right — the spread's one deliberate grid-break. */
+.contents__intro {
+  margin-top: auto;
+  margin-left: auto;
+  max-width: 34ch;
+  font-family: var(--font-body);
+  font-size: clamp(12px, 2.6cqw, 17px);
+  line-height: 1.6;
+  color: var(--sumi);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contents__feature-page,
+  .contents__dept-title {
+    transition: none;
+  }
+}

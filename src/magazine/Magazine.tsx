@@ -61,7 +61,7 @@ export function Magazine({ targetSpread, onSpreadSettled }: MagazineProps) {
     } else {
       dispatch({ type: "TURN", to: targetSpread });
     }
-  }, [busy, dispatch, state.current, targetSpread]);
+  }, [busy, dispatch, state, targetSpread]);
 
   // Apply a navigation that arrived mid-turn.
   useEffect(() => {
@@ -69,13 +69,13 @@ export function Magazine({ targetSpread, onSpreadSettled }: MagazineProps) {
     const to = pendingTarget.current;
     pendingTarget.current = null;
     if (to !== state.current) dispatch({ type: "TURN", to });
-  }, [busy, dispatch, state.current]);
+  }, [busy, dispatch, state]);
 
   // Report settles upward (router sync).
   const settled = !busy;
   useEffect(() => {
     if (settled) onSpreadSettled?.(state.current);
-  }, [onSpreadSettled, settled, state.current]);
+  }, [onSpreadSettled, settled, state]);
 
   // Keyboard chrome.
   useEffect(() => {
@@ -93,7 +93,7 @@ export function Magazine({ targetSpread, onSpreadSettled }: MagazineProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dispatch, state.current]);
+  }, [dispatch, state]);
 
   // Horizontal wheel flick.
   useEffect(() => {
@@ -109,7 +109,7 @@ export function Magazine({ targetSpread, onSpreadSettled }: MagazineProps) {
     };
     stage.addEventListener("wheel", onWheel, { passive: true });
     return () => stage.removeEventListener("wheel", onWheel);
-  }, [dispatch, state.current]);
+  }, [dispatch, state]);
 
   const flight = state.sheet;
   const leftSpread = flight !== null ? flight : state.current;

@@ -61,15 +61,16 @@ export function useFlipDrag(
         pointer.current.lastT = now;
         const delta = (startX - ev.clientX) / (width * 0.85);
         const p = edge === "fore" ? delta : 1 + delta;
-        const clamped = Math.min(1, Math.max(0, p));
-        applyProgress(clamped);
-        dispatch({ type: "DRAG_MOVE", progress: clamped });
+        // Visuals go through the imperative CSS-var channel only; React state
+        // hears about progress once, on release.
+        applyProgress(Math.min(1, Math.max(0, p)));
       };
       const up = (ev: PointerEvent) => {
         if (pointer.current?.id !== ev.pointerId) return;
         window.removeEventListener("pointermove", move);
         window.removeEventListener("pointerup", up);
         window.removeEventListener("pointercancel", up);
+        dispatch({ type: "DRAG_MOVE", progress: progressRef.current });
         dispatch({ type: "DRAG_END", velocity: pointer.current.velocity });
         pointer.current = null;
       };
@@ -116,7 +117,7 @@ export function useFlipDrag(
       tween.current?.kill();
       tween.current = null;
     };
-  }, [applyProgress, dispatch, reducedMotion, state.dragging, state.direction, state.queue.length, state.settleTarget, state.sheet]);
+  }, [applyProgress, dispatch, reducedMotion, state]);
 
   return { onPointerDown, progressRef };
 }
