@@ -27,7 +27,7 @@ const FEATURES: readonly Feature[] = [
     route: "/profile",
     title: "the profile",
     dek: "in photographs",
-    image: "/images/about/alan-great-wall.webp",
+    image: null,
   },
   {
     no: "08",
@@ -100,7 +100,7 @@ function FeaturesPage() {
             {feature.image ? (
               <img src={feature.image} alt="" loading="lazy" decoding="async" />
             ) : (
-              <span className="contents2__mark">✳</span>
+              <span className="contents2__mark" />
             )}
           </div>
         ))}

@@ -115,6 +115,7 @@ export function CaptureFarm() {
     <div
       aria-hidden
       inert
+      data-capture-farm=""
       style={{
         position: "fixed",
         left: -20000,

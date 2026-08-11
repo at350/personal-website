@@ -36,19 +36,19 @@ export const about = {
   notes: [
     {
       label: "Before code",
-      text: "I was a journalist first. Reporting still shapes how I interview users, inspect evidence, and decide what belongs in a story.",
+      text: "i was a journalist first. it still shows in how i interview users and decide what belongs in a story.",
     },
     {
       label: "Tiny infrastructure",
-      text: "I design geocaches. My favorite camouflage is the fake electric box, which is an absurd amount of civic theater for a tiny container.",
+      text: "i design geocaches. my best camouflage is a fake electric box, which is a lot of civic theater for a tiny container.",
     },
     {
       label: "Unnecessary pilgrimage",
-      text: "I have visited both the world's largest operational fire hydrant and its non-operational counterpart.",
+      text: "i have seen both the world's largest operational fire hydrant and the largest non-operational one. yes, both.",
     },
     {
       label: "Languages",
-      text: "English is my first language, and I speak conversational Mandarin.",
+      text: "english first, conversational mandarin second.",
     },
   ],
   photos: [
@@ -188,7 +188,7 @@ export const resume = {
       marginalia: {
         label: "A note from the build",
         ariaLabel: "Read a personal note about Ember Studios",
-        text: "The work is private, but the question is public: what makes a machine conversation worth keeping?",
+        text: "the work is nda'd. the question — what makes a machine conversation worth keeping — is not.",
       },
     },
     {
@@ -205,7 +205,7 @@ export const resume = {
       marginalia: {
         label: "From the call sheet",
         ariaLabel: "Read a personal note about WingRep",
-        text: "I learned the systems, then made the calls myself.",
+        text: "built the outbound systems, then made the calls myself.",
       },
     },
     {
@@ -222,7 +222,7 @@ export const resume = {
       marginalia: {
         label: "Margin status",
         ariaLabel: "Read a personal note about Meritus Labs",
-        text: "Still early. The discovery work comes before the deck.",
+        text: "still early. doing the discovery before making a deck.",
       },
     },
     {
@@ -239,7 +239,7 @@ export const resume = {
       marginalia: {
         label: "At slide scale",
         ariaLabel: "Read a personal note about the FORGE Research Cohort",
-        text: "Whole-slide images are enormous. The hard part is deciding what evidence deserves attention.",
+        text: "whole-slide images are absurdly large. the hard part is knowing where to look.",
       },
     },
     {
@@ -256,7 +256,7 @@ export const resume = {
       marginalia: {
         label: "The good scoreboard",
         ariaLabel: "Read a personal note about iTalented",
-        text: "The most satisfying wins belonged to students I coached.",
+        text: "the best wins on my record are ones my students got.",
       },
     },
     {
@@ -273,7 +273,7 @@ export const resume = {
       marginalia: {
         label: "Deck rule",
         ariaLabel: "Read a personal note about TAMID Group",
-        text: "A good strategy deck should make the next decision easier.",
+        text: "a deck is good if it makes the next decision easier.",
       },
     },
     {
@@ -290,7 +290,7 @@ export const resume = {
       marginalia: {
         label: "Behind the byline",
         ariaLabel: "Read a personal note about Teach for Chicago Journalism",
-        text: "Journalism education is also an operations problem.",
+        text: "turns out journalism education is mostly an ops problem.",
       },
     },
     {
@@ -307,7 +307,7 @@ export const resume = {
       marginalia: {
         label: "Evaluation footnote",
         ariaLabel: "Read a personal note about the Thomson Reuters CS+Law Innovation Lab",
-        text: "The best evaluation pipeline still needs a clean place to say, 'a person should look at this.'",
+        text: "every eval pipeline needs a button that says 'a human should look at this.'",
       },
     },
     {
@@ -324,7 +324,7 @@ export const resume = {
       marginalia: {
         label: "What survived",
         ariaLabel: "Read a personal note about the Vox Vera client project",
-        text: "The useful part was not the largest chart. It was the segment that changed what the client should do next.",
+        text: "the chart that mattered wasn't the biggest one. it was the one that changed the plan.",
       },
     },
     {
@@ -341,7 +341,7 @@ export const resume = {
       marginalia: {
         label: "Production-night inventory",
         ariaLabel: "Read a personal note about El Estoque Newsmagazine",
-        text: "Production nights meant crashing InDesign, missing photo credits, and half-eaten bags of chips.",
+        text: "production nights were indesign crashes, missing photo credits, and half-eaten bags of chips.",
       },
     },
     {
@@ -358,7 +358,7 @@ export const resume = {
       marginalia: {
         label: "Crossfire lesson",
         ariaLabel: "Read a personal note about Monta Vista Debate",
-        text: "Seven years of learning that every claim deserves an opponent.",
+        text: "seven years of having every claim i made argued against. useful.",
       },
     },
     {
@@ -375,7 +375,7 @@ export const resume = {
       marginalia: {
         label: "First paper",
         ariaLabel: "Read a personal note about the University of California Merced research",
-        text: "My first published research began with drone images of winter crops.",
+        text: "my first paper started with drone photos of winter crops.",
       },
     },
     {
@@ -392,7 +392,7 @@ export const resume = {
       marginalia: {
         label: "A different clock",
         ariaLabel: "Read a personal note about the University of California Santa Barbara research",
-        text: "Spiking networks were my introduction to models that behave less like ordinary software.",
+        text: "spiking neural nets: my first models that didn't behave like normal software.",
       },
     },
   ],

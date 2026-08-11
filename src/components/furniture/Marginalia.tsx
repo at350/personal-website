@@ -4,6 +4,8 @@ import "@/styles/furniture.css";
 interface MarginaliaProps {
   label: string;
   ariaLabel: string;
+  /** Footnote numeral shown as the mark, e.g. 3 renders "03". */
+  index: number;
   children: React.ReactNode;
 }
 
@@ -11,7 +13,7 @@ interface MarginaliaProps {
  * A vermilion ✳ in the margin. Opens on hover (with an appear delay),
  * and stickily on click or keyboard focus. Esc dismisses.
  */
-export function Marginalia({ label, ariaLabel, children }: MarginaliaProps) {
+export function Marginalia({ label, ariaLabel, index, children }: MarginaliaProps) {
   const [pinned, setPinned] = useState(false);
   const id = useId();
   const rootRef = useRef<HTMLSpanElement>(null);
@@ -42,7 +44,7 @@ export function Marginalia({ label, ariaLabel, children }: MarginaliaProps) {
         aria-label={ariaLabel}
         onClick={() => setPinned((v) => !v)}
       >
-        ✳
+        {String(index).padStart(2, "0")}
       </button>
       <span className="marginalia__note" role="note" id={id}>
         <span className="marginalia__label mono-label">{label}</span>

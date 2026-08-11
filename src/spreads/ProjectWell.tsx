@@ -41,9 +41,7 @@ export function ProjectWell({ face, mode }: SpreadFaceProps) {
 
       {project.recognition && (
         <p className="proj-feature__recognition">
-          <span className="proj-star" aria-hidden>
-            ✳
-          </span>{" "}
+          <span className="proj-star" aria-hidden></span>{" "}
           {project.recognition}
         </p>
       )}

@@ -22,6 +22,9 @@ export function Cover({ face, mode }: SpreadFaceProps) {
 
   useEffect(() => {
     if (!motionOK() || !rootRef.current) return;
+    // Never animate inside the texture farm: a capture taken mid-entrance
+    // rasterizes a cover with no name on it.
+    if (rootRef.current.closest("[data-capture-farm]")) return;
     const lines = rootRef.current.querySelectorAll(".cover2__word");
     const split = new SplitText(lines, { type: "chars" });
     const tween = gsap.from(split.chars, {

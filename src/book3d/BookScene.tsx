@@ -41,7 +41,7 @@ export interface BookMotion {
 }
 
 const TOTAL_LEAVES = SPREADS.length - 1;
-const LEAF_THICKNESS = 1.15;
+const LEAF_THICKNESS = 2.3;
 /** Softer spring for choreographed turns; snappier when a drag is released. */
 const SPRING_K_AUTO = 52;
 const SPRING_K_RELEASE = 110;
@@ -66,10 +66,14 @@ function edgeTexture(): THREE.CanvasTexture {
    the moment it tilts from the key light, so the print carries part of its
    own brightness (emissive through the same texture). Turns still model
    light — the directional term and cast shadows ride on top. */
-const EMISSIVE_LIFT = 0.62;
+const EMISSIVE_LIFT = 0.72;
 
-function usePageMaterial(key: string | null, mirror = false) {
+function usePageMaterial(key: string | null, mirror = false, unlit = false) {
   const mat = useMemo(() => {
+    if (unlit) {
+      // Static pages are exactly the DOM's pixels: no lighting math at all.
+      return new THREE.MeshBasicMaterial({ color: 0xffffff }) as unknown as THREE.MeshStandardMaterial;
+    }
     const m = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: 0.94,
@@ -77,7 +81,7 @@ function usePageMaterial(key: string | null, mirror = false) {
     });
     m.emissive = new THREE.Color(1, 1, 1).multiplyScalar(EMISSIVE_LIFT);
     return m;
-  }, []);
+  }, [unlit]);
   const applied = useRef<string | null>(null);
   useEffect(() => {
     const apply = () => {
@@ -90,12 +94,12 @@ function usePageMaterial(key: string | null, mirror = false) {
           t.offset.x = 1;
         }
         mat.map = t;
-        mat.emissiveMap = t;
+        if ("emissiveMap" in mat) mat.emissiveMap = t;
         mat.needsUpdate = true;
         applied.current = key;
       } else if (!texture && applied.current !== null) {
         mat.map = null;
-        mat.emissiveMap = null;
+        if ("emissiveMap" in mat) mat.emissiveMap = null;
         mat.needsUpdate = true;
         applied.current = null;
       }
@@ -120,15 +124,11 @@ function Stack({
   ph: number;
 }) {
   const mesh = useRef<THREE.Mesh>(null);
-  const topMat = usePageMaterial(topKey);
+  const topMat = usePageMaterial(topKey, false, true);
   const edges = useMemo(edgeTexture, []);
   const materials = useMemo(() => {
-    const lift = new THREE.Color(1, 1, 1).multiplyScalar(EMISSIVE_LIFT);
-    const paper = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 });
-    paper.emissive = lift;
-    const edge = new THREE.MeshStandardMaterial({ map: edges, roughness: 0.95 });
-    edge.emissive = lift;
-    edge.emissiveMap = edges;
+    const paper = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const edge = new THREE.MeshBasicMaterial({ map: edges });
     // box faces: +x, -x, +y, -y, +z (camera), -z
     return [edge, edge, edge, edge, topMat, paper];
   }, [edges, topMat]);
@@ -146,7 +146,7 @@ function Stack({
   });
 
   return (
-    <mesh ref={mesh} castShadow receiveShadow geometry={geo} material={materials} />
+    <mesh ref={mesh} castShadow geometry={geo} material={materials} />
   );
 }
 
@@ -299,11 +299,11 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
     <>
       <Rig ph={ph} />
       <HiddenTicker />
-      <ambientLight intensity={0.28} />
+      <ambientLight intensity={0.2} />
       <directionalLight
         ref={light}
         position={[-pw * 0.7, ph * 0.9, ph * 1.35]}
-        intensity={0.2}
+        intensity={0.16}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-radius={9}

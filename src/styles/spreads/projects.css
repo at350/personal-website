@@ -4,6 +4,7 @@
 /* ————— p.8 · the count ————— */
 
 .proj-count {
+  background: var(--ink);
   position: absolute;
   inset: 0;
   background: var(--paper);
@@ -20,7 +21,7 @@
   font-size: 38cqw;
   line-height: 0.8;
   letter-spacing: 0.002em;
-  color: var(--ink);
+  color: var(--paper);
 }
 
 /* Tucked into the counterform under the V. The rule is the page's one red. */
@@ -29,9 +30,9 @@
   margin-top: -2cqh;
   margin-left: 30cqw;
   font-family: var(--font-mono);
-  font-size: max(10px, 1.8cqw);
+  font-size: max(11px, 1.8cqw);
   letter-spacing: 0.14em;
-  color: var(--ink-2);
+  color: var(--paper); opacity: 0.6;
   padding-bottom: 0.9cqh;
   border-bottom: 2px solid var(--red);
 }
@@ -93,7 +94,7 @@
 
 .proj-index__meta {
   color: var(--ink-3);
-  font-size: max(10px, 1.5cqw);
+  font-size: max(11px, 1.5cqw);
   text-align: right;
 }
 
@@ -152,7 +153,7 @@
   border: 1px solid var(--hairline);
   padding: 0.28em 0.65em;
   color: var(--ink-2);
-  font-size: max(10px, 1.4cqw);
+  font-size: max(11px, 1.4cqw);
 }
 
 .proj-index__recognition {
@@ -172,7 +173,7 @@
 
 .proj-index__link {
   color: var(--ink);
-  font-size: max(10px, 1.5cqw);
+  font-size: max(11px, 1.5cqw);
   text-decoration: none;
   border-bottom: 1px solid var(--ink);
   padding-bottom: 2px;
@@ -263,7 +264,7 @@
 .proj-feature__meta {
   margin-top: 0.8cqh;
   color: var(--ink-3);
-  font-size: max(10px, 1.5cqw);
+  font-size: max(11px, 1.5cqw);
 }
 
 .proj-feature__summary {
@@ -278,7 +279,7 @@
 .proj-feature__stack {
   margin-top: 1.8cqh;
   color: var(--ink-2);
-  font-size: max(10px, 1.5cqw);
+  font-size: max(11px, 1.5cqw);
 }
 
 .proj-feature__recognition {
@@ -295,7 +296,7 @@
   margin-top: 1.8cqh;
   width: max-content;
   color: var(--ink);
-  font-size: max(10px, 1.5cqw);
+  font-size: max(11px, 1.5cqw);
   text-decoration: none;
   border-bottom: 1px solid var(--ink);
   padding-bottom: 2px;
@@ -328,12 +329,12 @@
   align-items: baseline;
   gap: 2cqw;
   color: var(--ink-2);
-  font-size: max(10px, 1.5cqw);
+  font-size: max(11px, 1.5cqw);
 }
 
 .proj-rest__no {
   font-family: var(--font-condensed);
-  font-size: max(10px, 2.2cqw);
+  font-size: max(11px, 2.2cqw);
   line-height: 1;
   color: var(--ink-3);
   font-feature-settings: "lnum" 1;

@@ -19,8 +19,8 @@
 }
 
 .profile__statement {
-  font-family: var(--font-ui);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 800;
   font-size: clamp(19px, 6.5cqw, 54px);
   line-height: 1.03;
   letter-spacing: -0.015em;
@@ -57,7 +57,7 @@
 
 .profile__num {
   font-family: var(--font-mono);
-  font-size: max(10px, 1.7cqw);
+  font-size: max(11px, 1.7cqw);
   letter-spacing: 0.08em;
   color: var(--red);
 }
@@ -155,9 +155,71 @@
   padding: max(6px, 1.1cqw) max(10px, 1.8cqw);
   background: var(--paper);
   color: var(--ink);
-  font-size: max(10px, 1.6cqw);
+  font-size: max(11px, 1.6cqw);
 }
 
 .profile__plate-no {
   color: var(--red);
+}
+
+/* ————— The off-hours poster (recto v3): white woodtype on ink ————— */
+
+.profile[data-face="recto"] {
+  background: var(--ink);
+  display: flex;
+  flex-direction: column;
+  padding: 8cqh 8cqw;
+}
+
+.profile__poster-eyebrow {
+  color: var(--paper);
+  opacity: 0.55;
+  font-size: max(11px, 1.7cqw);
+}
+
+.profile__poster {
+  margin-top: auto;
+  margin-bottom: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4cqh;
+}
+
+.profile__poster-row {
+  display: flex;
+  align-items: baseline;
+  gap: 3cqw;
+}
+
+.profile__poster-no {
+  font-family: var(--font-mono);
+  font-size: max(11px, 1.8cqw);
+  color: var(--red);
+  font-feature-settings: "lnum" 1;
+}
+
+.profile__poster-word {
+  font-family: var(--font-condensed);
+  font-size: clamp(26px, 8.6cqw, 76px);
+  line-height: 0.98;
+  color: var(--paper);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* Second row steps right — the page's grid break. */
+.profile__poster-row:nth-child(2) {
+  margin-left: 9cqw;
+}
+
+.profile__poster-row:nth-child(4) {
+  margin-left: 4.5cqw;
+}
+
+.profile__plate--poster {
+  position: static;
+  background: transparent;
+  color: var(--paper);
+  opacity: 0.55;
+  padding: 0;
 }

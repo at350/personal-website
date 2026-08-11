@@ -11,8 +11,10 @@ export interface LeafColumn {
 export const LEAF_SEGMENTS = 28;
 
 /** Peak outward bow, radians. Real paper bows more when driven faster. */
-export const BOW_BASE = 0.16;
-export const BOW_VELOCITY_GAIN = 0.35;
+export const BOW_BASE = 0.3;
+export const BOW_VELOCITY_GAIN = 0.5;
+/** Extra curvature concentrated toward the free edge — the visible curl. */
+export const CURL_BASE = 0.34;
 
 /**
  * Column positions for a leaf at turn progress p (0 = lying right, 1 = lying
@@ -27,19 +29,19 @@ export function leafColumns(
   const p = Math.min(1, Math.max(0, progress));
   const theta = p * Math.PI;
   // Bow peaks mid-turn and vanishes when the page rests flat on either side.
-  const bow =
-    Math.sin(theta) *
-    (BOW_BASE + Math.min(Math.abs(velocity) * BOW_VELOCITY_GAIN, 0.22));
+  const drive = Math.min(Math.abs(velocity) * BOW_VELOCITY_GAIN, 0.3);
+  const bow = Math.sin(theta) * (BOW_BASE + drive);
+  const curl = Math.sin(theta) * CURL_BASE;
   const L = pageWidth / segments;
   const out: LeafColumn[] = [{ x: 0, z: 0 }];
   let x = 0;
   let z = 0;
   for (let k = 0; k < segments; k += 1) {
     const u = (k + 0.5) / segments;
-    // Segment direction: base rotation plus the bow, which is strongest in
-    // the middle of the sheet (a sine arch), pulling the sheet convex toward
-    // the side it is leaving.
-    const angle = theta + bow * Math.sin(Math.PI * u);
+    // Base rotation, plus a mid-sheet bow (paper carries an arch), plus a
+    // curl that concentrates toward the free edge — the tip visibly rolls
+    // ahead of the body instead of the sheet swinging like a rigid door.
+    const angle = theta + bow * Math.sin(Math.PI * u) + curl * u * u;
     x += L * Math.cos(-angle);
     z += L * Math.sin(-angle) * -1; // lift toward +z
     out.push({ x, z });

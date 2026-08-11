@@ -53,9 +53,8 @@ function SpreadWord({ face, mode }: SpreadFaceProps) {
       {face === "verso" ? (
         <p className="resume2__legend">
           <span className="resume2__legend-mark" aria-hidden>
-            ✳
           </span>{" "}
-          margin notes
+          notes 01–13 live in the margins
         </p>
       ) : null}
       {face === "verso" ? (
@@ -105,6 +104,7 @@ function LedgerGroup({
               <Marginalia
                 label={entry.marginalia.label}
                 ariaLabel={entry.marginalia.ariaLabel}
+                index={resume.entries.findIndex((e) => e.id === entry.id) + 1}
               >
                 {entry.marginalia.text}
               </Marginalia>

@@ -3,7 +3,7 @@
   position: absolute;
   bottom: calc(var(--page-pad) * 0.45);
   color: var(--ink-3);
-  font-size: 10.5px;
+  font-size: 11px;
   z-index: 4;
 }
 
@@ -23,7 +23,7 @@
   position: absolute;
   top: calc(var(--page-pad) * 0.45);
   color: var(--ink-3);
-  font-size: 10px;
+  font-size: 11px;
   z-index: 4;
 }
 
@@ -61,7 +61,7 @@
 }
 
 .barcode__caption {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--ink-2);
   text-align: center;
@@ -149,16 +149,21 @@
 }
 
 .marginalia__mark {
+  font-family: var(--font-mono);
+  font-size: max(11px, 0.72em);
+  font-feature-settings: "lnum" 1;
+  letter-spacing: 0.06em;
   color: var(--red);
-  font-size: 0.95em;
   line-height: 1;
-  padding: 2px 4px;
-  transition: transform 300ms var(--ease-settle);
+  padding: 2px 3px;
+  vertical-align: super;
+  border-bottom: 1px solid transparent;
+  transition: border-color 200ms ease;
 }
 
 .marginalia:hover .marginalia__mark,
 .marginalia[data-open] .marginalia__mark {
-  transform: rotate(45deg) scale(1.15);
+  border-bottom-color: var(--red);
 }
 
 .marginalia__note {
@@ -195,7 +200,7 @@
 
 .marginalia__label {
   color: var(--red);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .marginalia__text {

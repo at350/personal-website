@@ -90,7 +90,7 @@
 .bstage__folio {
   color: var(--ink-3);
   letter-spacing: 0.22em;
-  font-size: 10.5px;
+  font-size: 11px;
   min-width: 64px;
   text-align: center;
   padding: 6px 4px;
@@ -145,7 +145,7 @@
 
 .bstage__toc-no {
   color: var(--red);
-  font-size: 10px;
+  font-size: 11px;
   min-width: 22px;
 }
 

@@ -97,9 +97,7 @@ function Index({ mode }: { mode: "book" | "reader" }) {
 
                   {project.recognition && (
                     <p className="proj-index__recognition">
-                      <span className="proj-star" aria-hidden>
-                        ✳
-                      </span>{" "}
+                      <span className="proj-star" aria-hidden></span>{" "}
                       {project.recognition}
                     </p>
                   )}

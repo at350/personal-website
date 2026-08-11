@@ -13,7 +13,7 @@
   display: flex;
   justify-content: space-between;
   color: var(--ink-2);
-  font-size: max(10px, 1.55cqw);
+  font-size: max(11px, 1.55cqw);
   letter-spacing: 0.22em;
 }
 
@@ -91,7 +91,7 @@
 
 .cover2__line-no {
   font-family: var(--font-mono);
-  font-size: max(10px, 1.8cqw);
+  font-size: max(11px, 1.8cqw);
   color: var(--red);
   font-feature-settings: "lnum" 1;
 }
@@ -120,7 +120,7 @@
 
 .cover2__place {
   color: var(--ink-3);
-  font-size: max(10px, 1.5cqw);
+  font-size: max(11px, 1.5cqw);
 }
 
 .cover2__barcode .barcode {
@@ -155,7 +155,7 @@
 
 .back2__issue {
   color: var(--ink-3);
-  font-size: max(10px, 1.6cqw);
+  font-size: max(11px, 1.6cqw);
 }
 
 .back2__barcode {

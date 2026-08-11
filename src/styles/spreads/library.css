@@ -25,7 +25,7 @@
 
 .library__eyebrow {
   color: var(--ink-2);
-  font-size: max(10px, 1.6cqw);
+  font-size: max(11px, 1.6cqw);
   letter-spacing: 0.2em;
 }
 
@@ -37,7 +37,7 @@
 
 .library__chip {
   color: var(--ink-3);
-  font-size: max(10px, 1.45cqw);
+  font-size: max(11px, 1.45cqw);
   letter-spacing: 0.14em;
   transition: color 200ms var(--ease-settle);
 }
@@ -144,7 +144,7 @@
   justify-content: space-between;
   gap: 1.5cqw;
   margin-bottom: 0.9cqh;
-  font-size: max(10px, 1.5cqw);
+  font-size: max(11px, 1.5cqw);
 }
 
 .media-plate__index {
@@ -229,7 +229,7 @@ a.media-plate:focus-visible .media-plate__title {
 /* Films: red stars. */
 .media-plate__rating {
   margin-top: 0.5cqh;
-  font-size: max(10px, 1.8cqw);
+  font-size: max(11px, 1.8cqw);
   letter-spacing: 0.18em;
   color: var(--red);
 }
@@ -237,14 +237,14 @@ a.media-plate:focus-visible .media-plate__title {
 .media-plate__source {
   margin-top: 0.6cqh;
   color: var(--ink-3);
-  font-size: max(10px, 1.45cqw);
+  font-size: max(11px, 1.45cqw);
   letter-spacing: 0.1em;
 }
 
 .media-plate__excerpt {
   margin-top: 0.8cqh;
   font-family: var(--font-body);
-  font-size: max(10px, 1.75cqw);
+  font-size: max(11px, 1.75cqw);
   line-height: 1.5;
   color: var(--ink-2);
   display: -webkit-box;
@@ -260,7 +260,7 @@ a.media-plate:focus-visible .media-plate__title {
 }
 
 .media-plate--photo .media-plate__title {
-  font-size: max(10px, 1.75cqw);
+  font-size: max(11px, 1.75cqw);
   color: var(--ink-2);
 }
 
@@ -382,7 +382,7 @@ a.media-plate:focus-visible .media-plate__title {
   width: max-content;
   max-width: calc(100% - 12px);
   padding: 4px 7px;
-  font-size: max(10px, 1.6cqw);
+  font-size: max(11px, 1.6cqw);
   line-height: 1.35;
 }
 

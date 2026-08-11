@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Magazine editorial reference archive</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #fff;
+        --ink: #0e0e0c;
+        --muted: #66645f;
+        --line: rgba(14, 14, 12, 0.16);
+        --red: #e8351a;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      html { background: var(--paper); color: var(--ink); }
+      body { margin: 0; }
+      a { color: inherit; text-underline-offset: 0.18em; }
+      img { display: block; width: 100%; height: auto; background: #f4f4f2; }
+
+      .shell {
+        width: min(1500px, calc(100% - 40px));
+        margin: 0 auto;
+      }
+
+      header {
+        min-height: 72vh;
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.5fr);
+        align-items: end;
+        gap: 60px;
+        padding: 38px 0 60px;
+        border-bottom: 1px solid var(--ink);
+      }
+
+      .eyebrow,
+      .meta,
+      .number,
+      .chip {
+        font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow { align-self: start; }
+      h1 {
+        max-width: 11ch;
+        margin: 22vh 0 0;
+        font: 700 clamp(64px, 10vw, 170px) / 0.82 Georgia, serif;
+        letter-spacing: -0.075em;
+      }
+
+      .intro {
+        max-width: 34ch;
+        margin: 0;
+        font: 25px/1.25 Georgia, serif;
+      }
+
+      .section {
+        padding: 80px 0 110px;
+        border-bottom: 1px solid var(--ink);
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: 150px minmax(0, 1fr) minmax(260px, 0.5fr);
+        gap: 28px;
+        align-items: start;
+        margin-bottom: 54px;
+      }
+
+      h2 {
+        margin: 0;
+        font: 700 clamp(40px, 5.5vw, 88px) / 0.92 Georgia, serif;
+        letter-spacing: -0.055em;
+      }
+
+      .section-note {
+        margin: 0;
+        color: var(--muted);
+        font: 17px/1.45 Georgia, serif;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 22px;
+      }
+
+      figure, .text-card {
+        margin: 0;
+        border-top: 1px solid var(--ink);
+        padding-top: 10px;
+      }
+
+      .span-4 { grid-column: span 4; }
+      .span-5 { grid-column: span 5; }
+      .span-6 { grid-column: span 6; }
+      .span-7 { grid-column: span 7; }
+      .span-8 { grid-column: span 8; }
+      .span-12 { grid-column: span 12; }
+
+      figcaption, .card-copy {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        gap: 14px;
+        padding-top: 13px;
+      }
+
+      h3 {
+        margin: 0 0 7px;
+        font-size: 18px;
+        line-height: 1.15;
+      }
+
+      .caption-copy p,
+      .card-copy p {
+        margin: 0;
+        color: var(--muted);
+        font: 15px/1.45 Georgia, serif;
+      }
+
+      .portrait-pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .text-card {
+        min-height: 420px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background: var(--ink);
+        color: var(--paper);
+        padding: 22px;
+      }
+
+      .text-card strong {
+        display: block;
+        max-width: 8ch;
+        font: 700 clamp(50px, 6vw, 94px) / 0.88 Georgia, serif;
+        letter-spacing: -0.06em;
+      }
+
+      .text-card .card-copy p { color: rgba(255,255,255,.7); }
+      .red { color: var(--red); }
+
+      .mapping {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 15px;
+      }
+
+      .mapping th,
+      .mapping td {
+        padding: 18px 12px;
+        border-top: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .mapping th {
+        width: 22%;
+        font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+      }
+
+      .rules {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        counter-reset: rule;
+      }
+
+      .rules li {
+        counter-increment: rule;
+        display: grid;
+        grid-template-columns: 80px minmax(0, 1fr);
+        gap: 20px;
+        padding: 22px 0;
+        border-top: 1px solid var(--line);
+        font: 28px/1.1 Georgia, serif;
+      }
+
+      .rules li::before {
+        content: counter(rule, decimal-leading-zero);
+        color: var(--red);
+        font: 13px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: .12em;
+      }
+
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 30px;
+        padding: 32px 0 70px;
+        color: var(--muted);
+      }
+
+      @media (max-width: 900px) {
+        header, .section-head { grid-template-columns: 1fr; }
+        header { min-height: auto; gap: 36px; }
+        h1 { margin-top: 22vh; }
+        .grid { grid-template-columns: 1fr; }
+        .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 { grid-column: auto; }
+        .mapping, .mapping tbody, .mapping tr, .mapping th, .mapping td { display: block; }
+        .mapping th { width: auto; padding-bottom: 4px; }
+        .mapping td { border-top: 0; padding-top: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <div>
+          <p class="eyebrow">Alan Tai · editorial research · reconstructed 2026.08.11</p>
+          <h1>One issue. Many speeds.</h1>
+        </div>
+        <p class="intro">A personal website should borrow the judgment of a magazine—not merely its furniture.</p>
+      </header>
+
+      <main>
+        <section class="section">
+          <div class="section-head">
+            <span class="meta red">01 · Cover</span>
+            <h2>Concept before decoration.</h2>
+            <p class="section-note">NYT Magazine, Coverjunkie, and Eye establish the cover rule: one governing idea survives at thumbnail size; the issue system supplies continuity.</p>
+          </div>
+          <div class="grid">
+            <figure class="span-8">
+              <img src="assets/screenshots/coverjunkie-typographic-covers-2026-08-11.jpg" alt="Coverjunkie typographic cover archive" />
+              <figcaption>
+                <span class="number">01</span>
+                <div class="caption-copy">
+                  <h3>Coverjunkie · typographic covers</h3>
+                  <p>Type can become the image, crop, collide, or carry the whole concept. The useful commonality is decisive hierarchy—not a shared style.</p>
+                </div>
+              </figcaption>
+            </figure>
+            <div class="text-card span-4">
+              <span class="meta red">Access gap</span>
+              <strong>NYT Magazine</strong>
+              <div class="card-copy">
+                <span class="number">02</span>
+                <p>The official section could not be captured. Design-press interviews and retrospectives preserve the core lesson: choose the visual method after the editorial proposition.</p>
+              </div>
+            </div>
+            <figure class="span-6">
+              <div class="portrait-pair">
+                <img src="assets/images/eye-issue-109-cover-official.jpg" alt="Eye Magazine issue 109 cover" />
+                <img src="assets/images/eye-issue-106-cover-official.jpg" alt="Eye Magazine issue 106 cover" />
+              </div>
+              <figcaption>
+                <span class="number">03</span>
+                <div class="caption-copy">
+                  <h3>Eye · system plus surprise</h3>
+                  <p>A stable logo and issue frame make room for radically different cover concepts.</p>
+                </div>
+              </figcaption>
+            </figure>
+            <figure class="span-6">
+              <img src="assets/screenshots/eye-magazine-issues-2026-08-11.jpg" alt="Eye Magazine issue archive" />
+              <figcaption>
+                <span class="number">04</span>
+                <div class="caption-copy">
+                  <h3>Issue identity as infrastructure</h3>
+                  <p>The archive makes continuity visible without forcing the same composition on every issue.</p>
+                </div>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <span class="meta red">02 · Pacing</span>
+            <h2>Air and density belong together.</h2>
+            <p class="section-note">The Gentlewoman and POPEYE prevent a false choice between minimalism and information. A publication needs both speeds.</p>
+          </div>
+          <div class="grid">
+            <figure class="span-7">
+              <img src="assets/images/the-gentlewoman-issue-33-rhian-spread-official.jpg" alt="The Gentlewoman issue 33 Rhian spread" />
+              <figcaption>
+                <span class="number">05</span>
+                <div class="caption-copy">
+                  <h3>The Gentlewoman · asymmetric authority</h3>
+                  <p>Image mass, white field, one display word, and quiet credits. Restraint works because the subject carries the page.</p>
+                </div>
+              </figcaption>
+            </figure>
+            <figure class="span-5">
+              <img src="assets/images/the-gentlewoman-issue-33-cover-official.jpg" alt="The Gentlewoman issue 33 cover presentation" />
+              <figcaption>
+                <span class="number">06</span>
+                <div class="caption-copy">
+                  <h3>Portrait first</h3>
+                  <p>The cover labels the subject and gets out of the way. Confidence replaces cover-line clutter.</p>
+                </div>
+              </figcaption>
+            </figure>
+            <figure class="span-5">
+              <img src="assets/images/popeye-issue-953-cover-official.jpg" alt="POPEYE issue 953 illustrated cover" />
+              <figcaption>
+                <span class="number">07</span>
+                <div class="caption-copy">
+                  <h3>POPEYE · authored abundance</h3>
+                  <p>Illustration, masthead, multiple languages, issue data, and a direct theme coexist because their order is unambiguous.</p>
+                </div>
+              </figcaption>
+            </figure>
+            <figure class="span-7">
+              <img src="assets/screenshots/popeye-magazine-house-2026-08-11.jpg" alt="POPEYE Magazine House issue page" />
+              <figcaption>
+                <span class="number">08</span>
+                <div class="caption-copy">
+                  <h3>Catalog density can still feel editorial</h3>
+                  <p>Numbers, prices, dates, ranks, and buttons do not dilute the publication when the grid and typography stay disciplined.</p>
+                </div>
+              </figcaption>
+            </figure>
+            <figure class="span-6">
+              <img src="assets/images/scholastic-news-trails-1965-official.png" alt="Scholastic News Trails 1965 cover" />
+              <figcaption>
+                <span class="number">09</span>
+                <div class="caption-copy">
+                  <h3>Scholastic · direct editorial address</h3>
+                  <p>Readers should recognize the topic, issue, and invitation immediately. Condensed display energy is useful when it serves that task.</p>
+                </div>
+              </figcaption>
+            </figure>
+            <figure class="span-6">
+              <img src="assets/images/scholastic-magazines-centennial-official.png" alt="A centennial selection of Scholastic magazines" />
+              <figcaption>
+                <span class="number">10</span>
+                <div class="caption-copy">
+                  <h3>A century, not one style</h3>
+                  <p>The transferable principle is pace and legibility—not faux-aged paper or schoolhouse nostalgia.</p>
+                </div>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <span class="meta red">03 · Object</span>
+            <h2>The book metaphor must be earned.</h2>
+            <p class="section-note">Stripe Press makes the object's material evidence readable. The current site needs the same agreement between pose, edge, thickness, shadow, and motion.</p>
+          </div>
+          <div class="grid">
+            <figure class="span-12">
+              <img src="assets/screenshots/stripe-press-catalog-2026-08-11.jpg" alt="Stripe Press catalog shown as a physical stack of books" />
+              <figcaption>
+                <span class="number">11</span>
+                <div class="caption-copy">
+                  <h3>Stripe Press · readable material</h3>
+                  <p>Spines, edges, scale, and weight establish a collection before interaction begins. The equivalent resting pose for this site must show more than a rotated cover plane.</p>
+                </div>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <span class="meta red">04 · Digital</span>
+            <h2>Translate the judgment, not the costume.</h2>
+            <p class="section-note">mymind and Jim Bang show two compatible digital lessons: type can act like cover art, and metadata can make a portfolio readable without explanatory prose.</p>
+          </div>
+          <div class="grid">
+            <figure class="span-7">
+              <img src="assets/screenshots/mymind-home-2026-08-11.jpg" alt="mymind homepage with oversized display headline" />
+              <figcaption>
+                <span class="number">12</span>
+                <div class="caption-copy">
+                  <h3>mymind · conceptual display scale</h3>
+                  <p>Borrow the confidence of the headline and the brevity of the promise. Do not borrow the gradient or product-UI styling.</p>
+                </div>
+              </figcaption>
+            </figure>
+            <figure class="span-5">
+              <img src="assets/screenshots/jibang-portfolio-2026-08-11.jpg" alt="Jim Bang personal archive with numbered ledger navigation" />
+              <figcaption>
+                <span class="number">13</span>
+                <div class="caption-copy">
+                  <h3>Jim Bang · the archive is the interface</h3>
+                  <p>Numbered rows, tiny dates, restrained labels, and almost no onboarding copy make the information architecture visible.</p>
+                </div>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <span class="meta red">05 · Translation</span>
+            <h2>Where each reference belongs.</h2>
+            <p class="section-note">A reference only helps when it has a defined job. These mappings prevent the moodboard from becoming an aesthetic soup.</p>
+          </div>
+          <table class="mapping">
+            <tbody>
+              <tr><th>Cover</th><td>NYT Magazine + Coverjunkie + Eye: one concept, stable issue identity, minimal subordinate lines.</td></tr>
+              <tr><th>Contents / library</th><td>POPEYE + Eye + Jim Bang: deliberate density, strong numbering, visible metadata, exact scan order.</td></tr>
+              <tr><th>Letter / profile</th><td>The Gentlewoman: real photography, asymmetry across the gutter, quiet captioning, earned white space.</td></tr>
+              <tr><th>Projects / resume</th><td>Scholastic + POPEYE + Jim Bang: direct section hierarchy, evidence-led rows, clear dates, minimal explanation.</td></tr>
+              <tr><th>Book pose</th><td>Stripe Press: readable spine, edge, thickness, coherent light, and a continuous move into the flat reading pose.</td></tr>
+              <tr><th>Motion / copy</th><td>mymind + Jim Bang: large conceptual statements, short support copy, one meaningful interaction per spread.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <span class="meta red">06 · Rules</span>
+            <h2>What the research actually requires.</h2>
+            <p class="section-note">These are the audit criteria. A visual flourish that contradicts them is not supported by the reference set.</p>
+          </div>
+          <ol class="rules">
+            <li>Every spread has a distinct editorial role.</li>
+            <li>The cover has one idea that survives at thumbnail size.</li>
+            <li>Folios and issue metadata form a consistent navigation system.</li>
+            <li>Density is allowed; clutter is not.</li>
+            <li>Empty space must give something authority.</li>
+            <li>The book looks physical before it moves.</li>
+            <li>Motion reveals cause, hierarchy, or state.</li>
+            <li>Source artwork never ships in the public site.</li>
+          </ol>
+        </section>
+      </main>
+
+      <footer>
+        <span class="meta">Internal visual research · not for redistribution</span>
+        <a class="meta" href="brand.md">Read the full synthesis →</a>
+      </footer>
+    </div>
+  </body>
+</html>

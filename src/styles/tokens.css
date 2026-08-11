@@ -9,7 +9,7 @@
   --ink-2: #55524c;
   --ink-3: #98948c;
   --hairline: rgba(14, 14, 12, 0.14);
-  --red: #e8351a;
+  --red: #d7261e;
 
   /* Legacy aliases (spread CSS migrates off these; keep mapped to v2) */
   --void: var(--paper);

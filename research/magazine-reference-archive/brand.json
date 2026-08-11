@@ -1,0 +1,368 @@
+{
+  "company": "Magazine Editorial Reference Archive",
+  "slug": "magazine-reference-archive",
+  "retrieved_at": "2026-08-11",
+  "summary": "A source-attributed reconstruction of the editorial references behind Alan Tai's personal-site direction. The archive separates publisher-owned evidence from project-specific inferences and is intended for internal visual research, not for republishing source artwork.",
+  "official_sources": [
+    {
+      "title": "The Gentlewoman — Magazine",
+      "url": "https://thegentlewoman.co.uk/magazine",
+      "retrieved_at": "2026-08-11",
+      "supports": ["restrained portrait covers", "asymmetric interior spreads", "editorial pacing", "white-space discipline"],
+      "rights_notes": "Publisher-owned photography and page designs. Saved locally for private design research only."
+    },
+    {
+      "title": "Eye Magazine — Issues",
+      "url": "https://eyemagazine.com/issues",
+      "retrieved_at": "2026-08-11",
+      "supports": ["recurring issue system", "concept-led covers", "editorial identity", "archive navigation"],
+      "rights_notes": "Eye Magazine artwork and photography remain the property of their respective owners. Research reference only."
+    },
+    {
+      "title": "POPEYE — Magazine House",
+      "url": "https://magazineworld.jp/popeye/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["dense catalog composition", "bilingual metadata", "utility typography", "approachable editorial voice"],
+      "rights_notes": "Magazine House cover artwork is publisher-owned. Research reference only."
+    },
+    {
+      "title": "Stripe Press — Ideas for progress",
+      "url": "https://press.stripe.com/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["physical-object presentation", "book spine and edge visibility", "collectible-series coherence", "tactile lighting"],
+      "rights_notes": "Stripe Press product photography and book designs are proprietary. Research reference only."
+    },
+    {
+      "title": "mymind",
+      "url": "https://mymind.com/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["conceptual display typography", "simple copy hierarchy", "image-like type", "controlled motion"],
+      "rights_notes": "mymind site imagery and interface are proprietary. Research reference only."
+    },
+    {
+      "title": "Scholastic Classroom Magazines Over the Decades",
+      "url": "https://www.scholastic.com/newsroom/all-news/scholastic-classroom-magazines-over-the-decades.html",
+      "retrieved_at": "2026-08-11",
+      "supports": ["newsmagazine directness", "headline hierarchy", "archival print furniture", "education-publication energy"],
+      "rights_notes": "Scholastic archival images are publisher-owned. Research reference only."
+    },
+    {
+      "title": "Jim Bang — Jim's archive",
+      "url": "https://www.jibang.me/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["numbered ledger navigation", "copy economy", "quiet metadata", "portfolio information architecture"],
+      "rights_notes": "Personal-site design and content belong to Jim Bang. Research reference only."
+    },
+    {
+      "title": "The New York Times Magazine",
+      "url": "https://www.nytimes.com/section/magazine",
+      "retrieved_at": "2026-08-11",
+      "supports": ["concept-first covers", "editorial art direction", "photography-typography-illustration range"],
+      "rights_notes": "No local screenshot was captured because browser access was blocked. Reference through cited design-industry coverage; all NYT artwork remains rights-controlled."
+    }
+  ],
+  "secondary_sources": [
+    {
+      "title": "Coverjunkie — the best magazine covers",
+      "url": "https://coverjunkie.com/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["broad cover taxonomy", "typographic covers", "impact covers", "cross-publication comparison"],
+      "rights_notes": "Coverjunkie is a curated secondary archive containing third-party cover art. Screenshots are research-only."
+    },
+    {
+      "title": "Coverjunkie — typographic covers",
+      "url": "https://coverjunkie.com/category/typographic-covers",
+      "retrieved_at": "2026-08-11",
+      "supports": ["type as the main cover image", "controlled masthead collision", "single-concept covers"],
+      "rights_notes": "Third-party cover art. Research-only; do not reuse in production."
+    },
+    {
+      "title": "The New York Times Magazine selection of covers — Creative Review",
+      "url": "https://www.creativereview.co.uk/the-new-york-times-magazine-selection-of-covers/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["NYT Magazine cover range", "concept-led editorial design"],
+      "rights_notes": "Secondary editorial coverage; images remain with credited creators and publishers."
+    },
+    {
+      "title": "The New York Times Magazine Design Director Gail Bichler — Eye on Design",
+      "url": "https://eyeondesign.aiga.org/the-new-york-times-magazine-design-director-gail-bichler/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["politically charged cover process", "commissioning and conceptual art direction"],
+      "rights_notes": "Secondary interview; linked, not downloaded."
+    },
+    {
+      "title": "Behind the scenes on 3 iconic New York Times Magazine covers — Creative Bloq",
+      "url": "https://www.creativebloq.com/design/magazines/behind-the-scenes-the-new-york-times-magazine",
+      "retrieved_at": "2026-08-11",
+      "supports": ["cover concept development", "editorial image commissioning"],
+      "rights_notes": "Secondary editorial coverage; linked, not downloaded."
+    }
+  ],
+  "identity": {
+    "names": [
+      "The New York Times Magazine",
+      "Coverjunkie",
+      "The Gentlewoman",
+      "POPEYE",
+      "Eye",
+      "Scholastic classroom magazines",
+      "Stripe Press",
+      "mymind",
+      "Jim Bang"
+    ],
+    "taglines": [],
+    "tone": ["editorial", "specific", "restrained", "tactile", "direct", "curious"],
+    "visual_keywords": ["concept-first cover", "physical issue", "folio", "ledger", "catalog density", "asymmetric spread", "object lighting", "print furniture"]
+  },
+  "colors": [
+    {
+      "name": "Project paper",
+      "hex": "#FFFFFF",
+      "rgb": [255, 255, 255],
+      "usage": "The current site's paper and void. A project decision, not a shared color across references.",
+      "source_url": "../../docs/superpowers/specs/2026-08-11-v2-direction-reset.md",
+      "confidence": "official"
+    },
+    {
+      "name": "Project ink",
+      "hex": "#0E0E0C",
+      "rgb": [14, 14, 12],
+      "usage": "Primary type and physical-object definition.",
+      "source_url": "../../docs/superpowers/specs/2026-08-11-v2-direction-reset.md",
+      "confidence": "official"
+    },
+    {
+      "name": "Project red",
+      "hex": "#E8351A",
+      "rgb": [232, 53, 26],
+      "usage": "Single editorial accent for issue marks, state, and emphasis.",
+      "source_url": "../../docs/superpowers/specs/2026-08-11-v2-direction-reset.md",
+      "confidence": "official"
+    }
+  ],
+  "typography": [
+    {
+      "family": "Zodiak",
+      "usage": "Project-selected feature display and editorial voice; use at image scale, not as decorative garnish.",
+      "fallback": "Georgia, serif",
+      "license_notes": "Existing self-hosted project font; see project README for license notes.",
+      "source_url": "../../docs/superpowers/specs/2026-08-11-v2-direction-reset.md",
+      "confidence": "official"
+    },
+    {
+      "family": "Tanker",
+      "usage": "Project-selected condensed display voice, informed by direct scholastic/newsmagazine hierarchy.",
+      "fallback": "Arial Narrow, sans-serif",
+      "license_notes": "Existing self-hosted project font; see project README for license notes.",
+      "source_url": "../../docs/superpowers/specs/2026-08-11-v2-direction-reset.md",
+      "confidence": "official"
+    },
+    {
+      "family": "Server Mono",
+      "usage": "Folios, issue metadata, ledgers, dates, and controls; informed by Eye, POPEYE, and Jim Bang.",
+      "fallback": "ui-monospace, monospace",
+      "license_notes": "Existing self-hosted project font; see project README for license notes.",
+      "source_url": "../../docs/superpowers/specs/2026-08-11-v2-direction-reset.md",
+      "confidence": "official"
+    }
+  ],
+  "assets": [
+    {
+      "type": "screenshot",
+      "name": "Coverjunkie current archive",
+      "path": "assets/screenshots/coverjunkie-home-2026-08-11.jpg",
+      "source_url": "https://coverjunkie.com/",
+      "rights_notes": "Research-only screenshot containing third-party cover art.",
+      "confidence": "secondary"
+    },
+    {
+      "type": "screenshot",
+      "name": "Coverjunkie typographic covers",
+      "path": "assets/screenshots/coverjunkie-typographic-covers-2026-08-11.jpg",
+      "source_url": "https://coverjunkie.com/category/typographic-covers",
+      "rights_notes": "Research-only screenshot containing third-party cover art.",
+      "confidence": "secondary"
+    },
+    {
+      "type": "screenshot",
+      "name": "The Gentlewoman magazine presentation",
+      "path": "assets/screenshots/the-gentlewoman-magazine-2026-08-11.jpg",
+      "source_url": "https://thegentlewoman.co.uk/magazine",
+      "rights_notes": "Publisher-owned page design and photography; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "image",
+      "name": "The Gentlewoman issue 33 cover and object",
+      "path": "assets/images/the-gentlewoman-issue-33-cover-official.jpg",
+      "source_url": "https://thegentlewoman.co.uk/magazine",
+      "rights_notes": "Publisher-owned; private visual research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "image",
+      "name": "The Gentlewoman issue 33 Rhian spread",
+      "path": "assets/images/the-gentlewoman-issue-33-rhian-spread-official.jpg",
+      "source_url": "https://thegentlewoman.co.uk/magazine",
+      "rights_notes": "Publisher-owned; private visual research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "Eye Magazine issues archive",
+      "path": "assets/screenshots/eye-magazine-issues-2026-08-11.jpg",
+      "source_url": "https://eyemagazine.com/issues",
+      "rights_notes": "Publisher-owned cover art; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "image",
+      "name": "Eye issue 109 cover",
+      "path": "assets/images/eye-issue-109-cover-official.jpg",
+      "source_url": "https://www.eyemagazine.com/magazine/issue-109",
+      "rights_notes": "Publisher-owned cover art; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "image",
+      "name": "Eye issue 106 cover",
+      "path": "assets/images/eye-issue-106-cover-official.jpg",
+      "source_url": "https://www.eyemagazine.com/magazine/issue-106",
+      "rights_notes": "Publisher-owned cover art; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "POPEYE Magazine House issue page",
+      "path": "assets/screenshots/popeye-magazine-house-2026-08-11.jpg",
+      "source_url": "https://magazineworld.jp/popeye/",
+      "rights_notes": "Publisher-owned design and artwork; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "image",
+      "name": "POPEYE issue 953 cover",
+      "path": "assets/images/popeye-issue-953-cover-official.jpg",
+      "source_url": "https://magazineworld.jp/popeye/popeye-953/",
+      "rights_notes": "Publisher-owned cover art; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "Stripe Press catalog as physical stack",
+      "path": "assets/screenshots/stripe-press-catalog-2026-08-11.jpg",
+      "source_url": "https://press.stripe.com/",
+      "rights_notes": "Publisher-owned product imagery; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "mymind current homepage",
+      "path": "assets/screenshots/mymind-home-2026-08-11.jpg",
+      "source_url": "https://mymind.com/",
+      "rights_notes": "Proprietary website design; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "image",
+      "name": "mymind 2023 homepage",
+      "path": "assets/images/mymind-homepage-2023-official.png",
+      "source_url": "https://mymind.com/introducing-our-new-website",
+      "rights_notes": "Proprietary website image; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "Scholastic magazine history",
+      "path": "assets/screenshots/scholastic-magazines-history-2026-08-11.jpg",
+      "source_url": "https://www.scholastic.com/newsroom/all-news/scholastic-classroom-magazines-over-the-decades.html",
+      "rights_notes": "Publisher-owned archival material; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "image",
+      "name": "Scholastic magazines centennial selection",
+      "path": "assets/images/scholastic-magazines-centennial-official.png",
+      "source_url": "https://www.scholastic.com/newsroom/all-news/scholastic-classroom-magazines-over-the-decades.html",
+      "rights_notes": "Publisher-owned archival material; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "image",
+      "name": "Scholastic News Trails 1965 cover",
+      "path": "assets/images/scholastic-news-trails-1965-official.png",
+      "source_url": "https://www.scholastic.com/newsroom/all-news/scholastic-classroom-magazines-over-the-decades.html",
+      "rights_notes": "Publisher-owned archival material; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "Jim Bang portfolio archive",
+      "path": "assets/screenshots/jibang-portfolio-2026-08-11.jpg",
+      "source_url": "https://www.jibang.me/",
+      "rights_notes": "Personal-site design; research only.",
+      "confidence": "official"
+    }
+  ],
+  "style_guidance": {
+    "layout": [
+      "Give each spread one governing composition rather than repeating a card grid everywhere.",
+      "Use a persistent folio and issue system, then permit controlled exceptions for full-bleed pages.",
+      "Treat density as a deliberate mode: POPEYE-like catalog pages can be dense, while Gentlewoman-like profiles need air.",
+      "Show the book as a physical object only when spine, top edge, thickness, and light make the pose legible."
+    ],
+    "imagery": [
+      "Prefer a single commissioned-feeling idea on the cover over several equal-weight promotional lines.",
+      "Use real personal photography as editorial material, not as generic card thumbnails.",
+      "Let typography become the image on concept-led pages; avoid adding decoration merely to fill space."
+    ],
+    "iconography": [
+      "Use print furniture—folios, issue marks, rules, barcodes, running heads—as functional system elements.",
+      "Keep UI icons subordinate to the publication object."
+    ],
+    "motion": [
+      "Motion should reveal physical cause, hierarchy, or state: a page turns, a book settles, a cover concept assembles.",
+      "Use one memorable interaction per spread and keep all other motion quiet.",
+      "Preserve immediate exits and restrained entrances for tooltips and marginalia."
+    ],
+    "avoid": [
+      "Do not copy the palette of any source; the project stays white, near-black, and one red.",
+      "Do not borrow mymind's gradient language or the first version's beige editorial styling.",
+      "Do not imitate covers literally or republish source artwork.",
+      "Do not make every spread equally sparse or equally dense.",
+      "Do not use a 3D pose that reads as a flat rectangle rotated in space."
+    ]
+  },
+  "remotion": {
+    "theme_tokens": {
+      "colors": {
+        "paper": "#FFFFFF",
+        "ink": "#0E0E0C",
+        "accent": "#E8351A"
+      },
+      "fontFamily": {
+        "display": "Zodiak, Georgia, serif",
+        "condensed": "Tanker, Arial Narrow, sans-serif",
+        "metadata": "Server Mono, ui-monospace, monospace"
+      },
+      "radii": {
+        "paper": 0
+      },
+      "spacing": {}
+    },
+    "composition_ideas": [
+      "Object-first issue reveal inspired by Stripe Press product presentation.",
+      "Conceptual cover-title build followed by quiet folio metadata.",
+      "Alternation between dense POPEYE-like catalogs and airy Gentlewoman-like profiles."
+    ],
+    "title_card": "White paper, near-black type, one red mark; the title behaves like cover art.",
+    "lower_third": "Server Mono issue metadata with a single hairline; no rounded container.",
+    "transitions": ["critically damped page settle", "hard typographic cut", "brief masked reveal"],
+    "asset_import_notes": ["All collected source imagery is research-only and must not ship in the public site."]
+  },
+  "open_questions": [
+    "Which three to five exact NYT Magazine covers were in the user's original saved set?",
+    "Were there additional saved Coverjunkie examples beyond the typographic and impact categories?",
+    "Should the finished site expose any research-process colophon, or should this archive remain internal only?"
+  ]
+}

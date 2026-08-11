@@ -61,6 +61,7 @@ export function EditorsLetter({ face }: SpreadFaceProps) {
             <Marginalia
               label={note.label}
               ariaLabel={`Read a margin note: ${note.label}`}
+              index={i + 1}
             >
               {note.text}
             </Marginalia>

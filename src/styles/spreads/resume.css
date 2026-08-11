@@ -58,7 +58,7 @@
 
 .resume2__legend {
   font-family: var(--font-mono);
-  font-size: max(10px, 1.5cqw);
+  font-size: max(11px, 1.5cqw);
   letter-spacing: 0.08em;
   color: var(--ink-3);
   padding-bottom: 0.6em;
@@ -72,7 +72,7 @@
 
 .resume2__label {
   color: var(--ink-3);
-  font-size: max(10px, 1.4cqw);
+  font-size: max(11px, 1.4cqw);
   margin-bottom: max(5px, 0.8cqh);
 }
 
@@ -132,7 +132,7 @@
   flex: none;
   text-align: right;
   font-family: var(--font-mono);
-  font-size: max(10px, 1.4cqw);
+  font-size: max(11px, 1.4cqw);
   line-height: 1.5;
   color: var(--ink-3);
   font-feature-settings: "lnum" 1;
@@ -206,7 +206,7 @@
 
 .resume2__summary {
   font-family: var(--font-body);
-  font-size: max(10px, 1.8cqw);
+  font-size: max(11px, 1.8cqw);
   line-height: 1.35;
   color: var(--ink-3);
   white-space: nowrap;
@@ -218,7 +218,7 @@
 
 .resume2__dates {
   font-family: var(--font-mono);
-  font-size: max(10px, 1.5cqw);
+  font-size: max(11px, 1.5cqw);
   line-height: 1.2;
   color: var(--ink-2);
   white-space: nowrap;
@@ -309,7 +309,7 @@
 
 .resume2__rec-meta {
   color: var(--ink-3);
-  font-size: max(10px, 1.4cqw);
+  font-size: max(11px, 1.4cqw);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -318,7 +318,7 @@
 .resume2__rec-note {
   font-family: var(--font-body);
   font-style: italic;
-  font-size: max(10px, 1.8cqw);
+  font-size: max(11px, 1.8cqw);
   line-height: 1.4;
   color: var(--ink-2);
   white-space: nowrap;
