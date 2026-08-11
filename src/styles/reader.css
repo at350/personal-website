@@ -1,0 +1,67 @@
+.reader {
+  min-height: 100vh;
+  background: var(--void);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 clamp(12px, 3vw, 40px) 64px;
+}
+
+.reader__mast {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 4px;
+  color: var(--gray-warm);
+  position: sticky;
+  top: 0;
+  background: var(--void);
+  z-index: 20;
+}
+
+.reader__open {
+  color: var(--sumi-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.reader__open:hover {
+  color: var(--shu);
+}
+
+.reader__spread {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+/* Each page keeps its printed geometry: a 3:4 plate with container units. */
+.reader__page {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  background: var(--washi);
+  container-type: size;
+  overflow: hidden;
+  box-shadow:
+    0 10px 30px rgba(28, 26, 23, 0.12),
+    0 2px 8px rgba(28, 26, 23, 0.08);
+}
+
+.reader__foot {
+  margin-top: 24px;
+}
+
+.reader__foot a {
+  color: var(--gray-warm);
+  text-decoration: none;
+}
+
+.reader__foot a:hover {
+  color: var(--shu);
+}

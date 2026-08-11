@@ -6,7 +6,7 @@
   "description": "Field Notes — the personal magazine of Alan Tai. Issue No. 01.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/build-feeds.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",

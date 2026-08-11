@@ -56,6 +56,13 @@ export function routeForSpread(index: number, defs: readonly SpreadDef[] = SPREA
   return "/";
 }
 
+export function isKnownRoute(route: string): boolean {
+  const normalized = route !== "/" && route.endsWith("/") ? route.slice(0, -1) : route;
+  return SPREADS.some(
+    (d) => d.route === normalized || d.aliases?.includes(normalized),
+  );
+}
+
 /** Spread index that holds a given page number. */
 export function spreadForPage(page: number, defs: readonly SpreadDef[] = SPREADS): number {
   const index = Math.floor(page / 2);
