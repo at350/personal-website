@@ -119,12 +119,13 @@
   content: none;
 }
 
-/* A page's inner face. */
+/* A page's inner face. Container so spread type scales with the page itself. */
 .page-face {
   position: absolute;
   inset: 0;
   background: var(--washi);
   overflow: hidden;
+  container-type: size;
 }
 
 /* The sheet in flight. */

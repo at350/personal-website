@@ -1,5 +1,6 @@
 import type { SpreadBinding, SpreadFaceProps } from "./spread-types";
 import { SPREADS } from "./folio";
+import { BackCover, Cover } from "@/spreads/Cover";
 
 function PlaceholderFace({ face }: SpreadFaceProps) {
   return (
@@ -11,7 +12,7 @@ function PlaceholderFace({ face }: SpreadFaceProps) {
 
 /** id → component bindings. Spread modules are attached here as they land. */
 const BINDINGS: Record<string, Omit<SpreadBinding, "id">> = {
-  cover: { Component: PlaceholderFace },
+  cover: { Component: Cover, fullBleed: { verso: true, recto: true } },
   contents: { Component: PlaceholderFace },
   letter: { Component: PlaceholderFace },
   profile: { Component: PlaceholderFace },
@@ -21,7 +22,7 @@ const BINDINGS: Record<string, Omit<SpreadBinding, "id">> = {
   library: { Component: PlaceholderFace },
   dispatches: { Component: PlaceholderFace },
   letters: { Component: PlaceholderFace },
-  back: { Component: PlaceholderFace },
+  back: { Component: BackCover, fullBleed: { verso: true, recto: true } },
 };
 
 export const ISSUE: readonly SpreadBinding[] = SPREADS.map((def) => {
