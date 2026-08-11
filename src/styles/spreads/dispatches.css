@@ -13,7 +13,7 @@
 
 .dispatches__mark {
   color: var(--ink-3);
-  font-size: max(8px, 1.6cqw);
+  font-size: max(10px, 1.6cqw);
 }
 
 /* ————— Verso: the entries ————— */
@@ -49,7 +49,7 @@
 
 .dispatches__status {
   color: var(--ink-3);
-  font-size: max(7.5px, 1.5cqw);
+  font-size: max(10px, 1.5cqw);
   margin-bottom: 1cqh;
 }
 
@@ -79,7 +79,7 @@
   display: inline-block;
   margin-top: 2.2cqh;
   font-family: var(--font-mono);
-  font-size: max(8.5px, 1.7cqw);
+  font-size: max(10px, 1.7cqw);
   letter-spacing: 0.04em;
   color: var(--ink-2);
   text-decoration: none;

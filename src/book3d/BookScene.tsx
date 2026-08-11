@@ -24,9 +24,19 @@ export interface BookMotion {
   released: boolean;
   /** Horizontal book shift in px (centers the closed cover). */
   shift: number;
-  /** Pointer position -1..1 for the resting tilt. */
+  /** Pointer position -1..1 for parallax. */
   pointerX: number;
   pointerY: number;
+  /**
+   * Presentation pose target: 0 = three-quarter display object (spine, top
+   * edge and cover all visible — the Stripe Press stance), 1 = flat reading
+   * position where the live DOM takes over.
+   */
+  poseTarget: number;
+  /** Smoothed pose value, written by the scene each frame. */
+  pose: number;
+  /** Scene → stage: report pose so the overlay can fade at the right moment. */
+  onPose: ((pose: number) => void) | null;
   onSettled: (() => void) | null;
 }
 
@@ -52,16 +62,22 @@ function edgeTexture(): THREE.CanvasTexture {
   return t;
 }
 
+/* Paper must read as paper at every angle: a pure lambert surface goes gray
+   the moment it tilts from the key light, so the print carries part of its
+   own brightness (emissive through the same texture). Turns still model
+   light — the directional term and cast shadows ride on top. */
+const EMISSIVE_LIFT = 0.62;
+
 function usePageMaterial(key: string | null, mirror = false) {
-  const mat = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        roughness: 0.94,
-        metalness: 0,
-      }),
-    [],
-  );
+  const mat = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.94,
+      metalness: 0,
+    });
+    m.emissive = new THREE.Color(1, 1, 1).multiplyScalar(EMISSIVE_LIFT);
+    return m;
+  }, []);
   const applied = useRef<string | null>(null);
   useEffect(() => {
     const apply = () => {
@@ -74,10 +90,12 @@ function usePageMaterial(key: string | null, mirror = false) {
           t.offset.x = 1;
         }
         mat.map = t;
+        mat.emissiveMap = t;
         mat.needsUpdate = true;
         applied.current = key;
       } else if (!texture && applied.current !== null) {
         mat.map = null;
+        mat.emissiveMap = null;
         mat.needsUpdate = true;
         applied.current = null;
       }
@@ -105,8 +123,12 @@ function Stack({
   const topMat = usePageMaterial(topKey);
   const edges = useMemo(edgeTexture, []);
   const materials = useMemo(() => {
+    const lift = new THREE.Color(1, 1, 1).multiplyScalar(EMISSIVE_LIFT);
     const paper = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 });
+    paper.emissive = lift;
     const edge = new THREE.MeshStandardMaterial({ map: edges, roughness: 0.95 });
+    edge.emissive = lift;
+    edge.emissiveMap = edges;
     // box faces: +x, -x, +y, -y, +z (camera), -z
     return [edge, edge, edge, edge, topMat, paper];
   }, [edges, topMat]);
@@ -186,7 +208,13 @@ function HiddenTicker() {
 }
 
 function Rig({ ph }: { ph: number }) {
-  const { camera, size } = useThree();
+  const { camera, gl, size } = useThree();
+  useEffect(() => {
+    // White paper must render as white paper: no filmic curve between the
+    // texture and the screen, or the mesh reads gray next to the DOM overlay.
+    gl.toneMapping = THREE.NoToneMapping;
+    gl.outputColorSpace = THREE.SRGBColorSpace;
+  }, [gl]);
   useEffect(() => {
     const cam = camera as THREE.PerspectiveCamera;
     cam.fov = CAM_FOV;
@@ -199,13 +227,20 @@ function Rig({ ph }: { ph: number }) {
   return null;
 }
 
+/* The display stance: spine, top edge and cover all readable at once. */
+const POSE_YAW = -0.30;
+const POSE_PITCH = 0.16;
+const POSE_DROP = 0.994; // posed book sits a breath smaller — object, not page
+
 export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; ph: number }) {
   const group = useRef<THREE.Group>(null);
   const light = useRef<THREE.DirectionalLight>(null);
+  const clockRef = useRef(0);
 
   // Spring integration + settle detection lives with the frames.
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 30);
+    clockRef.current += dt;
     if (!motion.dragging && motion.target !== null && motion.leaf !== null) {
       const k = motion.released ? SPRING_K_RELEASE : SPRING_K_AUTO;
       const c = 2 * Math.sqrt(k) * 1.02; // a touch overdamped: paper, not rubber
@@ -213,8 +248,8 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
       motion.velocity += a * dt;
       motion.progress += motion.velocity * dt;
       if (
-        Math.abs(motion.progress - motion.target) < 0.002 &&
-        Math.abs(motion.velocity) < 0.02
+        Math.abs(motion.progress - motion.target) < 0.0012 &&
+        Math.abs(motion.velocity) < 0.012
       ) {
         motion.progress = motion.target;
         motion.velocity = 0;
@@ -227,12 +262,28 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
 
     const g = group.current;
     if (!g) return;
-    g.position.x = THREE.MathUtils.damp(g.position.x, motion.shift, 8, dt);
+
+    // One continuous pose channel: 0 = display stance, 1 = flat reading.
+    // Everything derives from it, so no transition can ever pop.
+    motion.pose = THREE.MathUtils.damp(motion.pose, motion.poseTarget, 5.2, dt);
+    motion.onPose?.(motion.pose);
+    const posed = 1 - motion.pose;
+
     const airborne = motion.leaf !== null ? Math.sin(motion.progress * Math.PI) : 0;
-    const tiltX = -0.045 * airborne + motion.pointerY * -0.012;
-    const tiltY = motion.pointerX * 0.014;
-    g.rotation.x = THREE.MathUtils.damp(g.rotation.x, tiltX, 7, dt);
-    g.rotation.y = THREE.MathUtils.damp(g.rotation.y, tiltY, 7, dt);
+    const idle = posed * 0.5 + airborne * 0.2;
+    const breatheY = Math.sin(clockRef.current * 0.55) * 4 * idle;
+    const breatheR = Math.sin(clockRef.current * 0.38) * 0.012 * idle;
+
+    g.position.x = THREE.MathUtils.damp(g.position.x, motion.shift, 6.5, dt);
+    g.position.y = THREE.MathUtils.damp(g.position.y, breatheY, 2.4, dt);
+
+    const yaw = POSE_YAW * posed + motion.pointerX * (0.02 + 0.05 * posed) + breatheR;
+    const pitch =
+      POSE_PITCH * posed - 0.055 * airborne + motion.pointerY * -(0.012 + 0.03 * posed);
+    g.rotation.x = THREE.MathUtils.damp(g.rotation.x, pitch, 6, dt);
+    g.rotation.y = THREE.MathUtils.damp(g.rotation.y, yaw, 6, dt);
+    const scale = 1 - (1 - POSE_DROP) * posed;
+    g.scale.setScalar(THREE.MathUtils.damp(g.scale.x, scale, 6, dt));
   });
 
   const leftCount = motion.leaf !== null ? motion.leaf : motion.current;
@@ -248,11 +299,11 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
     <>
       <Rig ph={ph} />
       <HiddenTicker />
-      <ambientLight intensity={0.8} />
+      <ambientLight intensity={0.28} />
       <directionalLight
         ref={light}
         position={[-pw * 0.7, ph * 0.9, ph * 1.35]}
-        intensity={0.38}
+        intensity={0.2}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-radius={9}

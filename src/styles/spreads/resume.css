@@ -58,7 +58,7 @@
 
 .resume2__legend {
   font-family: var(--font-mono);
-  font-size: max(8.5px, 1.5cqw);
+  font-size: max(10px, 1.5cqw);
   letter-spacing: 0.08em;
   color: var(--ink-3);
   padding-bottom: 0.6em;
@@ -72,7 +72,7 @@
 
 .resume2__label {
   color: var(--ink-3);
-  font-size: max(8px, 1.4cqw);
+  font-size: max(10px, 1.4cqw);
   margin-bottom: max(5px, 0.8cqh);
 }
 
@@ -132,7 +132,7 @@
   flex: none;
   text-align: right;
   font-family: var(--font-mono);
-  font-size: max(8px, 1.4cqw);
+  font-size: max(10px, 1.4cqw);
   line-height: 1.5;
   color: var(--ink-3);
   font-feature-settings: "lnum" 1;
@@ -201,6 +201,7 @@
   font-weight: 400;
   font-size: max(10.5px, 1.9cqw);
   color: var(--ink-2);
+  overflow-wrap: anywhere; /* long role titles wrap inside the column */
 }
 
 .resume2__summary {
@@ -217,7 +218,7 @@
 
 .resume2__dates {
   font-family: var(--font-mono);
-  font-size: max(8.5px, 1.5cqw);
+  font-size: max(10px, 1.5cqw);
   line-height: 1.2;
   color: var(--ink-2);
   white-space: nowrap;
@@ -308,7 +309,7 @@
 
 .resume2__rec-meta {
   color: var(--ink-3);
-  font-size: max(8px, 1.4cqw);
+  font-size: max(10px, 1.4cqw);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

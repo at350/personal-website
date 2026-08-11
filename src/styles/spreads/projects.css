@@ -29,7 +29,7 @@
   margin-top: -2cqh;
   margin-left: 30cqw;
   font-family: var(--font-mono);
-  font-size: max(9px, 1.8cqw);
+  font-size: max(10px, 1.8cqw);
   letter-spacing: 0.14em;
   color: var(--ink-2);
   padding-bottom: 0.9cqh;
@@ -93,7 +93,7 @@
 
 .proj-index__meta {
   color: var(--ink-3);
-  font-size: max(8px, 1.5cqw);
+  font-size: max(10px, 1.5cqw);
   text-align: right;
 }
 
@@ -152,7 +152,7 @@
   border: 1px solid var(--hairline);
   padding: 0.28em 0.65em;
   color: var(--ink-2);
-  font-size: max(8px, 1.4cqw);
+  font-size: max(10px, 1.4cqw);
 }
 
 .proj-index__recognition {
@@ -172,7 +172,7 @@
 
 .proj-index__link {
   color: var(--ink);
-  font-size: max(8px, 1.5cqw);
+  font-size: max(10px, 1.5cqw);
   text-decoration: none;
   border-bottom: 1px solid var(--ink);
   padding-bottom: 2px;
@@ -263,7 +263,7 @@
 .proj-feature__meta {
   margin-top: 0.8cqh;
   color: var(--ink-3);
-  font-size: max(8px, 1.5cqw);
+  font-size: max(10px, 1.5cqw);
 }
 
 .proj-feature__summary {
@@ -278,7 +278,7 @@
 .proj-feature__stack {
   margin-top: 1.8cqh;
   color: var(--ink-2);
-  font-size: max(8px, 1.5cqw);
+  font-size: max(10px, 1.5cqw);
 }
 
 .proj-feature__recognition {
@@ -295,7 +295,7 @@
   margin-top: 1.8cqh;
   width: max-content;
   color: var(--ink);
-  font-size: max(8px, 1.5cqw);
+  font-size: max(10px, 1.5cqw);
   text-decoration: none;
   border-bottom: 1px solid var(--ink);
   padding-bottom: 2px;
@@ -328,7 +328,7 @@
   align-items: baseline;
   gap: 2cqw;
   color: var(--ink-2);
-  font-size: max(8px, 1.5cqw);
+  font-size: max(10px, 1.5cqw);
 }
 
 .proj-rest__no {

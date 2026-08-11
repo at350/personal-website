@@ -20,7 +20,7 @@ function usePageSize() {
   const compute = () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const pw = Math.min(0.42 * w, 0.6 * h);
+    const pw = Math.min(0.46 * w, 0.66 * h);
     return { pw, ph: (pw * 4) / 3 };
   };
   const [size, setSize] = useState(compute);
@@ -70,6 +70,11 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  const touchOnly = useMemo(
+    () => typeof window !== "undefined" && window.matchMedia("(hover: none)").matches,
+    [],
+  );
+
   const motion = useMemo<BookMotion>(
     () => ({
       leaf: null,
@@ -82,6 +87,9 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       shift: 0,
       pointerX: 0,
       pointerY: 0,
+      poseTarget: touchOnly ? 1 : 0,
+      pose: touchOnly ? 1 : 0,
+      onPose: null,
       onSettled: null,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,7 +119,17 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.progress = 0;
       motion.velocity = 0;
     }
-  }, [dispatch, motion, pw, state]);
+    motion.poseTarget =
+      state.sheet !== null || state.dragging
+        ? touchOnly
+          ? 0.5
+          : 0.3
+        : touchOnly
+          ? 1
+          : hoverRef.current
+            ? 1
+            : 0;
+  }, [dispatch, motion, pw, state, touchOnly]);
 
   // Shift is pure derivation — computed in render so the overlay and the mesh
   // always agree on where the book sits.
@@ -147,17 +165,24 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     if (!busy) onSpreadSettled?.(state.current);
   }, [busy, onSpreadSettled, state]);
 
-  // Drag from the fore-edges.
-  const onEdgeDown = useCallback(
-    (edge: "fore" | "back") => (e: React.PointerEvent) => {
+  // One drag engine for edge zones (instant) and the page surface (threshold).
+  const beginDrag = useCallback(
+    (edge: "fore" | "back", startX: number, pointerId: number) => {
       if (motion.leaf !== null && motion.target !== null) return;
       dispatch({ type: "DRAG_START", edge });
-      const startX = e.clientX;
+      const stage = stageRef.current;
+      stage?.classList.add("bstage--dragging");
+      try {
+        stage?.setPointerCapture(pointerId);
+      } catch {
+        /* capture is a nicety, not a requirement */
+      }
+      window.getSelection()?.removeAllRanges();
       const startProgress = edge === "fore" ? 0 : 1;
       motion.progress = startProgress;
       motion.velocity = 0;
       motion.dragging = true;
-      let lastX = e.clientX;
+      let lastX = startX;
       let lastT = performance.now();
       const width = pw * 2;
       const move = (ev: PointerEvent) => {
@@ -173,6 +198,12 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         window.removeEventListener("pointermove", move);
         window.removeEventListener("pointerup", up);
         window.removeEventListener("pointercancel", up);
+        stage?.classList.remove("bstage--dragging");
+        try {
+          stage?.releasePointerCapture(pointerId);
+        } catch {
+          /* released with the pointer */
+        }
         motion.dragging = false;
         dispatch({ type: "DRAG_MOVE", progress: motion.progress });
         dispatch({ type: "DRAG_END", velocity: motion.velocity / 2.5 });
@@ -184,18 +215,99 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     [motion, pw],
   );
 
-  // Pointer tilt (rest = CSS on the overlay; flight = mesh).
+  const onEdgeDown = useCallback(
+    (edge: "fore" | "back") => (e: React.PointerEvent) => {
+      e.preventDefault();
+      beginDrag(edge, e.clientX, e.pointerId);
+    },
+    [beginDrag],
+  );
+
+  // Grab anywhere on the paper: a horizontal pull past a small threshold
+  // becomes a page turn; a plain click stays a click. Never selects text.
+  const onSurfaceDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      if (motion.leaf !== null || motion.dragging) return;
+      const downX = e.clientX;
+      const downY = e.clientY;
+      const pointerId = e.pointerId;
+      let engaged = false;
+      const move = (ev: PointerEvent) => {
+        if (engaged) return;
+        const dx = ev.clientX - downX;
+        const dy = ev.clientY - downY;
+        if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+          engaged = true;
+          cleanup();
+          const edge = dx < 0 ? "fore" : "back";
+          if (edge === "fore" && state.current >= TOTAL - 1) return;
+          if (edge === "back" && state.current <= 0) return;
+          // A drag is not a click: swallow the click that would follow.
+          window.addEventListener(
+            "click",
+            (ce) => {
+              ce.stopPropagation();
+              ce.preventDefault();
+            },
+            { capture: true, once: true },
+          );
+          beginDrag(edge, downX, pointerId);
+        }
+      };
+      const cleanup = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", cleanup);
+        window.removeEventListener("pointercancel", cleanup);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", cleanup);
+      window.addEventListener("pointercancel", cleanup);
+    },
+    [beginDrag, motion, state],
+  );
+
+  // Pose choreography: the book rests as a display object and flattens for
+  // reading when the pointer reaches it. One damped channel, no state pops.
+  const hoverRef = useRef(false);
+  const desiredPose = useCallback(() => {
+    if (motion.leaf !== null || motion.dragging) return touchOnly ? 0.5 : 0.3;
+    if (touchOnly) return 1;
+    return hoverRef.current ? 1 : 0;
+  }, [motion, touchOnly]);
+
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
       const nx = (e.clientX / window.innerWidth) * 2 - 1;
       const ny = (e.clientY / window.innerHeight) * 2 - 1;
       motion.pointerX = nx;
       motion.pointerY = ny;
-      overlayRef.current?.style.setProperty("--tilt-x", String(nx));
-      overlayRef.current?.style.setProperty("--tilt-y", String(ny));
+      const cx = window.innerWidth / 2 + motion.shift;
+      const cy = window.innerHeight / 2;
+      hoverRef.current =
+        Math.abs(e.clientX - cx) < pw + 48 && Math.abs(e.clientY - cy) < ph / 2 + 48;
+      motion.poseTarget = desiredPose();
     },
-    [motion],
+    [desiredPose, motion, ph, pw],
   );
+
+  // The scene reports pose every frame; the overlay melts in and out of the
+  // mesh through it (imperative style writes — no React churn at 60fps).
+  useEffect(() => {
+    motion.onPose = (pose: number) => {
+      const el = overlayRef.current;
+      if (!el) return;
+      const turning = motion.leaf !== null;
+      const t = Math.min(1, Math.max(0, (pose - 0.86) / 0.14));
+      const opacity = turning ? 0 : t * t * (3 - 2 * t);
+      el.style.opacity = String(opacity);
+      el.style.visibility = opacity < 0.02 ? "hidden" : "visible";
+      el.style.pointerEvents = opacity > 0.9 ? "auto" : "none";
+    };
+    return () => {
+      motion.onPose = null;
+    };
+  }, [motion]);
 
   // Queued turn helper: never drop an intent because paper was moving.
   const go = useCallback(
@@ -233,7 +345,6 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       ? "COVER"
       : "END";
 
-  const overlayVisible = state.sheet === null;
   const shift = motion.shift;
 
   return (
@@ -251,10 +362,12 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
 
       <div
         ref={overlayRef}
-        className={`bstage__spread ${overlayVisible ? "" : "bstage__spread--hidden"}`}
+        className="bstage__spread"
+        onPointerDown={onSurfaceDown}
         style={{
           width: pw * 2,
           height: ph,
+          opacity: touchOnly ? 1 : 0,
           transform: `translate(calc(-50% + ${shift}px), -50%)`,
         }}
       >

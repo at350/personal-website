@@ -145,7 +145,7 @@
 
 .contents2__dept-no {
   font-family: var(--font-mono);
-  font-size: max(9px, 1.8cqw);
+  font-size: max(10px, 1.8cqw);
   letter-spacing: 0.08em;
   color: var(--ink-3);
   font-feature-settings: "lnum" 1;
@@ -180,7 +180,7 @@
 
 .contents2__place {
   font-family: var(--font-mono);
-  font-size: max(8px, 1.6cqw);
+  font-size: max(10px, 1.6cqw);
   letter-spacing: 0.08em;
   color: var(--ink-3);
   font-feature-settings: "lnum" 1;

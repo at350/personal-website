@@ -69,35 +69,23 @@ export function MediaWall({ items, page }: MediaWallProps) {
     .filter((_, i) => i % 2 === parity)
     .slice(0, PAGE_CAPACITY[page]);
 
-  const columns: { key: string; entries: { item: MediaItem; order: number }[] }[] = [
-    { key: "a", entries: [] },
-    { key: "b", entries: [] },
-  ];
-  shown.forEach((item, order) => {
-    columns[order % 2].entries.push({ item, order });
-  });
-
   return (
-    <div className="media-wall" data-page={page}>
-      {columns.map((column) => (
-        <ul className="media-wall__col" key={column.key}>
-          {column.entries.map(({ item, order }) => (
-            <li
-              /* The filter in the key remounts the plate: the 240ms rise
-                 replays, staggered by reading order. */
-              key={`${filter}:${item.id}`}
-              className="media-wall__cell"
-              style={{ "--order": order } as CSSProperties}
-            >
-              <MediaPlate
-                item={item}
-                index={`${PAGE_FOLIOS[page]}·${String(order + 1).padStart(2, "0")}`}
-              />
-            </li>
-          ))}
-        </ul>
+    <ul className="media-wall media-wall--mosaic" data-page={page}>
+      {shown.map((item, order) => (
+        <li
+          /* The filter in the key remounts the tile: the 240ms rise
+             replays, staggered by reading order. */
+          key={`${filter}:${item.id}`}
+          className={`media-cell media-cell--${item.kind}`}
+          style={{ "--order": order } as CSSProperties}
+        >
+          <MediaPlate
+            item={item}
+            index={`${PAGE_FOLIOS[page]}·${String(order + 1).padStart(2, "0")}`}
+          />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 

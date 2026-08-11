@@ -61,7 +61,7 @@
 }
 
 .barcode__caption {
-  font-size: 8.5px;
+  font-size: 10px;
   letter-spacing: 0.08em;
   color: var(--ink-2);
   text-align: center;
@@ -195,7 +195,7 @@
 
 .marginalia__label {
   color: var(--red);
-  font-size: 9.5px;
+  font-size: 10px;
 }
 
 .marginalia__text {

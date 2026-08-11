@@ -11,23 +11,23 @@
   inset: 0;
 }
 
-/* The live spread. Sits exactly over the flat mesh; carries a whisper of
-   pointer tilt at rest (the mesh matches it once paper starts moving). */
+/* The live spread. Fades in only when the book lies flat (the pose channel
+   drives opacity imperatively) — the mesh and this layer must be pixel twins
+   at that moment, so no transforms, no shadows, nothing painterly here. */
 .bstage__spread {
   position: absolute;
   left: 50%;
   top: 50%;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  transform-style: preserve-3d;
-  perspective: 2400px;
-  transition: opacity 90ms linear;
-  box-shadow: 0 1px 0 rgba(14, 14, 12, 0.04);
 }
 
-.bstage__spread--hidden {
-  opacity: 0;
-  pointer-events: none;
+/* While a page is being pulled, nothing is selectable anywhere on the stage. */
+.bstage--dragging,
+.bstage--dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  cursor: grabbing !important;
 }
 
 .ov-face {
@@ -145,7 +145,7 @@
 
 .bstage__toc-no {
   color: var(--red);
-  font-size: 9.5px;
+  font-size: 10px;
   min-width: 22px;
 }
 

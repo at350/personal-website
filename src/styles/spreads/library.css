@@ -25,7 +25,7 @@
 
 .library__eyebrow {
   color: var(--ink-2);
-  font-size: max(8.5px, 1.6cqw);
+  font-size: max(10px, 1.6cqw);
   letter-spacing: 0.2em;
 }
 
@@ -37,7 +37,7 @@
 
 .library__chip {
   color: var(--ink-3);
-  font-size: max(8px, 1.45cqw);
+  font-size: max(10px, 1.45cqw);
   letter-spacing: 0.14em;
   transition: color 200ms var(--ease-settle);
 }
@@ -144,7 +144,7 @@
   justify-content: space-between;
   gap: 1.5cqw;
   margin-bottom: 0.9cqh;
-  font-size: max(8px, 1.5cqw);
+  font-size: max(10px, 1.5cqw);
 }
 
 .media-plate__index {
@@ -237,7 +237,7 @@ a.media-plate:focus-visible .media-plate__title {
 .media-plate__source {
   margin-top: 0.6cqh;
   color: var(--ink-3);
-  font-size: max(8px, 1.45cqw);
+  font-size: max(10px, 1.45cqw);
   letter-spacing: 0.1em;
 }
 
@@ -284,4 +284,161 @@ a.media-plate:focus-visible .media-plate__title {
   .media-plate__thumb {
     transition: none;
   }
+}
+
+/* ————— Mosaic layout (supersedes the column wall) ————— */
+
+.media-wall--mosaic {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 10.5cqh;
+  grid-auto-flow: dense;
+  gap: 3px;
+  align-items: stretch;
+}
+
+.media-wall--mosaic .media-cell {
+  position: relative;
+  overflow: hidden;
+  animation: plate-in 240ms var(--ease-settle) both;
+  animation-delay: calc(var(--order) * 45ms);
+}
+
+/* Tile shapes: images command space, words fill the seams. */
+.media-cell--photo {
+  grid-column: span 2;
+  grid-row: span 3;
+}
+
+.media-cell--film {
+  grid-row: span 3;
+}
+
+.media-cell--video {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.media-cell--article {
+  grid-row: span 2;
+}
+
+.media-cell--post {
+  grid-row: span 2;
+}
+
+.media-cell--link {
+  grid-row: span 2;
+}
+
+/* Image tiles: the picture is the tile; type sits on a small paper chip. */
+.media-cell--photo .media-plate,
+.media-cell--video .media-plate,
+.media-cell--film .media-plate {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border: none;
+  padding: 0;
+}
+
+.media-cell--photo .media-plate__media,
+.media-cell--video .media-plate__media,
+.media-cell--film .media-plate__media {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto !important;
+}
+
+.media-cell--photo .media-plate__thumb,
+.media-cell--video .media-plate__thumb,
+.media-cell--film .media-plate__thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-cell--photo .media-plate__meta,
+.media-cell--video .media-plate__meta,
+.media-cell--film .media-plate__meta {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  background: var(--paper);
+  padding: 3px 6px;
+  margin: 0;
+}
+
+.media-cell--photo .media-plate__title,
+.media-cell--video .media-plate__title,
+.media-cell--film .media-plate__title {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  right: 6px;
+  z-index: 2;
+  background: var(--paper);
+  width: max-content;
+  max-width: calc(100% - 12px);
+  padding: 4px 7px;
+  font-size: max(10px, 1.6cqw);
+  line-height: 1.35;
+}
+
+.media-cell--photo .media-plate__source,
+.media-cell--video .media-plate__source,
+.media-cell--film .media-plate__source,
+.media-cell--photo .media-plate__excerpt,
+.media-cell--video .media-plate__excerpt {
+  display: none;
+}
+
+.media-cell--film .media-plate__rating {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  z-index: 2;
+  background: var(--paper);
+  padding: 3px 6px;
+  color: var(--red);
+}
+
+/* Text tiles: hairline boxes, ink on paper. */
+.media-cell--post .media-plate,
+.media-cell--article .media-plate,
+.media-cell--link .media-plate {
+  display: flex;
+  flex-direction: column;
+  gap: max(4px, 0.7cqh);
+  height: 100%;
+  padding: max(8px, 1.6cqw);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+
+.media-cell--post .media-plate {
+  border-left: 2px solid var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-wall--mosaic .media-cell {
+    animation: none;
+  }
+}
+
+/* Tile edges: images get a hairline frame so the mosaic reads as set tiles. */
+.media-cell--photo,
+.media-cell--video,
+.media-cell--film {
+  outline: 1px solid var(--hairline);
+  outline-offset: -1px;
+  background: var(--paper-shade);
+}
+
+.media-cell--post .media-plate__excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }

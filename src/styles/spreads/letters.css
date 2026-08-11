@@ -13,7 +13,7 @@
 
 .letters__mark {
   color: var(--ink-3);
-  font-size: max(8px, 1.6cqw);
+  font-size: max(10px, 1.6cqw);
 }
 
 /* ————— Verso: the ledger ————— */
@@ -68,7 +68,7 @@
 
 .letters__index {
   font-family: var(--font-mono);
-  font-size: max(8.5px, 1.7cqw);
+  font-size: max(10px, 1.7cqw);
   color: var(--ink-3);
   font-feature-settings: "lnum" 1;
   transition: color 200ms var(--ease-settle);
@@ -91,7 +91,7 @@
   justify-self: end;
   text-align: right;
   font-family: var(--font-mono);
-  font-size: max(8.5px, 1.6cqw);
+  font-size: max(10px, 1.6cqw);
   color: var(--ink-2);
   font-feature-settings: "lnum" 1;
 }
@@ -127,7 +127,7 @@
 
 .colophon__term {
   color: var(--ink-3);
-  font-size: max(8px, 1.55cqw);
+  font-size: max(10px, 1.55cqw);
   padding-top: 0.35em; /* optical alignment with the serif first line */
 }
 

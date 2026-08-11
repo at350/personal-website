@@ -57,7 +57,7 @@
 
 .profile__num {
   font-family: var(--font-mono);
-  font-size: max(8.5px, 1.7cqw);
+  font-size: max(10px, 1.7cqw);
   letter-spacing: 0.08em;
   color: var(--red);
 }
@@ -155,7 +155,7 @@
   padding: max(6px, 1.1cqw) max(10px, 1.8cqw);
   background: var(--paper);
   color: var(--ink);
-  font-size: max(8.5px, 1.6cqw);
+  font-size: max(10px, 1.6cqw);
 }
 
 .profile__plate-no {
