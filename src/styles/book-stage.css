@@ -93,6 +93,77 @@
   font-size: 10.5px;
   min-width: 64px;
   text-align: center;
+  padding: 6px 4px;
+  transition: color 160ms ease;
+}
+
+.bstage__folio:hover,
+.bstage__folio[aria-expanded="true"] {
+  color: var(--ink);
+}
+
+/* The quick contents — a printed slip above the folio bar. */
+.bstage__toc {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 10px 0;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  animation: toc-rise 240ms var(--ease-settle);
+}
+
+@keyframes toc-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.bstage__toc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 7px 18px;
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.bstage__toc-row:hover,
+.bstage__toc-row:focus-visible {
+  background: var(--paper-shade);
+}
+
+.bstage__toc-no {
+  color: var(--red);
+  font-size: 9.5px;
+  min-width: 22px;
+}
+
+.bstage__toc-row--here .bstage__toc-label {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.bstage__toc-label {
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bstage__toc {
+    animation: none;
+  }
 }
 
 .bstage__arrow {

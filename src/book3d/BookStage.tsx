@@ -66,6 +66,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   );
   const { pw, ph } = usePageSize();
   const [showGrid, setShowGrid] = useState(false);
+  const [tocOpen, setTocOpen] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -217,6 +218,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       else if (e.key === "Home") go(0);
       else if (e.key === "End") go(TOTAL - 1);
       else if (e.key === "g") setShowGrid((v) => !v);
+      else if (e.key === "Escape") setTocOpen(false);
       else return;
       e.preventDefault();
     };
@@ -283,9 +285,14 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         >
           ←
         </button>
-        <p className="bstage__folio mono-label" aria-hidden>
+        <button
+          className="bstage__folio mono-label"
+          aria-expanded={tocOpen}
+          aria-label="Contents"
+          onClick={() => setTocOpen((v) => !v)}
+        >
           {folioLine}
-        </p>
+        </button>
         <button
           className="bstage__arrow mono-label"
           onClick={() => go(state.current + 1)}
@@ -294,6 +301,29 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         >
           →
         </button>
+        {tocOpen ? (
+          <div className="bstage__toc" role="menu">
+            {SPREADS.map((def, i) => {
+              const p = spreadPages(i);
+              return (
+                <button
+                  key={def.id}
+                  role="menuitem"
+                  className={`bstage__toc-row ${i === state.current ? "bstage__toc-row--here" : ""}`}
+                  onClick={() => {
+                    setTocOpen(false);
+                    go(i);
+                  }}
+                >
+                  <span className="mono-label bstage__toc-no">
+                    {p ? String(p[0]).padStart(2, "0") : i === 0 ? "—" : "··"}
+                  </span>
+                  <span className="bstage__toc-label">{def.label.toLowerCase()}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </nav>
 
       <div aria-live="polite" className="visually-hidden">
