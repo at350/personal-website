@@ -110,25 +110,37 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.progress = 0;
       motion.velocity = 0;
     }
-    const atCover = state.current === 0 && state.sheet === null;
-    const atBack = state.current === TOTAL - 1 && state.sheet === null;
-    motion.shift = atCover ? -pw / 2 : atBack ? pw / 2 : 0;
   }, [dispatch, motion, pw, state]);
+
+  // Shift is pure derivation — computed in render so the overlay and the mesh
+  // always agree on where the book sits.
+  const atCover = state.current === 0 && state.sheet === null;
+  const atBack = state.current === TOTAL - 1 && state.sheet === null;
+  motion.shift = atCover ? -pw / 2 : atBack ? pw / 2 : 0;
 
   // Texture prefetch around the action.
   useEffect(() => {
     prefetchAround(state.current);
   }, [state.current]);
 
-  // External navigation.
+  // External navigation. Requests that land mid-turn are queued, not dropped —
+  // rapid keyboard/TOC input must never feel ignored.
   const prevTarget = useRef(targetSpread);
+  const pendingTarget = useRef<number | null>(null);
   useEffect(() => {
     if (prevTarget.current === targetSpread) return;
     prevTarget.current = targetSpread;
-    if (targetSpread !== state.current && !busy) {
-      dispatch({ type: "TURN", to: targetSpread });
-    }
+    if (targetSpread === state.current) return;
+    if (busy) pendingTarget.current = targetSpread;
+    else dispatch({ type: "TURN", to: targetSpread });
   }, [busy, state, targetSpread]);
+
+  useEffect(() => {
+    if (busy || pendingTarget.current === null) return;
+    const to = pendingTarget.current;
+    pendingTarget.current = null;
+    if (to !== state.current) dispatch({ type: "TURN", to });
+  }, [busy, state]);
 
   useEffect(() => {
     if (!busy) onSpreadSettled?.(state.current);
@@ -184,23 +196,33 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     [motion],
   );
 
+  // Queued turn helper: never drop an intent because paper was moving.
+  const go = useCallback(
+    (to: number) => {
+      const clamped = Math.min(Math.max(to, 0), TOTAL - 1);
+      if (busy) pendingTarget.current = clamped;
+      else dispatch({ type: "TURN", to: clamped });
+    },
+    [busy],
+  );
+
   // Keyboard.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && /^(input|textarea|select)$/i.test(t.tagName)) return;
-      if (e.key === "ArrowRight") dispatch({ type: "TURN", to: state.current + 1 });
-      else if (e.key === "ArrowLeft") dispatch({ type: "TURN", to: state.current - 1 });
-      else if (e.key === "Home") dispatch({ type: "TURN", to: 0 });
-      else if (e.key === "End") dispatch({ type: "TURN", to: TOTAL - 1 });
+      if (e.key === "ArrowRight") go(state.current + 1);
+      else if (e.key === "ArrowLeft") go(state.current - 1);
+      else if (e.key === "Home") go(0);
+      else if (e.key === "End") go(TOTAL - 1);
       else if (e.key === "g") setShowGrid((v) => !v);
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [state]);
+  }, [go, state]);
 
   const pages = spreadPages(state.current);
   const folioLine = pages
@@ -255,8 +277,8 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       <nav className="bstage__nav" aria-label="Pages">
         <button
           className="bstage__arrow mono-label"
-          onClick={() => dispatch({ type: "TURN", to: state.current - 1 })}
-          disabled={state.current === 0 || busy}
+          onClick={() => go(state.current - 1)}
+          disabled={state.current === 0}
           aria-label="Previous spread"
         >
           ←
@@ -266,8 +288,8 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         </p>
         <button
           className="bstage__arrow mono-label"
-          onClick={() => dispatch({ type: "TURN", to: state.current + 1 })}
-          disabled={state.current === TOTAL - 1 || busy}
+          onClick={() => go(state.current + 1)}
+          disabled={state.current === TOTAL - 1}
           aria-label="Next spread"
         >
           →

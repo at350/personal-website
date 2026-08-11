@@ -1,68 +1,86 @@
-import { useCallback, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Link } from "react-router";
+import gsap from "gsap";
+import { SplitText } from "gsap/SplitText";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
-import { SealMark } from "@/components/furniture/SealMark";
 import { Barcode } from "@/components/furniture/Barcode";
+import { motionOK } from "@/lib/motion";
 import "@/styles/spreads/cover.css";
 
+gsap.registerPlugin(SplitText);
+
 const COVER_LINES = [
-  { page: "04", text: "the editor's letter", href: "/about" },
+  { page: "04", text: "a letter", href: "/about" },
+  { page: "08", text: "five prototypes", href: "/projects" },
   { page: "12", text: "the annotated resume", href: "/resume" },
-  { page: "14", text: "the library", href: "/library" },
 ] as const;
 
+/* The masthead is the artwork: the name in Tanker, full measure, with the
+   counter of the final A printed red — the mark the rest of the site reuses. */
 export function Cover({ face, mode }: SpreadFaceProps) {
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const el = rootRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    el.style.setProperty("--gx", String((e.clientX - rect.left) / rect.width));
-    el.style.setProperty("--gy", String((e.clientY - rect.top) / rect.height));
+  useEffect(() => {
+    if (!motionOK() || !rootRef.current) return;
+    const lines = rootRef.current.querySelectorAll(".cover2__word");
+    const split = new SplitText(lines, { type: "chars" });
+    const tween = gsap.from(split.chars, {
+      yPercent: 108,
+      duration: 0.9,
+      ease: "power4.out",
+      stagger: 0.045,
+      delay: 0.15,
+    });
+    const rule = rootRef.current.querySelector(".cover2__rule");
+    const ruleTween = rule
+      ? gsap.from(rule, { scaleX: 0, duration: 1.1, ease: "power4.inOut", delay: 0.5 })
+      : null;
+    return () => {
+      tween.kill();
+      ruleTween?.kill();
+      split.revert();
+    };
   }, []);
 
   if (face === "verso" && mode === "book") return null;
 
   return (
-    <div className="cover" ref={rootRef} onPointerMove={onPointerMove}>
-      <p className="cover__kicker mono-label">the personal magazine of alan tai</p>
+    <div className="cover2" ref={rootRef}>
+      <header className="cover2__issue mono-label">
+        <span>A PERSONAL ISSUE</span>
+        <span>NO. 01 — 2026</span>
+      </header>
 
-      <h1 className="cover__masthead" aria-label="Field Notes">
-        <span className="cover__masthead-line">FIELD</span>
-        <span className="cover__masthead-line">
-          NOTES
-          <SealMark className="cover__seal" />
+      <h1 className="cover2__masthead">
+        <span className="cover2__word-mask">
+          <span className="cover2__word">ALAN</span>
+        </span>
+        <span className="cover2__word-mask">
+          <span className="cover2__word">
+            T<span className="cover2__a">A</span>I
+          </span>
         </span>
       </h1>
 
-      <p className="cover__dek">Things made, noticed, and kept.</p>
+      <div className="cover2__rule" aria-hidden />
 
-      <nav className="cover__lines" aria-label="Cover lines">
+      <p className="cover2__dek">Builds things. Writes them down.</p>
+
+      <nav className="cover2__lines" aria-label="In this issue">
         {COVER_LINES.map((line) => (
-          <Link key={line.page} className="cover__line" to={line.href}>
-            <span className="cover__line-page mono-label">{line.page}</span>
-            <span className="cover__line-text">{line.text}</span>
+          <Link key={line.page} className="cover2__line" to={line.href}>
+            <span className="cover2__line-no">{line.page}</span>
+            <span className="cover2__line-text">{line.text}</span>
           </Link>
         ))}
       </nav>
 
-      <p className="cover__issue mono-label">
-        NO. 01 · EVANSTON, IL · EST. 2026
-        <br />
-        $0.00 — PRICELESS
-      </p>
-
-      <span className="cover__edge-jp" lang="ja" aria-hidden>
-        野帳
-      </span>
-
-      <div className="cover__barcode">
-        <Barcode text="FIELDNOTES.01" caption="NO. 01" />
-      </div>
-
-      <div className="cover__gloss" aria-hidden />
-      <div className="cover__peel" aria-hidden />
+      <footer className="cover2__foot">
+        <span className="mono-label cover2__place">EVANSTON, ILLINOIS</span>
+        <div className="cover2__barcode">
+          <Barcode text="ALANTAI.01" height={26} />
+        </div>
+      </footer>
     </div>
   );
 }
@@ -70,14 +88,13 @@ export function Cover({ face, mode }: SpreadFaceProps) {
 export function BackCover({ face, mode }: SpreadFaceProps) {
   if (face === "recto" && mode === "book") return null;
   return (
-    <div className="back-cover">
-      <p className="back-cover__return">
-        FIELD NOTES <em>will return.</em>
+    <div className="back2">
+      <p className="back2__mark" aria-hidden>
+        T<span className="back2__a">A</span>I
       </p>
-      <p className="back-cover__issue mono-label">ISSUE NO. 02, EVENTUALLY</p>
-      <p className="back-cover__motto mono-label">make things that work.</p>
-      <div className="back-cover__barcode">
-        <Barcode text="FIELDNOTES.02" caption="NOT YET PRINTED" height={26} />
+      <p className="back2__issue mono-label">NO. 01 — 2026</p>
+      <div className="back2__barcode">
+        <Barcode text="ALANTAI.01" height={22} />
       </div>
     </div>
   );

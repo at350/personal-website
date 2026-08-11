@@ -1,231 +1,175 @@
-.cover {
+/* V2 cover — the name is the artwork. White paper, black Tanker, one red. */
+
+.cover2 {
   position: absolute;
   inset: 0;
-  padding: 9cqh 8cqw;
+  background: var(--paper);
   display: flex;
   flex-direction: column;
-  background: var(--washi);
+  padding: 6cqh 7cqw 6cqh;
 }
 
-.cover__kicker {
-  color: var(--sumi-2);
-  font-size: clamp(8px, 1.9cqw, 12px);
-  margin-bottom: 2.4cqh;
+.cover2__issue {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-2);
+  font-size: max(8px, 1.55cqw);
+  letter-spacing: 0.22em;
 }
 
-/* The nameplate is the cover art. */
-.cover__masthead {
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: 19.5cqw;
-  line-height: 0.92;
-  letter-spacing: -0.015em;
-  color: var(--sumi);
+.cover2__masthead {
+  margin-top: 7cqh;
   display: flex;
   flex-direction: column;
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  font-size: 34cqw;
+  line-height: 0.82;
+  letter-spacing: 0.002em;
+  color: var(--ink);
 }
 
-.cover__masthead-line {
-  position: relative;
+.cover2__word-mask {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.04em;
+}
+
+.cover2__word {
   display: block;
 }
 
-.cover__masthead-line:last-child {
-  margin-left: 8.5cqw; /* fukinsei: the second line steps out of line */
+/* The mark: the A whose counter prints red. */
+.cover2__a,
+.back2__a {
+  position: relative;
+  display: inline-block;
 }
 
-.cover__seal {
+.cover2__a::after,
+.back2__a::after {
+  content: "";
   position: absolute;
-  right: -6cqw;
-  bottom: 1cqw;
-  width: 6.6cqw;
-  height: 6.6cqw;
+  left: 50%;
+  top: 30%;
+  width: 0.2em;
+  height: 0.2em;
+  transform: translateX(-50%);
+  background: var(--red);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
-.cover__dek {
+.cover2__rule {
+  height: 3px;
+  background: var(--ink);
+  margin-top: 4.5cqh;
+  transform-origin: left center;
+}
+
+.cover2__dek {
+  margin-top: 2.2cqh;
   font-family: var(--font-body);
   font-style: italic;
-  font-size: clamp(11px, 3.4cqw, 22px);
-  color: var(--sumi-2);
-  margin-top: 3.2cqh;
-  margin-left: 0.4cqw;
+  font-size: clamp(12px, 3cqw, 21px);
+  color: var(--ink-2);
 }
 
-.cover__lines {
+.cover2__lines {
   margin-top: auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5cqh;
+  gap: 1.4cqh;
   width: max-content;
 }
 
-.cover__line {
+.cover2__line {
   display: flex;
   align-items: baseline;
-  gap: 1.6cqw;
+  gap: 1.8cqw;
   text-decoration: none;
 }
 
-.cover__line-page {
-  color: var(--gray-warm);
-  font-size: clamp(8px, 2cqw, 12px);
-  transition: color 200ms ease;
+.cover2__line-no {
+  font-family: var(--font-mono);
+  font-size: max(8.5px, 1.8cqw);
+  color: var(--red);
+  font-feature-settings: "lnum" 1;
 }
 
-.cover__line-text {
+.cover2__line-text {
   font-family: var(--font-ui);
-  font-size: clamp(10px, 2.9cqw, 17px);
-  color: var(--sumi);
-  border-bottom: 1px solid transparent;
-  transition: border-color 200ms ease;
-}
-
-.cover__line:hover .cover__line-page,
-.cover__line:focus-visible .cover__line-page {
-  color: var(--shu);
-}
-
-.cover__line:hover .cover__line-text {
-  border-bottom-color: var(--sumi);
-  color: var(--sumi);
-}
-
-.cover__issue {
-  margin-top: 3.4cqh;
-  color: var(--gray-warm);
-  font-size: clamp(7px, 1.7cqw, 10.5px);
-  line-height: 1.9;
-  max-width: 60cqw; /* clear of the barcode block */
-}
-
-/* 野帳 — field notebook, standing on the fore-edge. */
-.cover__edge-jp {
-  position: absolute;
-  top: 9cqh;
-  right: 2.6cqw;
-  writing-mode: vertical-rl;
-  text-orientation: upright;
-  font-family: var(--font-jp);
   font-weight: 500;
-  font-size: clamp(10px, 3cqw, 18px);
-  letter-spacing: 0.5em;
-  color: var(--gray-faint);
+  font-size: clamp(11px, 2.7cqw, 17px);
+  color: var(--ink);
+  letter-spacing: 0.01em;
+  border-bottom: 1px solid transparent;
+  transition: border-color 160ms ease;
 }
 
-.cover__barcode {
-  position: absolute;
-  right: 8cqw;
-  bottom: 8.6cqh;
+.cover2__line:hover .cover2__line-text,
+.cover2__line:focus-visible .cover2__line-text {
+  border-bottom-color: var(--ink);
 }
 
-.cover__barcode .barcode {
-  width: clamp(64px, 17cqw, 108px);
+.cover2__foot {
+  margin-top: 4cqh;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
 }
 
-/* Page gloss that follows the pointer — the varnished-cover feel. */
-.cover__gloss {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(
-    130cqw 90cqh at calc(var(--gx, 0.7) * 100%) calc(var(--gy, 0.2) * 100%),
-    rgba(255, 255, 255, 0.34),
-    rgba(255, 255, 255, 0.05) 40%,
-    transparent 65%
-  );
-  mix-blend-mode: soft-light;
-  transition: opacity 400ms ease;
+.cover2__place {
+  color: var(--ink-3);
+  font-size: max(7.5px, 1.5cqw);
 }
 
-/* Corner peel affordance: the page quietly breathes at the turn corner. */
-.cover__peel {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 5.5cqw;
-  height: 5.5cqw;
-  background: linear-gradient(
-    315deg,
-    var(--void) 0%,
-    var(--void) 48%,
-    var(--washi-deep) 50%,
-    var(--washi-hi) 60%,
-    var(--washi) 100%
-  );
-  box-shadow: -2px -2px 6px rgba(28, 26, 23, 0.08);
-  animation: peel-breathe 6s var(--ease-settle) infinite;
-  transform-origin: bottom right;
+.cover2__barcode .barcode {
+  width: clamp(56px, 15cqw, 96px);
+  background: var(--paper);
+  padding: 0;
 }
 
-@keyframes peel-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.5);
-  }
-}
-
-.cover:hover .cover__peel {
-  animation-play-state: paused;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cover__peel {
-    animation: none;
-  }
+.cover2__barcode .barcode__caption {
+  display: none;
 }
 
 /* ————— Back cover ————— */
-.back-cover {
+
+.back2 {
   position: absolute;
   inset: 0;
-  background: var(--washi);
+  background: var(--paper);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2cqh;
-  padding: 10cqh 10cqw;
-  text-align: center;
+  gap: 2.4cqh;
 }
 
-.back-cover__return {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 6.4cqw;
-  color: var(--sumi);
+.back2__mark {
+  font-family: var(--font-condensed);
+  font-size: 16cqw;
+  line-height: 1;
+  color: var(--ink);
 }
 
-.back-cover__return em {
-  font-style: italic;
-  font-weight: 400;
+.back2__issue {
+  color: var(--ink-3);
+  font-size: max(8px, 1.6cqw);
 }
 
-.back-cover__issue {
-  color: var(--gray-warm);
-  font-size: clamp(7px, 1.8cqw, 11px);
-}
-
-.back-cover__motto {
-  color: var(--shu);
-  font-size: clamp(7px, 1.8cqw, 11px);
-  margin-top: 6cqh;
-}
-
-.back-cover__barcode {
+.back2__barcode {
   position: absolute;
-  bottom: 8cqh;
-  right: 8cqw;
+  right: 7cqw;
+  bottom: 6cqh;
 }
 
-.back-cover__barcode .barcode {
-  width: clamp(56px, 14cqw, 90px);
+.back2__barcode .barcode {
+  width: clamp(48px, 12cqw, 80px);
+  background: var(--paper);
+  padding: 0;
 }
 
-/* Reader mode: the cover becomes a compact issue header. */
-.cover--reader,
-.back-cover--reader {
-  position: relative;
+.back2__barcode .barcode__caption {
+  display: none;
 }

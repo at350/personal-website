@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { usePrefersReducedMotion } from "./useFlipDrag";
+
+export function usePrefersReducedMotion(): boolean {
+  const [reduced] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  return reduced;
+}
 
 export type ViewMode = "book" | "reader";
 const STORAGE_KEY = "fn-view";
