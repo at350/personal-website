@@ -1,0 +1,255 @@
+/* The Annotated Resume — pages 12–13. BOB service-page density:
+   hairline rules, lining figures, a reserved 12cqw margin column
+   where every entry's ✳ waits. The marks are this spread's vermilion. */
+
+.resume {
+  position: absolute;
+  inset: 0;
+  background: var(--washi);
+  padding: 6.5cqh 7cqw 7cqh;
+  display: flex;
+  flex-direction: column;
+  color: var(--sumi);
+}
+
+/* ————— Verso head (fukinsei: the one grid-break — the head steps
+   out to the right; the empty top-left counterweights the dense ledger) ————— */
+
+.resume__head {
+  margin-left: 34cqw;
+  margin-bottom: 4cqh;
+}
+
+.resume__eyebrow {
+  color: var(--sumi-2);
+  font-size: max(9px, 1.7cqw);
+}
+
+.resume__hint {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(11px, 1.9cqw, 14px);
+  line-height: 1.5;
+  color: var(--gray-warm);
+  margin-top: 0.8cqh;
+}
+
+.resume__hint-mark {
+  color: var(--shu);
+  font-style: normal;
+  font-size: 0.85em;
+}
+
+/* ————— Shared group furniture ————— */
+
+.resume__group-label {
+  color: var(--gray-warm);
+  font-size: max(8.5px, 1.5cqw);
+}
+
+.resume__group {
+  margin-top: 2.6cqh;
+}
+
+.resume__group .resume__group-label {
+  margin-bottom: 0.9cqh;
+}
+
+/* ————— Education ————— */
+
+.resume__education {
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  padding: 1.4cqh 0 1.6cqh;
+}
+
+.resume__education .resume__group-label {
+  margin-bottom: 1.1cqh;
+}
+
+.resume__edu {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3cqw;
+}
+
+.resume__edu-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4cqh;
+  min-width: 0;
+}
+
+.resume__edu-institution {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: max(14px, 2.6cqw);
+  line-height: 1.2;
+}
+
+.resume__edu-program {
+  font-family: var(--font-body);
+  font-size: clamp(11.5px, 1.95cqw, 14px);
+  line-height: 1.35;
+  color: var(--sumi-2);
+}
+
+.resume__edu-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4cqh;
+  text-align: right;
+  color: var(--gray-warm);
+  font-size: max(8px, 1.5cqw);
+  line-height: 1.6;
+  flex-shrink: 0;
+}
+
+/* ————— The ledger rows ————— */
+
+.resume__rows {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.resume__row {
+  display: grid;
+  grid-template-columns: 12cqw minmax(0, 1fr) auto;
+  column-gap: 2cqw;
+  align-items: baseline;
+  padding: 1.1cqh 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.resume__margin {
+  font-size: clamp(11px, 2cqw, 14px);
+  line-height: 1.35;
+}
+
+.resume__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35cqh;
+  min-width: 0;
+}
+
+.resume__org {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: max(13px, 2.3cqw);
+  line-height: 1.35;
+}
+
+.resume__role {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: max(11px, 1.95cqw);
+  color: var(--sumi-2);
+}
+
+.resume__summary {
+  font-family: var(--font-body);
+  font-size: clamp(10.5px, 1.95cqw, 13.5px);
+  line-height: 1.35;
+  color: var(--gray-warm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resume__dates {
+  color: var(--gray-warm);
+  font-size: max(8px, 1.5cqw);
+  line-height: 1.35;
+  text-align: right;
+}
+
+/* Verso rows open notes into the outer (left) margin. The page face clips
+   overflow, so the note pins to the margin column and drops below the mark
+   instead of hanging past the fore-edge (which would be cut off). */
+.resume__row--notes-left .marginalia__note {
+  left: -1cqw;
+  right: auto;
+  top: calc(100% + 6px);
+  transform: translateY(-4px);
+  width: min(230px, 42cqw);
+}
+
+.resume__row--notes-left .marginalia:hover .marginalia__note,
+.resume__row--notes-left .marginalia:focus-within .marginalia__note,
+.resume__row--notes-left .marginalia[data-open] .marginalia__note {
+  transform: translateY(0);
+}
+
+/* ————— Recognition ————— */
+
+.resume__recognition {
+  margin-top: 3.2cqh;
+}
+
+.resume__rec {
+  display: grid;
+  grid-template-columns: 12cqw minmax(0, 1fr);
+  column-gap: 2cqw;
+  align-items: baseline;
+  padding: 1.1cqh 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.resume__rec-index {
+  color: var(--gray-faint);
+  font-size: max(8.5px, 1.6cqw);
+}
+
+.resume__rec-title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: max(13px, 2.4cqw);
+  line-height: 1.25;
+}
+
+.resume__rec-issuer {
+  color: var(--gray-warm);
+  font-size: max(8px, 1.5cqw);
+  line-height: 1.6;
+  margin-top: 0.2cqh;
+}
+
+.resume__rec-note {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(10.5px, 1.8cqw, 13px);
+  line-height: 1.45;
+  color: var(--sumi-2);
+  margin-top: 0.3cqh;
+}
+
+/* Compact mode for narrow pages (phone reader): the ledger tightens its leading
+   and summaries so both resume pages keep their footing inside the paper. */
+@container (max-width: 560px) {
+  .resume__row {
+    padding: 0.8cqh 0 0.9cqh;
+  }
+
+  .resume__org {
+    font-size: max(11px, 2.1cqw);
+  }
+
+  .resume__role,
+  .resume__summary {
+    font-size: max(10px, 1.8cqw);
+  }
+
+  .resume__dates {
+    font-size: max(8px, 1.5cqw);
+  }
+
+  .resume__edu {
+    padding: 0.8cqh 0;
+  }
+
+  .resume__head {
+    margin-bottom: 1.6cqh;
+  }
+}

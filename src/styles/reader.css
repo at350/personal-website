@@ -40,17 +40,33 @@
   margin-bottom: 26px;
 }
 
-/* Each page keeps its printed geometry: a 3:4 plate with container units. */
+/* Each page keeps its printed geometry: a 3:4 plate. The ratio is the page's
+   *preferred* height — dense pages may run on longer paper rather than clip.
+   inline-size containment keeps cqw typography working while height stays free. */
 .reader__page {
   position: relative;
-  aspect-ratio: 3 / 4;
   width: 100%;
   background: var(--washi);
-  container-type: size;
+  container-type: inline-size;
   overflow: hidden;
   box-shadow:
     0 10px 30px rgba(28, 26, 23, 0.12),
     0 2px 8px rgba(28, 26, 23, 0.08);
+}
+
+/* Spread roots lay themselves out absolutely inside the book's fixed faces;
+   in the reader they join normal flow so the paper can grow with them.
+   133.33cqw = the printed 3:4 page as a *minimum* — long content runs longer. */
+.reader__page > *:not(.running-head):not(.folio) {
+  position: relative;
+  inset: auto;
+  height: auto;
+  min-height: 133.33cqw;
+}
+
+/* Never vertically compress a column-flex spread to fit the preferred page. */
+.reader__page > *:not(.running-head):not(.folio) > * {
+  flex-shrink: 0;
 }
 
 .reader__foot {

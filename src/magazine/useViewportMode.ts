@@ -4,6 +4,8 @@ import { usePrefersReducedMotion } from "./useFlipDrag";
 export type ViewMode = "book" | "reader";
 const STORAGE_KEY = "fn-view";
 const BOOK_MIN_WIDTH = 900;
+/** An explicit user preference may open the book on somewhat smaller screens. */
+const BOOK_HARD_MIN = 700;
 
 function autoMode(reducedMotion: boolean): ViewMode {
   if (typeof window === "undefined") return "book";
@@ -36,7 +38,7 @@ export function useViewportMode(): [ViewMode, (m: ViewMode | null) => void] {
   const mode: ViewMode =
     override === "reader"
       ? "reader"
-      : override === "book" && window.innerWidth >= BOOK_MIN_WIDTH
+      : override === "book" && window.innerWidth >= BOOK_HARD_MIN
         ? "book"
         : auto;
 

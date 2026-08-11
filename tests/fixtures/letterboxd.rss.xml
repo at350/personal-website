@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:letterboxd="https://letterboxd.com" xmlns:tmdb="https://themoviedb.org" version="2.0">
+  <channel>
+    <title>Letterboxd - alantai</title>
+    <link>https://letterboxd.com/alantai/</link>
+    <description>Letterboxd - alantai</description>
+    <item>
+      <title>Past Lives, 2023 - ★★★★½</title>
+      <link>https://letterboxd.com/alantai/film/past-lives/</link>
+      <guid isPermaLink="false">letterboxd-watch-611198581</guid>
+      <pubDate>Sat, 1 Aug 2026 20:04:12 +1200</pubDate>
+      <letterboxd:watchedDate>2026-08-01</letterboxd:watchedDate>
+      <letterboxd:rewatch>No</letterboxd:rewatch>
+      <letterboxd:filmTitle>Past Lives</letterboxd:filmTitle>
+      <letterboxd:filmYear>2023</letterboxd:filmYear>
+      <letterboxd:memberRating>4.5</letterboxd:memberRating>
+      <tmdb:movieId>666277</tmdb:movieId>
+      <description><![CDATA[ <p><img src="https://a.ltrbxd.com/resized/film-poster/8/5/2/1/2/9/852129-past-lives-0-600-0-900-crop.jpg"/></p> <p>Watched on Saturday August 1, 2026.</p> ]]></description>
+      <dc:creator>alantai</dc:creator>
+    </item>
+    <item>
+      <title>Perfect Days, 2023 - ★★★½</title>
+      <link>https://letterboxd.com/alantai/film/perfect-days-2023/</link>
+      <guid isPermaLink="false">letterboxd-watch-602231144</guid>
+      <pubDate>Mon, 20 Jul 2026 09:15:33 +1200</pubDate>
+      <letterboxd:watchedDate>2026-07-19</letterboxd:watchedDate>
+      <letterboxd:rewatch>No</letterboxd:rewatch>
+      <tmdb:movieId>976893</tmdb:movieId>
+      <description><![CDATA[ <p><img src="https://a.ltrbxd.com/resized/film-poster/9/7/6/8/9/3/976893-perfect-days-0-600-0-900-crop.jpg"/></p> <p>Watched on Sunday July 19, 2026.</p> ]]></description>
+      <dc:creator>alantai</dc:creator>
+    </item>
+  </channel>
+</rss>

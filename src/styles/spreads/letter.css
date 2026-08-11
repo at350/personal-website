@@ -1,0 +1,134 @@
+/* THE EDITOR'S LETTER — pp. 04–05. About, part 1.
+   Verso: the letter, set right of a wide empty margin (the fukinsei gesture).
+   Recto: the portrait plate. Vermilion budget: the ✳ marks only. */
+
+.letter {
+  position: absolute;
+  inset: 0;
+  background: var(--washi);
+}
+
+/* ————— Verso (p. 04): the letter ————— */
+
+.letter[data-face="verso"] {
+  padding: 6.5cqh 8cqw 6cqh 0;
+}
+
+/* The single narrow column, pushed off the wide empty left margin. */
+.letter__column {
+  margin-left: 31cqw;
+  max-width: 61cqw;
+}
+
+.letter__eyebrow {
+  color: var(--gray-warm);
+  font-size: max(9px, 1.7cqw);
+  margin-bottom: 1.6cqh;
+}
+
+.letter__heading {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(19px, 4.8cqw, 40px);
+  line-height: 1.06;
+  letter-spacing: -0.01em;
+  color: var(--sumi);
+  max-width: 20ch; /* holds the heading to three lines */
+  text-wrap: balance;
+  margin-bottom: 2.4cqh;
+}
+
+.letter__body {
+  font-family: var(--font-body);
+  font-size: clamp(10.5px, 2.25cqw, 16px);
+  line-height: 1.7;
+  color: var(--sumi-2);
+  max-width: 35ch;
+  font-feature-settings: "onum" 1, "liga" 1;
+}
+
+.letter__body + .letter__body {
+  margin-top: 0.8em;
+}
+
+.letter__signoff {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(13px, 3cqw, 24px);
+  line-height: 1.2;
+  color: var(--sumi);
+  margin-top: 2cqh;
+}
+
+/* Two ✳ asides floating in the margin at different heights —
+   this spread's only vermilion. */
+.letter__aside {
+  position: absolute;
+  font-size: clamp(13px, 2.6cqw, 19px);
+  line-height: 1;
+}
+
+.letter__aside--one {
+  top: 33cqh;
+  left: 10cqw;
+}
+
+.letter__aside--two {
+  top: 59cqh;
+  left: 15.5cqw;
+}
+
+/* ————— Recto (p. 05): the portrait plate ————— */
+
+.letter[data-face="recto"] {
+  padding: 6.5cqh 8cqw 7cqh;
+}
+
+/* The matted plate, upper-center-left, hung a breath off square. */
+.letter__plate {
+  width: 72cqw; /* 64cqw image + 4cqw mat each side */
+  margin-left: 5cqw;
+  padding: 4cqw;
+  background: var(--washi-hi);
+  box-shadow:
+    0 1px 2px rgba(28, 26, 23, 0.06),
+    0 10px 28px rgba(28, 26, 23, 0.1);
+  transform: rotate(-0.4deg);
+}
+
+.letter__portrait {
+  width: 100%;
+}
+
+.letter__plate-caption {
+  margin-top: 2.4cqw;
+  color: var(--gray-warm);
+  font-size: max(9px, 1.7cqw);
+}
+
+/* The pull, offset right beneath the plate. */
+.letter__pull {
+  margin-top: 4.5cqh;
+  margin-left: 34cqw;
+  max-width: 48cqw;
+  border-top: 1px solid var(--hairline);
+  padding-top: 2cqh;
+}
+
+.letter__pull p {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(14px, 3cqw, 24px);
+  line-height: 1.5;
+  color: var(--sumi);
+  font-feature-settings: "onum" 1, "liga" 1;
+}
+
+.letter__plate-no {
+  position: absolute;
+  right: 8cqw;
+  bottom: 6.5cqh;
+  color: var(--gray-faint);
+  font-size: max(9px, 1.7cqw);
+}

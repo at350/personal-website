@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0">
+  <channel>
+    <title>Field Notes Dispatch</title>
+    <link>https://alantai.substack.com</link>
+    <description>Occasional letters from the bindery.</description>
+    <item>
+      <title>On slow software</title>
+      <link>https://alantai.substack.com/p/on-slow-software</link>
+      <guid isPermaLink="false">https://alantai.substack.com/p/on-slow-software</guid>
+      <pubDate>Tue, 04 Aug 2026 16:30:00 GMT</pubDate>
+      <description><![CDATA[<p>Field notes on <em>slow software</em>: why the tools that age best are the ones that do less, refuse dependencies &amp; ship a smaller surface area. I spent the month rebuilding my reading pipeline by hand &mdash; RSS, a cron job, one JSON file &mdash; and it taught me more about durability than any framework migration ever has. Plus: three links worth your weekend, and a short argument for owning your own archive.</p>]]></description>
+      <enclosure url="https://substackcdn.com/image/fetch/w_1200,h_600,c_fill/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fslow-software-cover.jpg" length="0" type="image/jpeg"/>
+      <dc:creator>Alan Tai</dc:creator>
+    </item>
+    <item>
+      <title>Twelve small tools</title>
+      <link>https://alantai.substack.com/p/twelve-small-tools</link>
+      <guid isPermaLink="false">https://alantai.substack.com/p/twelve-small-tools</guid>
+      <pubDate>Wed, 15 Jul 2026 09:00:00 GMT</pubDate>
+      <description><![CDATA[<p>A quick tour of the tiny scripts holding this site together.</p>]]></description>
+      <dc:creator>Alan Tai</dc:creator>
+    </item>
+  </channel>
+</rss>

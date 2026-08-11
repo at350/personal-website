@@ -1,27 +1,28 @@
-import type { SpreadBinding, SpreadFaceProps } from "./spread-types";
+import type { SpreadBinding } from "./spread-types";
 import { SPREADS } from "./folio";
 import { BackCover, Cover } from "@/spreads/Cover";
+import { Contents } from "@/spreads/Contents";
+import { EditorsLetter } from "@/spreads/EditorsLetter";
+import { Profile } from "@/spreads/Profile";
+import { ProjectsOpener } from "@/spreads/ProjectsOpener";
+import { ProjectWell } from "@/spreads/ProjectWell";
+import { Resume } from "@/spreads/Resume";
+import { Library } from "@/spreads/Library";
+import { Dispatches } from "@/spreads/Dispatches";
+import { Letters } from "@/spreads/Letters";
 
-function PlaceholderFace({ face }: SpreadFaceProps) {
-  return (
-    <div style={{ padding: "var(--page-pad)" }}>
-      <p className="mono-label">{face} — in production</p>
-    </div>
-  );
-}
-
-/** id → component bindings. Spread modules are attached here as they land. */
+/** id → component bindings; the flatplan itself lives in folio.ts. */
 const BINDINGS: Record<string, Omit<SpreadBinding, "id">> = {
   cover: { Component: Cover, fullBleed: { verso: true, recto: true } },
-  contents: { Component: PlaceholderFace },
-  letter: { Component: PlaceholderFace },
-  profile: { Component: PlaceholderFace },
-  features: { Component: PlaceholderFace },
-  well: { Component: PlaceholderFace },
-  resume: { Component: PlaceholderFace },
-  library: { Component: PlaceholderFace },
-  dispatches: { Component: PlaceholderFace },
-  letters: { Component: PlaceholderFace },
+  contents: { Component: Contents },
+  letter: { Component: EditorsLetter },
+  profile: { Component: Profile, fullBleed: { recto: true } },
+  features: { Component: ProjectsOpener },
+  well: { Component: ProjectWell },
+  resume: { Component: Resume },
+  library: { Component: Library },
+  dispatches: { Component: Dispatches },
+  letters: { Component: Letters },
   back: { Component: BackCover, fullBleed: { verso: true, recto: true } },
 };
 

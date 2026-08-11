@@ -1,0 +1,305 @@
+/* FEATURES (pp. 8–9) + THE WELL (pp. 10–11).
+   One vermilion concept per spread: the ✳ recognition marks. */
+
+/* ————— p.8 · curtain-raiser ————— */
+.features-opener {
+  position: absolute;
+  inset: 0;
+  padding: 9cqh 8cqw;
+  display: flex;
+  flex-direction: column;
+  background: var(--washi);
+}
+
+.features-opener__eyebrow {
+  color: var(--sumi-2);
+  font-size: clamp(8px, 1.9cqw, 12px);
+}
+
+.features-opener__display {
+  margin: auto 0; /* the middle band; everything else is ma */
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(30px, 11cqw, 84px);
+  line-height: 1.02;
+  letter-spacing: -0.012em;
+  color: var(--sumi);
+  display: flex;
+  flex-direction: column;
+}
+
+.features-opener__line {
+  display: block;
+}
+
+/* fukinsei: the second line steps off the grid — the spread's one break */
+.features-opener__line--offset {
+  margin-left: 10cqw;
+}
+
+.features-opener__footnote {
+  color: var(--gray-warm);
+  font-size: max(9px, 1.7cqw);
+}
+
+/* ————— p.9 · the index ————— */
+.feature-index {
+  position: absolute;
+  inset: 0;
+  padding: 9cqh 8cqw 8cqh;
+  display: flex;
+  flex-direction: column;
+  background: var(--washi);
+}
+
+.feature-index__list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--hairline);
+}
+
+.feature-index__row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 2.4cqw;
+  padding: 1.7cqh 0;
+  border-bottom: 1px solid var(--hairline);
+  text-align: left;
+}
+
+.feature-index__no {
+  min-width: 5cqw;
+  color: var(--gray-warm);
+  font-size: max(9px, 1.7cqw);
+  transition: color var(--dur-swap) var(--ease-settle);
+}
+
+.feature-index__name {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: clamp(15px, 3.6cqw, 26px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--sumi);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur-swap) var(--ease-settle);
+}
+
+.feature-index__meta {
+  margin-left: auto;
+  color: var(--gray-warm);
+  font-size: max(8px, 1.5cqw);
+  text-align: right;
+}
+
+.feature-index__row[data-active] .feature-index__no {
+  color: var(--sumi);
+}
+
+.feature-index__row[data-active] .feature-index__name {
+  border-bottom-color: var(--sumi);
+}
+
+/* The shared detail card — space reserved so the page never jumps. */
+.feature-index__panel {
+  margin-top: 3.2cqh;
+  margin-left: 7.4cqw; /* aligned with the name column */
+  min-height: 27cqh;
+}
+
+.feature-index__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5cqh;
+  animation: proj-card-in var(--dur-swap) var(--ease-settle);
+}
+
+@keyframes proj-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.feature-index__summary {
+  font-family: var(--font-body);
+  font-size: clamp(12px, 2.1cqw, 16px);
+  line-height: 1.55;
+  color: var(--sumi-2);
+  max-width: 56cqw;
+}
+
+.feature-index__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8cqh 1.2cqw;
+}
+
+.feature-index__chip {
+  border: 1px solid var(--hairline);
+  padding: 0.3em 0.7em;
+  color: var(--sumi-2);
+  font-size: max(8px, 1.5cqw);
+}
+
+.feature-index__recognition {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(11px, 2cqw, 15px);
+  line-height: 1.5;
+  color: var(--sumi-2);
+  max-width: 56cqw;
+}
+
+/* THE accent of the features spread and the well spread. */
+.proj-star {
+  color: var(--shu);
+  font-style: normal;
+}
+
+.feature-index__link {
+  color: var(--sumi);
+  font-size: max(8px, 1.6cqw);
+}
+
+/* ————— pp.10–11 · the well ————— */
+.proj-well {
+  position: absolute;
+  inset: 0;
+  padding: 8cqh 8cqw 9cqh;
+  display: flex;
+  flex-direction: column;
+  background: var(--washi);
+}
+
+.proj-well__plate {
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--hairline);
+  background: var(--washi-hi);
+  overflow: hidden;
+}
+
+/* fukinsei for the well spread: the Architec plate runs off the outer edge */
+.proj-well__plate--bleed {
+  margin-left: -8cqw;
+  border-left: none;
+}
+
+.proj-well__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.proj-well__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5cqh;
+}
+
+/* verso: plate on top, headline below it */
+.proj-well[data-face="verso"] .proj-well__head {
+  margin-top: 3cqh;
+}
+
+/* recto: text first, plate pushed to the lower half.
+   The plate may compress (cover crop) so the denser page never overflows. */
+.proj-well[data-face="recto"] .proj-well__plate {
+  margin-top: auto;
+  min-height: 0;
+  max-height: 33cqh;
+}
+
+.proj-well__meta {
+  color: var(--gray-warm);
+  font-size: max(8px, 1.5cqw);
+}
+
+.proj-well__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(20px, 4.6cqw, 34px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--sumi);
+}
+
+.proj-well__summary {
+  margin-top: 1.4cqh;
+  font-family: var(--font-body);
+  font-size: clamp(12px, 2.3cqw, 17px);
+  line-height: 1.55;
+  color: var(--sumi);
+  max-width: 64cqw;
+}
+
+.proj-well__detail {
+  margin-top: 1cqh;
+  font-family: var(--font-body);
+  font-size: clamp(11px, 1.95cqw, 14px);
+  line-height: 1.55;
+  color: var(--gray-warm);
+  max-width: 60cqw;
+}
+
+.proj-well__stack {
+  margin-top: 1.6cqh;
+  color: var(--sumi-2);
+  font-size: max(8px, 1.5cqw);
+}
+
+.proj-well__recognition {
+  margin-top: 1.2cqh;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(11px, 2cqw, 15px);
+  line-height: 1.5;
+  color: var(--sumi-2);
+  max-width: 60cqw;
+}
+
+.proj-well__link {
+  margin-top: 1.2cqh;
+  width: max-content;
+  color: var(--sumi);
+  font-size: max(8px, 1.6cqw);
+}
+
+/* p.11 bottom strip — FOB density for the other three */
+.proj-workshop {
+  margin-top: 2.2cqh;
+  padding-top: 1.6cqh;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9cqh;
+}
+
+.proj-workshop__eyebrow {
+  color: var(--gray-warm);
+  font-size: max(8px, 1.4cqw);
+}
+
+.proj-workshop__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5cqh;
+}
+
+.proj-workshop__entry {
+  color: var(--sumi-2);
+  font-size: max(8px, 1.5cqw);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feature-index__card {
+    animation: none;
+  }
+
+  .feature-index__no,
+  .feature-index__name {
+    transition: none;
+  }
+}

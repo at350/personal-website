@@ -1,0 +1,146 @@
+/* Dispatches spread — verso: the blog index as FOB shorts; recto: a quiet
+   manifesto over deliberate emptiness. The palate cleanser before the BOB.
+   Vermilion budget: verso = jump-line hover only; recto = the seal only. */
+
+.dispatches {
+  position: absolute;
+  inset: 0;
+  background: var(--washi);
+  display: flex;
+  flex-direction: column;
+  padding: 9cqh 8cqw 11cqh;
+}
+
+.dispatches__eyebrow {
+  color: var(--sumi-2);
+  font-size: clamp(8px, 1.9cqw, 12px);
+}
+
+/* ————— Verso: the index ————— */
+
+.dispatches__list {
+  margin-top: 4cqh;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.dispatches__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* The lead dispatch holds the top 55%; the space beneath it is ma, not filler. */
+.dispatches__item:first-child {
+  flex: 1;
+  min-height: 46cqh;
+}
+
+/* The second short sits under a hairline, stepped inward — fukinsei:
+   this indent is the spread's one deliberate grid-break. */
+.dispatches__item + .dispatches__item {
+  border-top: 1px solid var(--hairline);
+  padding-top: 3.2cqh;
+  padding-left: 8cqw;
+}
+
+/* Status stamp: mono metadata in a hairline box, set slightly off-true. */
+.dispatches__stamp {
+  display: inline-block;
+  border: 1px solid var(--hairline);
+  padding: 0.4em 0.8em;
+  font-size: clamp(7px, 1.6cqw, 10px);
+  color: var(--gray-warm);
+  transform: rotate(-1deg);
+  transform-origin: left center;
+}
+
+.dispatches__title {
+  margin-top: 2cqh;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(15px, 4cqw, 26px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--sumi);
+  max-width: 22ch;
+}
+
+.dispatches__item:first-child .dispatches__title {
+  font-size: clamp(21px, 6.2cqw, 40px);
+  line-height: 1.02;
+  max-width: 15ch;
+}
+
+.dispatches__dek {
+  margin-top: 1.4cqh;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(10px, 2.2cqw, 14px);
+  line-height: 1.5;
+  color: var(--gray-warm);
+  max-width: 36ch;
+}
+
+/* Jump line: the working print convention. Underline strikes vermilion on hover. */
+.dispatches__jump {
+  margin-top: 2.2cqh;
+  font-size: max(9px, 1.7cqw);
+  color: var(--sumi-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 0.2em;
+  transition:
+    border-color var(--dur-swap) var(--ease-settle),
+    color var(--dur-swap) var(--ease-settle);
+}
+
+.dispatches__jump:hover,
+.dispatches__jump:focus-visible {
+  color: var(--sumi);
+  border-bottom-color: var(--shu);
+}
+
+/* ————— Recto: the manifesto, then quiet ————— */
+
+.dispatches__credo {
+  margin-top: 3cqh;
+  font-family: var(--font-body);
+  font-size: clamp(12px, 2.4cqw, 16px);
+  line-height: 1.6;
+  color: var(--sumi);
+  max-width: 30ch;
+}
+
+.dispatches__footnote {
+  margin-top: 2.4cqh;
+  font-size: max(9px, 1.7cqw);
+  color: var(--gray-warm);
+}
+
+/* The bottom half stays empty except the rakkan and one line of wayfinding. */
+.dispatches__quiet {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.4cqh;
+}
+
+.dispatches__seal {
+  width: clamp(26px, 7cqw, 44px);
+  height: clamp(26px, 7cqw, 44px);
+}
+
+.dispatches__next {
+  font-size: max(9px, 1.7cqw);
+  color: var(--gray-warm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dispatches__jump {
+    transition: none;
+  }
+}

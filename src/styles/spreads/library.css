@@ -1,0 +1,191 @@
+/* THE LIBRARY — pp. 14–15. Popeye-catalog density on washi.
+   The spread's single vermilion concept: a plate's top hairline on hover. */
+
+.library {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--washi);
+  padding: 8.5cqh 6.5cqw 6.5cqh;
+  overflow: hidden;
+}
+
+/* ————— Header band ————— */
+
+.library__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 3cqw;
+  min-height: 8cqh;
+  padding-bottom: 1.4cqh;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.library__eyebrow {
+  color: var(--sumi-2);
+  font-size: max(9px, 1.7cqw);
+}
+
+/* The shelf count — the spread's one oversized figure, dipping through
+   the header rule into the catalog (the deliberate grid-break). */
+.library__count {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 1.2cqw;
+  margin-bottom: -2.4cqh;
+}
+
+.library__count-figure {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 9cqw;
+  line-height: 0.78;
+  letter-spacing: -0.02em;
+  color: var(--sumi);
+  font-feature-settings: "lnum" 1;
+}
+
+.library__count-label {
+  color: var(--gray-warm);
+  font-size: max(9px, 1.7cqw);
+}
+
+.library__head--recto {
+  justify-content: flex-end;
+}
+
+/* Static for now — filter interactivity arrives in a later pass. */
+.library__filters {
+  color: var(--gray-warm);
+  font-size: max(9px, 1.7cqw);
+}
+
+/* ————— The wall ————— */
+
+.media-wall {
+  flex: 1;
+  min-height: 0;
+  margin-top: 2.6cqh;
+  columns: 2;
+  column-gap: 2cqw;
+  overflow: hidden;
+}
+
+.media-wall__cell {
+  break-inside: avoid;
+  margin-bottom: 2cqw;
+}
+
+/* ————— Item plates ————— */
+
+.media-plate {
+  position: relative;
+  display: block;
+  padding-top: 1.2cqh;
+  border-top: 1px solid var(--hairline);
+  color: var(--sumi);
+  text-decoration: none;
+  transition:
+    transform var(--dur-swap) var(--ease-settle),
+    border-top-color 200ms var(--ease-settle);
+}
+
+a.media-plate:hover,
+a.media-plate:focus-visible {
+  transform: translateY(-2px);
+  border-top-color: var(--shu);
+  color: var(--sumi);
+}
+
+/* X posts read as clipped tickets. */
+.media-plate--post {
+  border-top-style: dashed;
+}
+
+.media-plate__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5cqw;
+  margin-bottom: 0.9cqh;
+}
+
+.media-plate__index {
+  color: var(--gray-warm);
+  font-size: max(9px, 1.7cqw);
+}
+
+.media-plate__kind {
+  border: 1px solid var(--hairline);
+  padding: 0.35cqh 0.9cqw;
+  color: var(--sumi-2);
+  font-size: max(9px, 1.5cqw);
+}
+
+.media-plate__thumb {
+  width: 100%;
+  height: auto;
+  max-height: 22cqh;
+  object-fit: cover;
+  margin-bottom: 1cqh;
+}
+
+.media-plate__title {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: max(11px, 2.05cqw);
+  line-height: 1.25;
+  color: var(--sumi);
+}
+
+.media-plate__rating {
+  margin-top: 0.5cqh;
+  font-size: max(10px, 1.8cqw);
+  letter-spacing: 0.18em;
+  color: var(--sumi);
+}
+
+.media-plate__source {
+  margin-top: 0.6cqh;
+  color: var(--gray-warm);
+  font-size: max(9px, 1.55cqw);
+  letter-spacing: 0.1em;
+}
+
+.media-plate__excerpt {
+  margin-top: 0.8cqh;
+  font-family: var(--font-body);
+  font-size: max(10px, 1.8cqw);
+  line-height: 1.5;
+  color: var(--sumi-2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+/* Photos: image dominant, caption-style title. */
+.media-plate--photo .media-plate__thumb {
+  max-height: 16cqh;
+}
+
+.media-plate--photo .media-plate__title {
+  font-size: max(10px, 1.8cqw);
+  color: var(--sumi-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-plate {
+    transition: none;
+  }
+
+  a.media-plate:hover,
+  a.media-plate:focus-visible {
+    transform: none;
+  }
+}

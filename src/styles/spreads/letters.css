@@ -1,0 +1,162 @@
+/* Letters & colophon spread — verso: letters to the editor; recto: the real colophon. */
+
+.letters {
+  position: absolute;
+  inset: 0;
+  background: var(--washi);
+  display: flex;
+  flex-direction: column;
+  padding: 9cqh 8cqw 11cqh;
+}
+
+.letters__eyebrow {
+  color: var(--sumi-2);
+  font-size: clamp(8px, 1.9cqw, 12px);
+}
+
+/* ————— Verso: letters to the editor ————— */
+
+.letters__heading {
+  margin-top: 3.8cqh;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(19px, 4.6cqw, 31px);
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+  color: var(--sumi);
+  max-width: 22ch; /* holds the heading to two lines */
+}
+
+/* The note steps out of the column — this spread's one deliberate grid-break. */
+.letters__note {
+  margin-top: 2.4cqh;
+  margin-left: 15cqw;
+  max-width: 36ch;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(11px, 2.2cqw, 15px);
+  line-height: 1.55;
+  color: var(--sumi-2);
+}
+
+/* The ledger sits on the floor of the page; the middle stays empty (ma). */
+.letters__ledger {
+  margin-top: auto;
+  border-top: 1px solid var(--hairline);
+}
+
+.letters__row {
+  display: grid;
+  grid-template-columns: 6cqw 1fr auto;
+  column-gap: 3cqw;
+  align-items: baseline;
+  padding: 1.5cqh 0;
+  border-bottom: 1px solid var(--hairline);
+  text-decoration: none;
+}
+
+/* The hover index is the verso's one vermilion moment. */
+.letters__row-index {
+  font-family: var(--font-mono);
+  font-size: max(9px, 1.7cqw);
+  color: var(--gray-warm);
+  font-feature-settings: "lnum" 1;
+  transition: color var(--dur-swap) var(--ease-settle);
+}
+
+.letters__row-label {
+  font-family: var(--font-ui);
+  font-size: clamp(11px, 2.4cqw, 15px);
+  line-height: 1.3;
+  color: var(--sumi);
+}
+
+.letters__row-display {
+  justify-self: end;
+  text-align: right;
+  color: var(--gray-warm);
+  font-size: max(8px, 1.6cqw);
+}
+
+.letters__row:hover .letters__row-index,
+.letters__row:focus-visible .letters__row-index {
+  color: var(--shu);
+}
+
+/* The email row leads the ledger and carries more weight (Apfel Fett). */
+.letters__row[data-kind="email"] {
+  padding: 1.9cqh 0;
+}
+
+.letters__row[data-kind="email"] .letters__row-label {
+  font-weight: 700;
+  font-size: clamp(13px, 3cqw, 19px);
+}
+
+.letters__row[data-kind="email"] .letters__row-display {
+  color: var(--sumi);
+}
+
+/* ————— Recto: the colophon ————— */
+
+.colophon__ledger {
+  margin-top: 4.5cqh;
+  border-top: 1px solid var(--hairline);
+}
+
+.colophon__row {
+  display: grid;
+  grid-template-columns: 14cqw 1fr;
+  column-gap: 3.5cqw;
+  padding: 1.8cqh 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.colophon__term {
+  color: var(--gray-warm);
+  font-size: max(8px, 1.6cqw);
+  padding-top: 0.35em; /* optical alignment with the serif first line */
+}
+
+.colophon__desc {
+  font-family: var(--font-body);
+  font-size: clamp(10px, 1.95cqw, 14px);
+  line-height: 1.55;
+  color: var(--sumi);
+  max-width: 46ch;
+  font-feature-settings: "lnum" 1; /* hex values and dates read as data */
+}
+
+.colophon__key {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  font-style: normal;
+}
+
+/* Rakkan against emptiness: the seal is this page's only printed vermilion. */
+.colophon__close {
+  margin-top: auto;
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1.8cqh;
+  text-align: right;
+}
+
+.colophon__seal {
+  width: clamp(28px, 6.6cqw, 44px);
+  height: clamp(28px, 6.6cqw, 44px);
+  transform: rotate(1.5deg);
+}
+
+.colophon__return {
+  color: var(--gray-warm);
+  font-size: clamp(7px, 1.7cqw, 10.5px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .letters__row-index {
+    transition: none;
+  }
+}

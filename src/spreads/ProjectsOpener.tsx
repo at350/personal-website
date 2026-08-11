@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { projects } from "@/lib/content";
 import "@/styles/spreads/projects.css";
@@ -43,12 +43,26 @@ function OpenerRecto({
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const panelId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const shownId = pinnedId ?? hoverId;
   const shown = projects.find((p) => p.id === shownId) ?? null;
 
   return (
-    <div className="feature-index" data-face={face} data-mode={mode}>
+    <div
+      className="feature-index"
+      data-face={face}
+      data-mode={mode}
+      ref={rootRef}
+      /* Preview persists while the pointer or focus stays anywhere in the
+         index — so the card (and its link) can actually be reached. */
+      onPointerLeave={() => setHoverId(null)}
+      onBlur={(e) => {
+        if (!rootRef.current?.contains(e.relatedTarget as Node | null)) {
+          setHoverId(null);
+        }
+      }}
+    >
       <ol className="feature-index__list">
         {projects.map((project, i) => (
           <li key={project.id} className="feature-index__item">
@@ -62,11 +76,7 @@ function OpenerRecto({
                 setPinnedId((v) => (v === project.id ? null : project.id))
               }
               onPointerEnter={() => setHoverId(project.id)}
-              onPointerLeave={() =>
-                setHoverId((v) => (v === project.id ? null : v))
-              }
               onFocus={() => setHoverId(project.id)}
-              onBlur={() => setHoverId((v) => (v === project.id ? null : v))}
             >
               <span className="feature-index__no mono-label">
                 {String(i + 1).padStart(2, "0")}

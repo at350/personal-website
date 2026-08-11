@@ -204,9 +204,13 @@ excerpts stay verbatim-or-absent (no invented quotes — journalism rules).
   "Pages 4–5 of 20 · The Editor's Letter".
 - Mount policy: current spread ±1 mounted; others lazy. `will-change` only while
   turning. Target: 60fps at 1440p.
-- Small screens (<900px): single-page mode (same engine, one page per view) with
-  bottom folio bar; <600px or reduced-motion: ReaderView with a magazine-strip
-  header. No DOM cloning anywhere.
+- Small screens (<900px) and reduced-motion: ReaderView — the same spread
+  components stacked as fixed-aspect printed pages with folios and running
+  heads, magazine-strip header, deep links scroll to their spread. (Decision
+  revision 2026-08-11: the intermediate single-page book mode was cut — the
+  stacked reader preserves the design 1:1 with zero DOM cloning and no second
+  layout system.) Users on wide screens can switch modes both ways; the
+  preference persists.
 
 ## 8. Assets
 

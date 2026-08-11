@@ -14,19 +14,18 @@
 .profile[data-face="verso"] {
   display: flex;
   flex-direction: column;
-  padding: 7.5cqh 7cqw 7cqh;
+  padding: 7.5cqh 7cqw 9.5cqh; /* deep foot margin keeps captions clear of the folio */
 }
 
-/* Runs to the fore-edge and is trimmed at the page cut — yugen, the cut
-   invites the turn. (The bleed is this spread's one grid break.) */
+/* Flush to the head margin; the stepped ledger below is the grid break.
+   (An earlier fore-edge bleed amputated word beginnings — reverted.) */
 .profile__headline {
   font-family: var(--font-ui);
   font-weight: 700;
-  font-size: clamp(21px, 6.4cqw, 46px);
-  line-height: 1.02;
+  font-size: clamp(22px, 6.8cqw, 50px);
+  line-height: 1.04;
   letter-spacing: -0.012em;
   color: var(--sumi);
-  margin-left: calc(-7cqw - 1.1cqw);
 }
 
 .profile__headline-line {
@@ -45,7 +44,7 @@
   grid-template-columns: 5cqw 1fr;
   column-gap: 2cqw;
   align-items: baseline;
-  padding: 1.3cqh 0 1.5cqh;
+  padding: 0.9cqh 0 1.1cqh;
   border-top: 1px solid var(--hairline);
 }
 
@@ -84,8 +83,9 @@
 }
 
 .profile__frame {
-  width: 17cqw;
+  width: 14.5cqw;
   margin: 0;
+  min-width: 0;
 }
 
 .profile__frame:nth-child(odd) {
@@ -106,12 +106,15 @@
 }
 
 .profile__frame figcaption {
-  margin-top: 0.9cqh;
+  margin-top: 0.7cqh;
   font-family: var(--font-mono);
-  font-size: max(9px, 1.6cqw);
-  line-height: 1.45;
+  font-size: max(8px, 1.5cqw);
+  line-height: 1.4;
   letter-spacing: 0.02em;
   color: var(--gray-warm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ————— Recto (p.07): the photo is the statement ————— */
