@@ -1,7 +1,12 @@
-import { useCallback, useEffect } from "react";
+import { Suspense, lazy, useCallback, useEffect } from "react";
 import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router";
-import { BookStage } from "./book3d/BookStage";
 import { isKnownRoute, routeForSpread, spreadForRoute } from "./magazine/folio";
+
+/* The WebGL book (three.js and friends) loads only when the book is shown —
+   reader-mode visitors never pay for it. */
+const BookStage = lazy(() =>
+  import("./book3d/BookStage").then((m) => ({ default: m.BookStage })),
+);
 import { useViewportMode } from "./magazine/useViewportMode";
 import { ReaderView } from "./routes/ReaderView";
 import { WritingPage } from "./routes/WritingPage";
@@ -37,7 +42,11 @@ function BookView() {
     [location.pathname, navigate],
   );
 
-  return <BookStage targetSpread={target} onSpreadSettled={onSettled} />;
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#fff" }} />}>
+      <BookStage targetSpread={target} onSpreadSettled={onSettled} />
+    </Suspense>
+  );
 }
 
 function ReaderRoute() {

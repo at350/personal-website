@@ -3,59 +3,36 @@ import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { projects } from "@/lib/content";
 import "@/styles/spreads/projects.css";
 
-/** Pages 8–9 — FEATURES: the curtain-raiser and the project index. */
+/** Pages 8–9 — the count, then the index. */
 export function ProjectsOpener({ face, mode }: SpreadFaceProps) {
-  return face === "verso" ? (
-    <OpenerVerso face={face} />
-  ) : (
-    <OpenerRecto face={face} mode={mode} />
-  );
+  return face === "verso" ? <Count /> : <Index mode={mode} />;
 }
 
-/* Page 8 — display type only, full washi. Ma is the design. */
-function OpenerVerso({ face }: { face: "verso" | "recto" }) {
+/* p.8 — the numeral is the page. */
+function Count() {
   return (
-    <div className="features-opener" data-face={face}>
-      <p className="features-opener__eyebrow mono-label">FEATURES</p>
-
-      <h2 className="features-opener__display">
-        <span className="features-opener__line">Five working</span>
-        <span className="features-opener__line features-opener__line--offset">
-          prototypes.
-        </span>
-      </h2>
-
-      <p className="features-opener__footnote mono-label">
-        hackathons, research, and other short weekends
-      </p>
+    <div className="proj-count">
+      <h2 className="proj-count__word">FIVE</h2>
+      <p className="proj-count__sub">working prototypes</p>
     </div>
   );
 }
 
-/* Page 9 — the typographic index. Hover/focus previews; click pins. */
-function OpenerRecto({
-  face,
-  mode,
-}: {
-  face: "verso" | "recto";
-  mode: "book" | "reader";
-}) {
+/* p.9 — the index. Rows expand in place; one open at a time.
+   Hover and focus preview, click pins. */
+function Index({ mode }: { mode: "book" | "reader" }) {
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const panelId = useId();
+  const baseId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const shownId = pinnedId ?? hoverId;
-  const shown = projects.find((p) => p.id === shownId) ?? null;
+  const openId = hoverId ?? pinnedId;
 
   return (
     <div
-      className="feature-index"
-      data-face={face}
+      className="proj-index"
       data-mode={mode}
       ref={rootRef}
-      /* Preview persists while the pointer or focus stays anywhere in the
-         index — so the card (and its link) can actually be reached. */
       onPointerLeave={() => setHoverId(null)}
       onBlur={(e) => {
         if (!rootRef.current?.contains(e.relatedTarget as Node | null)) {
@@ -63,71 +40,86 @@ function OpenerRecto({
         }
       }}
     >
-      <ol className="feature-index__list">
-        {projects.map((project, i) => (
-          <li key={project.id} className="feature-index__item">
-            <button
-              type="button"
-              className="feature-index__row"
-              aria-expanded={pinnedId === project.id}
-              aria-controls={panelId}
-              data-active={shown?.id === project.id || undefined}
-              onClick={() =>
-                setPinnedId((v) => (v === project.id ? null : project.id))
-              }
-              onPointerEnter={() => setHoverId(project.id)}
-              onFocus={() => setHoverId(project.id)}
+      <ol className="proj-index__list">
+        {projects.map((project, i) => {
+          const open = openId === project.id;
+          const rowId = `${baseId}-${project.id}-row`;
+          const panelId = `${baseId}-${project.id}-panel`;
+          return (
+            <li
+              key={project.id}
+              className="proj-index__item"
+              data-open={open || undefined}
             >
-              <span className="feature-index__no mono-label">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span className="feature-index__name">{project.name}</span>
-              <span className="feature-index__meta mono-label">
-                {project.discipline} · {project.year}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ol>
+              <h3 className="proj-index__h">
+                <button
+                  type="button"
+                  id={rowId}
+                  className="proj-index__row"
+                  aria-expanded={open}
+                  aria-controls={panelId}
+                  onClick={() =>
+                    setPinnedId((v) => (v === project.id ? null : project.id))
+                  }
+                  onPointerEnter={() => setHoverId(project.id)}
+                  onFocus={() => setHoverId(project.id)}
+                >
+                  <span className="proj-index__no" aria-hidden>
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="proj-index__name">{project.name}</span>
+                  <span className="proj-index__meta mono-label">
+                    {project.discipline} · {project.year}
+                  </span>
+                </button>
+              </h3>
 
-      <div className="feature-index__panel" id={panelId}>
-        {shown && (
-          <div className="feature-index__card" key={shown.id}>
-            <p className="feature-index__summary">{shown.summary}</p>
-
-            <ul
-              className="feature-index__chips"
-              aria-label={`${shown.name} stack`}
-            >
-              {shown.stack.map((item) => (
-                <li key={item} className="feature-index__chip mono-label">
-                  {item}
-                </li>
-              ))}
-            </ul>
-
-            {shown.recognition && (
-              <p className="feature-index__recognition">
-                <span className="proj-star" aria-hidden>
-                  ✳
-                </span>{" "}
-                {shown.recognition}
-              </p>
-            )}
-
-            {shown.link && (
-              <a
-                className="feature-index__link mono-label"
-                href={shown.link.href}
-                target="_blank"
-                rel="noopener noreferrer"
+              <div
+                id={panelId}
+                className="proj-index__reveal"
+                role="region"
+                aria-labelledby={rowId}
+                inert={!open}
               >
-                {shown.link.label} ↗
-              </a>
-            )}
-          </div>
-        )}
-      </div>
+                <div className="proj-index__body">
+                  <p className="proj-index__summary">{project.summary}</p>
+
+                  <ul
+                    className="proj-index__chips"
+                    aria-label={`${project.name} stack`}
+                  >
+                    {project.stack.map((item) => (
+                      <li key={item} className="proj-index__chip mono-label">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {project.recognition && (
+                    <p className="proj-index__recognition">
+                      <span className="proj-star" aria-hidden>
+                        ✳
+                      </span>{" "}
+                      {project.recognition}
+                    </p>
+                  )}
+
+                  {project.link && (
+                    <a
+                      className="proj-index__link mono-label"
+                      href={project.link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {project.link.label} ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

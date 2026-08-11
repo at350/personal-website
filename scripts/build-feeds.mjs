@@ -45,9 +45,9 @@ writeFileSync(
   `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
-    <title>Field Notes — Alan Tai</title>
+    <title>Alan Tai — Dispatches</title>
     <link>${SITE}</link>
-    <description>Dispatches from the personal magazine of Alan Tai.</description>
+    <description>Alan Tai — Dispatches. Occasional writing.</description>
 ${rssItems}
   </channel>
 </rss>

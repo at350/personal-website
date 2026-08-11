@@ -122,7 +122,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   // Texture prefetch around the action.
   useEffect(() => {
     prefetchAround(state.current);
-  }, [state.current]);
+  }, [state]);
 
   // External navigation. Requests that land mid-turn are queued, not dropped —
   // rapid keyboard/TOC input must never feel ignored.

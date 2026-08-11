@@ -1,305 +1,350 @@
-/* FEATURES (pp. 8–9) + THE WELL (pp. 10–11).
-   One vermilion concept per spread: the ✳ recognition marks. */
+/* PROJECTS (pp. 8–11) — the count, the index, the well.
+   Paper, ink, one red. The engine owns light; this file owns hairlines. */
 
-/* ————— p.8 · curtain-raiser ————— */
-.features-opener {
+/* ————— p.8 · the count ————— */
+
+.proj-count {
   position: absolute;
   inset: 0;
-  padding: 9cqh 8cqw;
+  background: var(--paper);
   display: flex;
   flex-direction: column;
-  background: var(--washi);
+  padding: 0 8cqw 9cqh;
 }
 
-.features-opener__eyebrow {
-  color: var(--sumi-2);
-  font-size: clamp(8px, 1.9cqw, 12px);
+.proj-count__word {
+  margin-top: 15cqh;
+  margin-left: -8cqw; /* the page's grid-break: the numeral hits the raw fore-edge */
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  font-size: 38cqw;
+  line-height: 0.8;
+  letter-spacing: 0.002em;
+  color: var(--ink);
 }
 
-.features-opener__display {
-  margin: auto 0; /* the middle band; everything else is ma */
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: clamp(30px, 11cqw, 84px);
-  line-height: 1.02;
-  letter-spacing: -0.012em;
-  color: var(--sumi);
-  display: flex;
-  flex-direction: column;
-}
-
-.features-opener__line {
-  display: block;
-}
-
-/* fukinsei: the second line steps off the grid — the spread's one break */
-.features-opener__line--offset {
-  margin-left: 10cqw;
-}
-
-.features-opener__footnote {
-  color: var(--gray-warm);
-  font-size: max(9px, 1.7cqw);
+/* Tucked into the counterform under the V. The rule is the page's one red. */
+.proj-count__sub {
+  width: max-content;
+  margin-top: -2cqh;
+  margin-left: 30cqw;
+  font-family: var(--font-mono);
+  font-size: max(9px, 1.8cqw);
+  letter-spacing: 0.14em;
+  color: var(--ink-2);
+  padding-bottom: 0.9cqh;
+  border-bottom: 2px solid var(--red);
 }
 
 /* ————— p.9 · the index ————— */
-.feature-index {
+
+.proj-index {
   position: absolute;
   inset: 0;
-  padding: 9cqh 8cqw 8cqh;
+  background: var(--paper);
   display: flex;
   flex-direction: column;
-  background: var(--washi);
+  padding: 12cqh 8cqw 9cqh;
 }
 
-.feature-index__list {
+.proj-index__list {
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--hairline);
 }
 
-.feature-index__row {
-  width: 100%;
-  display: flex;
-  align-items: baseline;
-  gap: 2.4cqw;
-  padding: 1.7cqh 0;
+.proj-index__item {
   border-bottom: 1px solid var(--hairline);
+}
+
+.proj-index__row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 7cqw 1fr auto;
+  column-gap: 2.4cqw;
+  align-items: baseline;
+  padding: 1.9cqh 0;
   text-align: left;
 }
 
-.feature-index__no {
-  min-width: 5cqw;
-  color: var(--gray-warm);
-  font-size: max(9px, 1.7cqw);
-  transition: color var(--dur-swap) var(--ease-settle);
+/* The page's grid-break: index numerals hang into the margin. */
+.proj-index__no {
+  margin-left: -3.2cqw;
+  font-family: var(--font-condensed);
+  font-size: 6cqw;
+  line-height: 1;
+  color: var(--ink-3);
+  font-feature-settings: "lnum" 1;
+  transition: color 240ms var(--ease-settle);
 }
 
-.feature-index__name {
+.proj-index__item[data-open] .proj-index__no {
+  color: var(--ink);
+}
+
+.proj-index__name {
   font-family: var(--font-ui);
   font-weight: 700;
-  font-size: clamp(15px, 3.6cqw, 26px);
-  line-height: 1.1;
+  font-size: clamp(14px, 3.4cqw, 25px);
+  line-height: 1.05;
   letter-spacing: -0.01em;
-  color: var(--sumi);
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--dur-swap) var(--ease-settle);
+  color: var(--ink);
 }
 
-.feature-index__meta {
-  margin-left: auto;
-  color: var(--gray-warm);
+.proj-index__meta {
+  color: var(--ink-3);
   font-size: max(8px, 1.5cqw);
   text-align: right;
 }
 
-.feature-index__row[data-active] .feature-index__no {
-  color: var(--sumi);
+/* In-place expansion: the grid-template-rows accordion. */
+.proj-index__reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  padding-left: 9.4cqw; /* the name column */
+  transition: grid-template-rows 460ms var(--ease-settle);
 }
 
-.feature-index__row[data-active] .feature-index__name {
-  border-bottom-color: var(--sumi);
+.proj-index__item[data-open] .proj-index__reveal {
+  grid-template-rows: 1fr;
 }
 
-/* The shared detail card — space reserved so the page never jumps. */
-.feature-index__panel {
-  margin-top: 3.2cqh;
-  margin-left: 7.4cqw; /* aligned with the name column */
-  min-height: 27cqh;
-}
-
-.feature-index__card {
+.proj-index__body {
+  overflow: hidden;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1.5cqh;
-  animation: proj-card-in var(--dur-swap) var(--ease-settle);
+  gap: 1.4cqh;
+  opacity: 0;
+  transition: opacity 240ms var(--ease-settle);
 }
 
-@keyframes proj-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
+.proj-index__item[data-open] .proj-index__body {
+  opacity: 1;
+  transition-delay: 120ms;
 }
 
-.feature-index__summary {
+/* Vertical breathing lives on children, so the closed track truly reaches 0. */
+.proj-index__body > :first-child {
+  margin-top: 0.5cqh;
+}
+
+.proj-index__body > :last-child {
+  margin-bottom: 2.6cqh;
+}
+
+.proj-index__summary {
   font-family: var(--font-body);
   font-size: clamp(12px, 2.1cqw, 16px);
-  line-height: 1.55;
-  color: var(--sumi-2);
+  line-height: 1.5;
+  color: var(--ink-2);
   max-width: 56cqw;
 }
 
-.feature-index__chips {
+.proj-index__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.8cqh 1.2cqw;
 }
 
-.feature-index__chip {
+.proj-index__chip {
   border: 1px solid var(--hairline);
-  padding: 0.3em 0.7em;
-  color: var(--sumi-2);
-  font-size: max(8px, 1.5cqw);
+  padding: 0.28em 0.65em;
+  color: var(--ink-2);
+  font-size: max(8px, 1.4cqw);
 }
 
-.feature-index__recognition {
+.proj-index__recognition {
   font-family: var(--font-body);
   font-style: italic;
   font-size: clamp(11px, 2cqw, 15px);
   line-height: 1.5;
-  color: var(--sumi-2);
-  max-width: 56cqw;
+  color: var(--ink-2);
+  max-width: 54cqw;
 }
 
-/* THE accent of the features spread and the well spread. */
+/* The section's accent. */
 .proj-star {
-  color: var(--shu);
+  color: var(--red);
   font-style: normal;
 }
 
-.feature-index__link {
-  color: var(--sumi);
-  font-size: max(8px, 1.6cqw);
+.proj-index__link {
+  color: var(--ink);
+  font-size: max(8px, 1.5cqw);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 2px;
+  transition:
+    color 200ms var(--ease-settle),
+    border-color 200ms var(--ease-settle);
+}
+
+.proj-index__link:hover,
+.proj-index__link:focus-visible {
+  color: var(--red);
+  border-color: var(--red);
 }
 
 /* ————— pp.10–11 · the well ————— */
-.proj-well {
+
+.proj-feature {
   position: absolute;
   inset: 0;
-  padding: 8cqh 8cqw 9cqh;
+  background: var(--paper);
   display: flex;
   flex-direction: column;
-  background: var(--washi);
+  padding: 8cqh 8cqw;
 }
 
-.proj-well__plate {
-  aspect-ratio: 16 / 10;
+.proj-feature__plate {
   border: 1px solid var(--hairline);
-  background: var(--washi-hi);
+  background: var(--paper);
   overflow: hidden;
 }
 
-/* fukinsei for the well spread: the Architec plate runs off the outer edge */
-.proj-well__plate--bleed {
+/* p.10 grid-break: the plate runs off the fore-edge. */
+.proj-feature[data-face="verso"] .proj-feature__plate {
   margin-left: -8cqw;
-  border-left: none;
+  width: calc(100% + 8cqw);
+  border-left: 0;
+  aspect-ratio: 16 / 10;
 }
 
-.proj-well__img {
+/* p.11, mirrored: the plate sits low and runs off the other fore-edge. */
+.proj-feature[data-face="recto"] .proj-feature__plate {
+  margin-top: auto;
+  margin-right: -8cqw;
+  width: calc(100% + 8cqw);
+  border-right: 0;
+  height: 28cqh;
+}
+
+.proj-feature__img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.proj-well__head {
+.proj-feature__head {
   display: flex;
-  flex-direction: column;
-  gap: 0.5cqh;
+  align-items: flex-start;
+  gap: 3cqw;
 }
 
-/* verso: plate on top, headline below it */
-.proj-well[data-face="verso"] .proj-well__head {
-  margin-top: 3cqh;
+.proj-feature[data-face="verso"] .proj-feature__head {
+  margin-top: 3.4cqh;
 }
 
-/* recto: text first, plate pushed to the lower half.
-   The plate may compress (cover crop) so the denser page never overflows. */
-.proj-well[data-face="recto"] .proj-well__plate {
-  margin-top: auto;
-  min-height: 0;
-  max-height: 33cqh;
+/* Mirror: the numeral crosses to the outer edge on the recto. */
+.proj-feature[data-face="recto"] .proj-feature__head {
+  flex-direction: row-reverse;
+  justify-content: space-between;
 }
 
-.proj-well__meta {
-  color: var(--gray-warm);
-  font-size: max(8px, 1.5cqw);
+.proj-feature__no {
+  font-family: var(--font-condensed);
+  font-size: 9cqw;
+  line-height: 0.85;
+  color: var(--ink);
+  font-feature-settings: "lnum" 1;
 }
 
-.proj-well__name {
+.proj-feature__name {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(20px, 4.6cqw, 34px);
-  line-height: 1.05;
-  letter-spacing: -0.01em;
-  color: var(--sumi);
+  font-weight: 800;
+  font-size: clamp(22px, 4.6cqw, 40px);
+  line-height: 1;
+  letter-spacing: -0.012em;
+  color: var(--ink);
 }
 
-.proj-well__summary {
-  margin-top: 1.4cqh;
-  font-family: var(--font-body);
-  font-size: clamp(12px, 2.3cqw, 17px);
-  line-height: 1.55;
-  color: var(--sumi);
-  max-width: 64cqw;
-}
-
-.proj-well__detail {
-  margin-top: 1cqh;
-  font-family: var(--font-body);
-  font-size: clamp(11px, 1.95cqw, 14px);
-  line-height: 1.55;
-  color: var(--gray-warm);
-  max-width: 60cqw;
-}
-
-.proj-well__stack {
-  margin-top: 1.6cqh;
-  color: var(--sumi-2);
+.proj-feature__meta {
+  margin-top: 0.8cqh;
+  color: var(--ink-3);
   font-size: max(8px, 1.5cqw);
 }
 
-.proj-well__recognition {
-  margin-top: 1.2cqh;
+.proj-feature__summary {
+  margin-top: 2.2cqh;
+  font-family: var(--font-body);
+  font-size: clamp(13px, 2.3cqw, 17px);
+  line-height: 1.55;
+  color: var(--ink);
+  max-width: 62cqw;
+}
+
+.proj-feature__stack {
+  margin-top: 1.8cqh;
+  color: var(--ink-2);
+  font-size: max(8px, 1.5cqw);
+}
+
+.proj-feature__recognition {
+  margin-top: 1.6cqh;
   font-family: var(--font-body);
   font-style: italic;
   font-size: clamp(11px, 2cqw, 15px);
   line-height: 1.5;
-  color: var(--sumi-2);
-  max-width: 60cqw;
+  color: var(--ink-2);
+  max-width: 58cqw;
 }
 
-.proj-well__link {
-  margin-top: 1.2cqh;
+.proj-feature__link {
+  margin-top: 1.8cqh;
   width: max-content;
-  color: var(--sumi);
-  font-size: max(8px, 1.6cqw);
+  color: var(--ink);
+  font-size: max(8px, 1.5cqw);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 2px;
+  transition:
+    color 200ms var(--ease-settle),
+    border-color 200ms var(--ease-settle);
 }
 
-/* p.11 bottom strip — FOB density for the other three */
-.proj-workshop {
-  margin-top: 2.2cqh;
-  padding-top: 1.6cqh;
+.proj-feature__link:hover,
+.proj-feature__link:focus-visible {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+/* p.11 bottom strip — a hairline, then the other three, numbered. */
+.proj-rest {
+  margin-top: 3cqh;
   border-top: 1px solid var(--hairline);
+  padding-top: 1.8cqh;
+}
+
+.proj-rest__list {
   display: flex;
   flex-direction: column;
   gap: 0.9cqh;
 }
 
-.proj-workshop__eyebrow {
-  color: var(--gray-warm);
-  font-size: max(8px, 1.4cqw);
-}
-
-.proj-workshop__list {
+.proj-rest__entry {
   display: flex;
-  flex-direction: column;
-  gap: 0.5cqh;
-}
-
-.proj-workshop__entry {
-  color: var(--sumi-2);
+  align-items: baseline;
+  gap: 2cqw;
+  color: var(--ink-2);
   font-size: max(8px, 1.5cqw);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .feature-index__card {
-    animation: none;
-  }
+.proj-rest__no {
+  font-family: var(--font-condensed);
+  font-size: max(10px, 2.2cqw);
+  line-height: 1;
+  color: var(--ink-3);
+  font-feature-settings: "lnum" 1;
+}
 
-  .feature-index__no,
-  .feature-index__name {
+@media (prefers-reduced-motion: reduce) {
+  .proj-index__no,
+  .proj-index__reveal,
+  .proj-index__body,
+  .proj-index__link,
+  .proj-feature__link {
     transition: none;
   }
 }

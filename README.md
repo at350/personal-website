@@ -1,9 +1,9 @@
-# FIELD NOTES — Issue No. 01
+# ALAN TAI — Issue No. 01
 
-Alan Tai's personal site as a flippable print magazine. A stark white void, one
-object in it: a washi-paper issue you can drag, flick, and keyboard through.
-Every spread is live, art-directed HTML — the resume keeps its margin notes,
-the library restocks itself, the colophon tells the truth.
+Alan Tai's personal site as one printed object: a stark white void, a bound
+issue you can drag, flick, and keyboard through. Every spread is live,
+art-directed HTML — the resume keeps its margin notes, the library restocks
+itself, the colophon tells the truth.
 
 ## Run
 
@@ -20,11 +20,18 @@ npm run lint
 
 ## How it's bound
 
-- **Engine** — `src/magazine/`: a pure state machine (`engine.ts`) drives one
-  CSS-3D sheet with two live faces; springs via GSAP; drag from the fore-edges,
-  arrow keys, `Home`/`End`, horizontal wheel. `g` toggles the printer's proof
-  (baseline grid, columns, crop marks). Reduced-motion and small screens get
-  the stacked **reader** instead — same components, same folios.
+- **Book** — `src/book3d/`: a WebGL book built on three.js via
+  `@react-three/fiber` (+ drei, maath). Pages are meshes with real thickness
+  that bend along a curve (`bend.ts`); one warm key light plus ambient fill,
+  a contact shadow under the book — all shading comes from the lighting
+  model, never from CSS. Page faces are rendered from the real DOM spreads
+  with `html-to-image` at 2× and cached (`pageTextures.tsx`). At rest the
+  flat spread swaps to a perfectly aligned live DOM overlay, so every page
+  stays a fully interactive website.
+- **Engine** — `src/magazine/engine.ts`: a pure state machine drives turns;
+  drag maps the pointer to leaf angle and releases into a critically damped
+  spring. Reduced-motion and small screens get the stacked **reader**
+  instead — same components, same folios.
 - **Issue map** — `src/magazine/folio.ts` is the flatplan: spreads, routes,
   and real page numbers derive from one table. Cover lines and TOC entries
   flip to the folio they print.
@@ -33,7 +40,7 @@ npm run lint
 - **Media library** — `src/lib/media/`: a verified seed merged with
   `live.json`, refreshed by `npm run refresh-media` (see below).
 
-## Self-updating library
+## Library refresh
 
 `.github/workflows/refresh-media.yml` runs daily and commits a new
 `src/lib/media/live.json` when feeds change. Configure repo secrets
@@ -47,11 +54,13 @@ npm run lint
 
 ## Type
 
-Set in **Zodiak** (Indian Type Foundry, via Fontshare), **Newsreader**
-(Production Type), **Apfel Grotezk** (Collletttivo), **Server Mono**
-(Internet Development Studio Co.), and **Shippori Mincho B1** (FONTDASU).
-All licenses permit self-hosted web embedding; files live in `public/fonts`.
+Set in **Zodiak** (Indian Type Foundry, via Fontshare), **Tanker**
+(Indian Type Foundry, via Fontshare), **Newsreader** (Production Type),
+**Apfel Grotezk** (Collletttivo), and **Server Mono** (Internet Development
+Studio Co.). All licenses permit self-hosted web embedding; files live in
+`public/fonts`.
 
 ## Paper
 
-Washi `#F7F3EA` on a white void. Ink: sumi `#1C1A17`. One vermilion: `#D9333F`.
+White `#FFFFFF`. Ink `#0E0E0C`. One red: `#E8351A`. Hairlines at 14% ink.
+No gradients — the book's lighting does the shading.

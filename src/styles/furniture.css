@@ -2,7 +2,7 @@
 .folio {
   position: absolute;
   bottom: calc(var(--page-pad) * 0.45);
-  color: var(--gray-warm);
+  color: var(--ink-3);
   font-size: 10.5px;
   z-index: 4;
 }
@@ -16,13 +16,13 @@
 }
 
 .folio__page {
-  color: var(--sumi);
+  color: var(--ink);
 }
 
 .running-head {
   position: absolute;
   top: calc(var(--page-pad) * 0.45);
-  color: var(--gray-warm);
+  color: var(--ink-3);
   font-size: 10px;
   z-index: 4;
 }
@@ -44,7 +44,7 @@
 /* End mark */
 .end-mark {
   display: inline-block;
-  color: var(--shu);
+  color: var(--red);
   font-size: 0.8em;
   margin-inline-start: 0.4em;
   transform: translateY(-0.05em);
@@ -56,14 +56,14 @@
   flex-direction: column;
   gap: 4px;
   width: 108px;
-  background: var(--washi-hi);
+  background: transparent;
   padding: 6px 6px 4px;
 }
 
 .barcode__caption {
   font-size: 8.5px;
   letter-spacing: 0.08em;
-  color: var(--sumi-2);
+  color: var(--ink-2);
   text-align: center;
 }
 
@@ -140,14 +140,16 @@
   opacity: 0.75;
 }
 
-/* Marginalia — the ✳ asides. */
+/* Marginalia — the ✳ asides. A note printed on the page, not floated over it:
+   white card, hairline-thin ink border, hard offset shadow like a second
+   impression of the plate. */
 .marginalia {
   position: relative;
   display: inline-block;
 }
 
 .marginalia__mark {
-  color: var(--shu);
+  color: var(--red);
   font-size: 0.95em;
   line-height: 1;
   padding: 2px 4px;
@@ -165,9 +167,9 @@
   top: 50%;
   transform: translateY(-50%) translateX(-4px);
   width: 200px;
-  background: var(--washi-hi);
-  border-left: 2px solid var(--shu);
-  box-shadow: 0 6px 24px rgba(28, 26, 23, 0.14);
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -192,7 +194,7 @@
 }
 
 .marginalia__label {
-  color: var(--shu);
+  color: var(--red);
   font-size: 9.5px;
 }
 
@@ -201,13 +203,12 @@
   font-style: italic;
   font-size: 13.5px;
   line-height: 1.55;
-  color: var(--sumi-2);
+  color: var(--ink-2);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .marginalia__note,
-  .marginalia__mark,
-  .stage__turn {
+  .marginalia__mark {
     transition: none;
   }
 }

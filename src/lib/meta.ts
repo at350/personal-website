@@ -1,20 +1,22 @@
 import { SPREADS, spreadForRoute } from "@/magazine/folio";
-import { dispatches, siteMeta } from "@/lib/content";
+import { dispatches } from "@/lib/content";
 
-const BASE_TITLE = "Alan Tai — Field Notes";
+const BASE_TITLE = "Alan Tai";
+const BASE_DESCRIPTION =
+  "Alan Tai — builds things, writes them down. Software, research, early-stage products. Issue No. 01.";
 
 const ROUTE_META: Record<string, { title: string; description: string }> = {
-  "/": { title: BASE_TITLE, description: siteMeta.description },
+  "/": { title: BASE_TITLE, description: BASE_DESCRIPTION },
   "/contents": { title: `Contents · ${BASE_TITLE}`, description: "What's in Issue No. 01." },
-  "/about": { title: `The Editor's Letter · ${BASE_TITLE}`, description: "Who makes this magazine, and why." },
-  "/profile": { title: `The Profile · ${BASE_TITLE}`, description: "Hobbies, photographs, and unnecessary pilgrimages." },
+  "/about": { title: `Letter · ${BASE_TITLE}`, description: "A short letter from Alan." },
+  "/profile": { title: `Profile · ${BASE_TITLE}`, description: "Photographs, hobbies, places." },
   "/projects": { title: `Projects · ${BASE_TITLE}`, description: "Five working prototypes across energy, supply chains, and public health." },
-  "/resume": { title: `Resume · ${BASE_TITLE}`, description: "The annotated resume, with notes in the margins." },
-  "/library": { title: `The Library · ${BASE_TITLE}`, description: "A self-updating media diet: posts, films, articles." },
+  "/resume": { title: `Resume · ${BASE_TITLE}`, description: "The annotated resume." },
+  "/library": { title: `Library · ${BASE_TITLE}`, description: "Films, articles, posts." },
   "/writing": { title: `Dispatches · ${BASE_TITLE}`, description: "Occasional writing." },
-  "/contact": { title: `Letters · ${BASE_TITLE}`, description: "Send a note, a link, or a strange problem." },
-  "/colophon": { title: `Colophon · ${BASE_TITLE}`, description: "What this magazine is set in, printed on, and built with." },
-  "/reader": { title: `Reader · ${BASE_TITLE}`, description: siteMeta.description },
+  "/contact": { title: `Letters · ${BASE_TITLE}`, description: "Send a note." },
+  "/colophon": { title: `Colophon · ${BASE_TITLE}`, description: "What Issue No. 01 is set in and built with." },
+  "/reader": { title: `Reader · ${BASE_TITLE}`, description: BASE_DESCRIPTION },
 };
 
 export function applyMeta(pathname: string) {

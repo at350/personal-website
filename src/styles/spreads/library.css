@@ -1,67 +1,82 @@
-/* THE LIBRARY — pp. 14–15. Popeye-catalog density on washi.
-   The spread's single vermilion concept: a plate's top hairline on hover. */
+/* THE LIBRARY — pp. 14–15. White paper, catalog plates, one red.
+   Verso's grid-break: the active filter as a Tanker section mark, cut by the
+   trim. Recto's: the second column drops below the first. */
 
 .library {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: var(--washi);
-  padding: 8.5cqh 6.5cqw 6.5cqh;
+  background: var(--paper);
+  padding: 8cqh 7cqw 7.5cqh;
   overflow: hidden;
 }
 
-/* ————— Header band ————— */
+/* ————— Verso header: eyebrow + working chips ————— */
 
 .library__head {
   display: flex;
-  align-items: flex-end;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 3cqw;
-  min-height: 8cqh;
-  padding-bottom: 1.4cqh;
+  gap: 2cqw;
+  padding-bottom: 1.2cqh;
   border-bottom: 1px solid var(--hairline);
 }
 
 .library__eyebrow {
-  color: var(--sumi-2);
-  font-size: max(9px, 1.7cqw);
+  color: var(--ink-2);
+  font-size: max(8.5px, 1.6cqw);
+  letter-spacing: 0.2em;
 }
 
-/* The shelf count — the spread's one oversized figure, dipping through
-   the header rule into the catalog (the deliberate grid-break). */
-.library__count {
-  position: relative;
-  z-index: 1;
+.library__chips {
   display: flex;
   align-items: baseline;
-  gap: 1.2cqw;
-  margin-bottom: -2.4cqh;
+  gap: 1.8cqw;
 }
 
-.library__count-figure {
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: 9cqw;
-  line-height: 0.78;
-  letter-spacing: -0.02em;
-  color: var(--sumi);
-  font-feature-settings: "lnum" 1;
+.library__chip {
+  color: var(--ink-3);
+  font-size: max(8px, 1.45cqw);
+  letter-spacing: 0.14em;
+  transition: color 200ms var(--ease-settle);
 }
 
-.library__count-label {
-  color: var(--gray-warm);
-  font-size: max(9px, 1.7cqw);
+.library__chip:hover {
+  color: var(--ink);
 }
 
-.library__head--recto {
-  justify-content: flex-end;
+.library__chip[aria-pressed="true"] {
+  color: var(--red);
 }
 
-/* Static for now — filter interactivity arrives in a later pass. */
-.library__filters {
-  color: var(--gray-warm);
-  font-size: max(9px, 1.7cqw);
+/* ————— The section mark ————— */
+
+.library__display {
+  margin-top: 1cqh;
+  margin-left: -7cqw; /* runs off the trim */
+  font-family: var(--font-condensed);
+  font-size: 19cqw;
+  line-height: 0.84;
+  letter-spacing: 0.002em;
+  color: var(--ink);
+  white-space: nowrap;
+  animation: library-display-swap 300ms var(--ease-settle) backwards;
+}
+
+.library__display-dot {
+  color: var(--red);
+}
+
+@keyframes library-display-swap {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
 }
 
 /* ————— The wall ————— */
@@ -69,41 +84,58 @@
 .media-wall {
   flex: 1;
   min-height: 0;
-  margin-top: 2.6cqh;
-  columns: 2;
-  column-gap: 2cqw;
+  display: flex;
+  gap: 4cqw;
   overflow: hidden;
 }
 
-.media-wall__cell {
-  break-inside: avoid;
-  margin-bottom: 2cqw;
+.library[data-face="verso"] .media-wall {
+  margin-top: 2.4cqh;
 }
 
-/* ————— Item plates ————— */
+.media-wall__col {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Recto's break: the right column starts a plate-height down. */
+.library[data-face="recto"] .media-wall__col:last-child {
+  padding-top: 9cqh;
+}
+
+.media-wall__cell {
+  margin-bottom: 2.8cqh;
+  animation: plate-in var(--dur-swap) var(--ease-settle) backwards;
+  animation-delay: calc(var(--order, 0) * 45ms);
+}
+
+@keyframes plate-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ————— Plates ————— */
 
 .media-plate {
-  position: relative;
   display: block;
-  padding-top: 1.2cqh;
+  padding-top: 1.1cqh;
   border-top: 1px solid var(--hairline);
-  color: var(--sumi);
+  color: var(--ink);
   text-decoration: none;
-  transition:
-    transform var(--dur-swap) var(--ease-settle),
-    border-top-color 200ms var(--ease-settle);
 }
 
-a.media-plate:hover,
-a.media-plate:focus-visible {
-  transform: translateY(-2px);
-  border-top-color: var(--shu);
-  color: var(--sumi);
-}
-
-/* X posts read as clipped tickets. */
+/* X posts read as quotes: a 2px ink rule, no top hairline. */
 .media-plate--post {
-  border-top-style: dashed;
+  border-top: 0;
+  border-left: 2px solid var(--ink);
+  padding-top: 0.2cqh;
+  padding-left: 2cqw;
 }
 
 .media-plate__meta {
@@ -112,56 +144,109 @@ a.media-plate:focus-visible {
   justify-content: space-between;
   gap: 1.5cqw;
   margin-bottom: 0.9cqh;
+  font-size: max(8px, 1.5cqw);
 }
 
 .media-plate__index {
-  color: var(--gray-warm);
-  font-size: max(9px, 1.7cqw);
+  color: var(--ink-3);
+  transition: color 200ms var(--ease-settle);
+}
+
+a.media-plate:hover .media-plate__index,
+a.media-plate:focus-visible .media-plate__index {
+  color: var(--red);
 }
 
 .media-plate__kind {
-  border: 1px solid var(--hairline);
-  padding: 0.35cqh 0.9cqw;
-  color: var(--sumi-2);
-  font-size: max(9px, 1.5cqw);
+  color: var(--red);
+}
+
+/* Skeleton until the image lands, then a 200ms fade. */
+.media-plate__media {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-height: 14cqh;
+  margin-bottom: 1cqh;
+  overflow: hidden;
+}
+
+.media-plate__media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--hairline);
+  animation: skeleton-pulse 700ms var(--ease-settle) infinite alternate;
+  transition: opacity 200ms ease-out;
+}
+
+.media-plate__media[data-loaded]::after {
+  opacity: 0;
+  animation: none;
+}
+
+@keyframes skeleton-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.45;
+  }
 }
 
 .media-plate__thumb {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
-  max-height: 22cqh;
+  height: 100%;
   object-fit: cover;
-  margin-bottom: 1cqh;
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+
+.media-plate__media[data-loaded] .media-plate__thumb {
+  opacity: 1;
 }
 
 .media-plate__title {
   font-family: var(--font-ui);
   font-weight: 500;
-  font-size: max(11px, 2.05cqw);
+  font-size: clamp(11px, 2.05cqw, 16px);
   line-height: 1.25;
-  color: var(--sumi);
+  color: var(--ink);
+  text-decoration-line: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+  transition: text-decoration-color 200ms var(--ease-settle);
 }
 
+a.media-plate:hover .media-plate__title,
+a.media-plate:focus-visible .media-plate__title {
+  text-decoration-color: var(--ink);
+}
+
+/* Films: red stars. */
 .media-plate__rating {
   margin-top: 0.5cqh;
   font-size: max(10px, 1.8cqw);
   letter-spacing: 0.18em;
-  color: var(--sumi);
+  color: var(--red);
 }
 
 .media-plate__source {
   margin-top: 0.6cqh;
-  color: var(--gray-warm);
-  font-size: max(9px, 1.55cqw);
+  color: var(--ink-3);
+  font-size: max(8px, 1.45cqw);
   letter-spacing: 0.1em;
 }
 
 .media-plate__excerpt {
   margin-top: 0.8cqh;
   font-family: var(--font-body);
-  font-size: max(10px, 1.8cqw);
+  font-size: max(10px, 1.75cqw);
   line-height: 1.5;
-  color: var(--sumi-2);
+  color: var(--ink-2);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -169,23 +254,34 @@ a.media-plate:focus-visible {
   overflow: hidden;
 }
 
-/* Photos: image dominant, caption-style title. */
-.media-plate--photo .media-plate__thumb {
-  max-height: 16cqh;
+/* Photos: image dominant, caption title. */
+.media-plate--photo .media-plate__media {
+  max-height: 18cqh;
 }
 
 .media-plate--photo .media-plate__title {
-  font-size: max(10px, 1.8cqw);
-  color: var(--sumi-2);
+  font-size: max(10px, 1.75cqw);
+  color: var(--ink-2);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .media-plate {
+  .library__chip,
+  .media-plate__index,
+  .media-plate__title {
     transition: none;
   }
 
-  a.media-plate:hover,
-  a.media-plate:focus-visible {
-    transform: none;
+  .library__display,
+  .media-wall__cell {
+    animation: none;
+  }
+
+  .media-plate__media::after {
+    animation: none;
+    transition: none;
+  }
+
+  .media-plate__thumb {
+    transition: none;
   }
 }

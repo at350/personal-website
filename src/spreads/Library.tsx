@@ -1,33 +1,47 @@
 import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { loadMedia } from "@/lib/media/store";
-import { MediaWall } from "@/components/MediaWall";
+import {
+  LIBRARY_FILTERS,
+  MediaWall,
+  setLibraryFilter,
+  useLibraryFilter,
+} from "@/components/MediaWall";
 import "@/styles/spreads/library.css";
 
 const items = loadMedia();
 
-const FILTER_NOTE = "POSTS · ARTICLES · FILMS · VIDEO · PHOTOS";
-
-/** Pages 14–15 — THE LIBRARY. Popeye-density media catalog. */
+/** Pages 14–15 — THE LIBRARY. Verso's chips filter the whole spread. */
 export function Library({ face }: SpreadFaceProps) {
+  const filter = useLibraryFilter();
+  const active = LIBRARY_FILTERS.find((entry) => entry.id === filter);
+
   return (
     <div className="library" data-face={face}>
       {face === "verso" ? (
-        <header className="library__head library__head--verso">
-          <p className="library__eyebrow mono-label">
-            THE LIBRARY — a media diet, self-updating
+        <>
+          <header className="library__head">
+            <p className="library__eyebrow mono-label">THE LIBRARY</p>
+            <div className="library__chips" role="group" aria-label="Filter the library">
+              {LIBRARY_FILTERS.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className="library__chip mono-label"
+                  aria-pressed={filter === entry.id}
+                  onClick={() => setLibraryFilter(entry.id)}
+                >
+                  {entry.label}
+                </button>
+              ))}
+            </div>
+          </header>
+          {/* The section mark: the active filter set huge, cut by the trim. */}
+          <p className="library__display" aria-hidden key={filter}>
+            {active?.label}
+            <span className="library__display-dot">.</span>
           </p>
-          <p className="library__count">
-            <span className="library__count-figure">
-              {String(items.length).padStart(2, "0")}
-            </span>
-            <span className="library__count-label mono-label">entries</span>
-          </p>
-        </header>
-      ) : (
-        <header className="library__head library__head--recto">
-          <p className="library__filters mono-label">{FILTER_NOTE}</p>
-        </header>
-      )}
+        </>
+      ) : null}
       <MediaWall items={items} page={face} />
     </div>
   );

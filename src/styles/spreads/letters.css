@@ -1,120 +1,133 @@
-/* Letters & colophon spread — verso: letters to the editor; recto: the real colophon. */
+/* V2 letters & colophon — verso: the contact ledger on the page floor;
+   recto: the imprint page, set for real. Red budget: row index on hover
+   (verso), the closing asterisk (recto). */
 
 .letters {
   position: absolute;
   inset: 0;
-  background: var(--washi);
+  background: var(--paper);
   display: flex;
   flex-direction: column;
-  padding: 9cqh 8cqw 11cqh;
+  padding: 8cqh 8cqw 10cqh;
 }
 
-.letters__eyebrow {
-  color: var(--sumi-2);
-  font-size: clamp(8px, 1.9cqw, 12px);
+.letters__mark {
+  color: var(--ink-3);
+  font-size: max(8px, 1.6cqw);
 }
 
-/* ————— Verso: letters to the editor ————— */
+/* ————— Verso: the ledger ————— */
 
 .letters__heading {
-  margin-top: 3.8cqh;
+  margin-top: 5cqh;
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(19px, 4.6cqw, 31px);
-  line-height: 1.14;
-  letter-spacing: -0.01em;
-  color: var(--sumi);
-  max-width: 22ch; /* holds the heading to two lines */
+  font-weight: 800;
+  font-size: clamp(18px, 4.4cqw, 32px);
+  line-height: 1.08;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  max-width: 16ch;
 }
 
-/* The note steps out of the column — this spread's one deliberate grid-break. */
+/* The one deliberate grid-break: the note leaves the column for the right edge. */
 .letters__note {
-  margin-top: 2.4cqh;
-  margin-left: 15cqw;
+  margin-top: 3cqh;
+  margin-left: auto;
   max-width: 36ch;
   font-family: var(--font-body);
   font-style: italic;
-  font-size: clamp(11px, 2.2cqw, 15px);
+  font-size: clamp(11px, 2.1cqw, 15px);
   line-height: 1.55;
-  color: var(--sumi-2);
+  color: var(--ink-2);
 }
 
-/* The ledger sits on the floor of the page; the middle stays empty (ma). */
+/* The ledger sits on the floor; the middle of the page stays empty. */
 .letters__ledger {
   margin-top: auto;
-  border-top: 1px solid var(--hairline);
+  border-top: 1px solid var(--ink);
+}
+
+.letters__li {
+  border-bottom: 1px solid var(--hairline);
 }
 
 .letters__row {
   display: grid;
-  grid-template-columns: 6cqw 1fr auto;
+  grid-template-columns: 5cqw 1fr auto;
   column-gap: 3cqw;
   align-items: baseline;
   padding: 1.5cqh 0;
-  border-bottom: 1px solid var(--hairline);
   text-decoration: none;
+  transition: transform 240ms var(--ease-settle);
 }
 
-/* The hover index is the verso's one vermilion moment. */
-.letters__row-index {
+.letters__row:hover,
+.letters__row:focus-visible {
+  transform: translateX(0.8cqw);
+}
+
+.letters__index {
   font-family: var(--font-mono);
-  font-size: max(9px, 1.7cqw);
-  color: var(--gray-warm);
+  font-size: max(8.5px, 1.7cqw);
+  color: var(--ink-3);
   font-feature-settings: "lnum" 1;
-  transition: color var(--dur-swap) var(--ease-settle);
+  transition: color 200ms var(--ease-settle);
 }
 
-.letters__row-label {
+.letters__row:hover .letters__index,
+.letters__row:focus-visible .letters__index {
+  color: var(--red);
+}
+
+.letters__label {
   font-family: var(--font-ui);
-  font-size: clamp(11px, 2.4cqw, 15px);
+  font-weight: 500;
+  font-size: clamp(11px, 2.4cqw, 16px);
   line-height: 1.3;
-  color: var(--sumi);
+  color: var(--ink);
 }
 
-.letters__row-display {
+.letters__value {
   justify-self: end;
   text-align: right;
-  color: var(--gray-warm);
-  font-size: max(8px, 1.6cqw);
+  font-family: var(--font-mono);
+  font-size: max(8.5px, 1.6cqw);
+  color: var(--ink-2);
+  font-feature-settings: "lnum" 1;
 }
 
-.letters__row:hover .letters__row-index,
-.letters__row:focus-visible .letters__row-index {
-  color: var(--shu);
-}
-
-/* The email row leads the ledger and carries more weight (Apfel Fett). */
+/* The email row leads and carries the weight. */
 .letters__row[data-kind="email"] {
-  padding: 1.9cqh 0;
+  padding: 2cqh 0;
 }
 
-.letters__row[data-kind="email"] .letters__row-label {
+.letters__row[data-kind="email"] .letters__label {
   font-weight: 700;
   font-size: clamp(13px, 3cqw, 19px);
 }
 
-.letters__row[data-kind="email"] .letters__row-display {
-  color: var(--sumi);
+.letters__row[data-kind="email"] .letters__value {
+  color: var(--ink);
 }
 
-/* ————— Recto: the colophon ————— */
+/* ————— Recto: the imprint ————— */
 
-.colophon__ledger {
-  margin-top: 4.5cqh;
-  border-top: 1px solid var(--hairline);
+.colophon {
+  margin-top: 5cqh;
+  border-top: 1px solid var(--ink);
 }
 
 .colophon__row {
   display: grid;
-  grid-template-columns: 14cqw 1fr;
+  grid-template-columns: 13cqw 1fr;
   column-gap: 3.5cqw;
-  padding: 1.8cqh 0;
+  padding: 1.7cqh 0;
   border-bottom: 1px solid var(--hairline);
 }
 
 .colophon__term {
-  color: var(--gray-warm);
-  font-size: max(8px, 1.6cqw);
+  color: var(--ink-3);
+  font-size: max(8px, 1.55cqw);
   padding-top: 0.35em; /* optical alignment with the serif first line */
 }
 
@@ -122,41 +135,33 @@
   font-family: var(--font-body);
   font-size: clamp(10px, 1.95cqw, 14px);
   line-height: 1.55;
-  color: var(--sumi);
-  max-width: 46ch;
+  color: var(--ink);
+  max-width: 44ch;
   font-feature-settings: "lnum" 1; /* hex values and dates read as data */
 }
 
 .colophon__key {
   font-family: var(--font-mono);
   font-size: 0.85em;
-  font-style: normal;
 }
 
-/* Rakkan against emptiness: the seal is this page's only printed vermilion. */
-.colophon__close {
+/* The imprint ends with the smallest possible gesture. */
+.colophon__asterisk {
   margin-top: auto;
-  margin-left: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1.8cqh;
-  text-align: right;
-}
-
-.colophon__seal {
-  width: clamp(28px, 6.6cqw, 44px);
-  height: clamp(28px, 6.6cqw, 44px);
-  transform: rotate(1.5deg);
-}
-
-.colophon__return {
-  color: var(--gray-warm);
-  font-size: clamp(7px, 1.7cqw, 10.5px);
+  align-self: flex-end;
+  color: var(--red);
+  font-size: clamp(11px, 2.2cqw, 16px);
+  line-height: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .letters__row-index {
+  .letters__row,
+  .letters__index {
     transition: none;
+  }
+
+  .letters__row:hover,
+  .letters__row:focus-visible {
+    transform: none;
   }
 }

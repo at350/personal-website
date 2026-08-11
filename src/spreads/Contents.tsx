@@ -1,124 +1,144 @@
+import { useState } from "react";
+import type { FocusEvent } from "react";
 import { useNavigate } from "react-router";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
-import { about, resume, siteMeta } from "@/lib/content";
+import { siteMeta } from "@/lib/content";
 import "@/styles/spreads/contents.css";
 
-const FEATURES = [
+interface Feature {
+  no: string;
+  route: string;
+  title: string;
+  dek: string;
+  /** Preview plate for the right band; null falls back to the red ✳ mark. */
+  image: string | null;
+}
+
+const FEATURES: readonly Feature[] = [
   {
-    page: "04",
+    no: "04",
     route: "/about",
-    title: "the editor's letter",
-    dek: about.heading,
+    title: "a letter",
+    dek: "systems with people still visible",
+    image: "/images/about/alan-headshot.webp",
   },
   {
-    page: "06",
+    no: "06",
     route: "/profile",
     title: "the profile",
-    dek: about.pullQuote,
+    dek: "in photographs",
+    image: "/images/about/alan-great-wall.webp",
   },
   {
-    page: "08",
+    no: "08",
     route: "/projects",
-    title: "five working prototypes",
-    // Verbatim from resume.recognition ("Five-time hackathon winner").
-    dek: "Built across energy, supply chains, public health, accessibility, and other very short weekends.",
+    title: "five prototypes",
+    dek: "energy, supply chains, health",
+    image: "/images/projects/architec.webp",
   },
   {
-    page: "12",
+    no: "12",
     route: "/resume",
     title: "the annotated resume",
-    dek: resume.heading,
+    dek: "the work, plus what did not fit",
+    image: null,
   },
-] as const;
+];
 
 const DEPARTMENTS = [
-  { page: "14", route: "/library", title: "the library" },
-  { page: "16", route: "/writing", title: "dispatches" },
-  { page: "18", route: "/contact", title: "letters + colophon" },
+  { no: "14", route: "/library", title: "library" },
+  { no: "16", route: "/writing", title: "writing" },
+  { no: "18", route: "/contact", title: "letters" },
 ] as const;
 
-const MASTHEAD_ROLES = [
-  "Editor-in-Chief",
-  "Art Director",
-  "Staff Writer",
-  "Fact Checker",
-  "Systems",
-  "Mailroom",
-] as const;
-
-function TableOfContents() {
+/* Verso — the table of contents is the artwork: four Tanker folios in a rail,
+   an empty band at the fore-edge that prints a preview when a row is held. */
+function FeaturesPage() {
   const navigate = useNavigate();
+  const [active, setActive] = useState<number | null>(null);
+
+  const clearUnlessInside = (event: FocusEvent<HTMLElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setActive(null);
+  };
 
   return (
-    <div className="contents" data-face="verso">
-      <p className="contents__eyebrow mono-label">in this issue</p>
-
-      <nav className="contents__features" aria-label="Features">
-        <ul>
-          {FEATURES.map((feature) => (
-            <li key={feature.page}>
-              <button
-                type="button"
-                className="contents__feature"
-                data-target-route={feature.route}
-                onClick={() => navigate(feature.route)}
-              >
-                <span className="contents__feature-page">{feature.page}</span>
-                <span className="contents__feature-body">
-                  <span className="contents__feature-title">{feature.title}</span>
-                  <span className="contents__feature-dek">{feature.dek}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+    <div className="contents2" data-face="verso">
+      <nav
+        className="contents2__rows"
+        aria-label="Features"
+        onMouseLeave={() => setActive(null)}
+        onBlur={clearUnlessInside}
+      >
+        {FEATURES.map((feature, index) => (
+          <button
+            key={feature.no}
+            type="button"
+            className="contents2__row"
+            data-active={active === index || undefined}
+            onClick={() => navigate(feature.route)}
+            onMouseEnter={() => setActive(index)}
+            onFocus={() => setActive(index)}
+          >
+            <span className="contents2__no" aria-hidden>
+              {feature.no}
+            </span>
+            <span className="contents2__entry">
+              <span className="contents2__title">{feature.title}</span>
+              <span className="contents2__dek">{feature.dek}</span>
+            </span>
+          </button>
+        ))}
       </nav>
 
-      <nav className="contents__departments" aria-label="Departments">
-        <p className="contents__dept-head mono-label">departments</p>
-        <ul className="contents__dept-list">
-          {DEPARTMENTS.map((dept) => (
-            <li key={dept.page}>
-              <button
-                type="button"
-                className="contents__dept"
-                data-target-route={dept.route}
-                onClick={() => navigate(dept.route)}
-              >
-                <span className="contents__dept-page">{dept.page}</span>
-                <span className="contents__dept-title">{dept.title}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <div className="contents2__band" aria-hidden>
+        {FEATURES.map((feature, index) => (
+          <div
+            key={feature.no}
+            className="contents2__plate"
+            data-open={active === index || undefined}
+          >
+            {feature.image ? (
+              <img src={feature.image} alt="" loading="lazy" decoding="async" />
+            ) : (
+              <span className="contents2__mark">✳</span>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-function Masthead() {
+/* Recto — departments as a hung mono ledger, then the imprint. Nothing else. */
+function DepartmentsPage() {
+  const navigate = useNavigate();
+
   return (
-    <div className="contents" data-face="recto">
-      <p className="contents__eyebrow mono-label">FIELD NOTES — ISSUE NO. 01</p>
-
-      <dl className="contents__masthead">
-        {MASTHEAD_ROLES.map((role) => (
-          <div className="contents__masthead-row" key={role}>
-            <dt className="contents__masthead-role">{role}</dt>
-            <dd className="contents__masthead-name">{siteMeta.name}</dd>
-          </div>
+    <div className="contents2" data-face="recto">
+      <nav className="contents2__ledger" aria-label="Departments">
+        {DEPARTMENTS.map((dept) => (
+          <button
+            key={dept.no}
+            type="button"
+            className="contents2__dept"
+            onClick={() => navigate(dept.route)}
+          >
+            <span className="contents2__dept-no" aria-hidden>
+              {dept.no}
+            </span>
+            <span className="contents2__dept-title">{dept.title}</span>
+          </button>
         ))}
-      </dl>
+      </nav>
 
-      <p className="contents__imprint">
-        Published occasionally from {siteMeta.location}.
-      </p>
-
-      <p className="contents__intro">{siteMeta.intro}</p>
+      <div className="contents2__imprint">
+        <p className="contents2__place">Published from {siteMeta.location}.</p>
+        <p className="contents2__intro">{siteMeta.intro}</p>
+      </div>
     </div>
   );
 }
 
 export function Contents({ face }: SpreadFaceProps) {
-  return face === "verso" ? <TableOfContents /> : <Masthead />;
+  return face === "verso" ? <FeaturesPage /> : <DepartmentsPage />;
 }

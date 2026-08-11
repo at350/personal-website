@@ -1,146 +1,151 @@
-/* Dispatches spread — verso: the blog index as FOB shorts; recto: a quiet
-   manifesto over deliberate emptiness. The palate cleanser before the BOB.
-   Vermilion budget: verso = jump-line hover only; recto = the seal only. */
+/* V2 dispatches — verso: two entries hung on Tanker numerals, the second
+   stepped off the grid; recto: one italic line and a red asterisk in white.
+   Red budget: jump-line underline (verso), the asterisk (recto). */
 
 .dispatches {
   position: absolute;
   inset: 0;
-  background: var(--washi);
+  background: var(--paper);
   display: flex;
   flex-direction: column;
-  padding: 9cqh 8cqw 11cqh;
+  padding: 8cqh 8cqw 10cqh;
 }
 
-.dispatches__eyebrow {
-  color: var(--sumi-2);
-  font-size: clamp(8px, 1.9cqw, 12px);
+.dispatches__mark {
+  color: var(--ink-3);
+  font-size: max(8px, 1.6cqw);
 }
 
-/* ————— Verso: the index ————— */
+/* ————— Verso: the entries ————— */
 
-.dispatches__list {
-  margin-top: 4cqh;
-  flex: 1;
+.dispatches__entries {
+  margin-top: 6cqh;
   display: flex;
   flex-direction: column;
+  gap: 7cqh;
 }
 
-.dispatches__item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+.dispatches__entry {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 4cqw;
+  align-items: start;
 }
 
-/* The lead dispatch holds the top 55%; the space beneath it is ma, not filler. */
-.dispatches__item:first-child {
-  flex: 1;
-  min-height: 46cqh;
+/* The one deliberate grid-break: entry 02 abandons the left edge. */
+.dispatches__entry + .dispatches__entry {
+  margin-left: 14cqw;
 }
 
-/* The second short sits under a hairline, stepped inward — fukinsei:
-   this indent is the spread's one deliberate grid-break. */
-.dispatches__item + .dispatches__item {
-  border-top: 1px solid var(--hairline);
-  padding-top: 3.2cqh;
-  padding-left: 8cqw;
+.dispatches__no {
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  font-size: clamp(26px, 7cqw, 52px);
+  line-height: 0.82;
+  color: var(--ink);
+  transform: translateY(-0.04em); /* optical cap alignment with the title */
+  font-feature-settings: "lnum" 1;
 }
 
-/* Status stamp: mono metadata in a hairline box, set slightly off-true. */
-.dispatches__stamp {
-  display: inline-block;
-  border: 1px solid var(--hairline);
-  padding: 0.4em 0.8em;
-  font-size: clamp(7px, 1.6cqw, 10px);
-  color: var(--gray-warm);
-  transform: rotate(-1deg);
-  transform-origin: left center;
+.dispatches__status {
+  color: var(--ink-3);
+  font-size: max(7.5px, 1.5cqw);
+  margin-bottom: 1cqh;
 }
 
 .dispatches__title {
-  margin-top: 2cqh;
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(15px, 4cqw, 26px);
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-  color: var(--sumi);
-  max-width: 22ch;
-}
-
-.dispatches__item:first-child .dispatches__title {
-  font-size: clamp(21px, 6.2cqw, 40px);
-  line-height: 1.02;
-  max-width: 15ch;
+  font-weight: 800;
+  font-size: clamp(15px, 3.6cqw, 26px);
+  line-height: 1.06;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  max-width: 18ch;
 }
 
 .dispatches__dek {
   margin-top: 1.4cqh;
   font-family: var(--font-body);
   font-style: italic;
-  font-size: clamp(10px, 2.2cqw, 14px);
+  font-size: clamp(10px, 2.1cqw, 14px);
   line-height: 1.5;
-  color: var(--gray-warm);
-  max-width: 36ch;
+  color: var(--ink-2);
+  max-width: 34ch;
 }
 
-/* Jump line: the working print convention. Underline strikes vermilion on hover. */
+/* The jump line: a printed route. Hover draws its underline in red. */
 .dispatches__jump {
+  position: relative;
+  display: inline-block;
   margin-top: 2.2cqh;
-  font-size: max(9px, 1.7cqw);
-  color: var(--sumi-2);
+  font-family: var(--font-mono);
+  font-size: max(8.5px, 1.7cqw);
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid var(--hairline);
-  padding-bottom: 0.2em;
-  transition:
-    border-color var(--dur-swap) var(--ease-settle),
-    color var(--dur-swap) var(--ease-settle);
+  padding-bottom: 0.3em;
+}
+
+.dispatches__jump::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--hairline);
+}
+
+.dispatches__jump::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 100%;
+  height: 1px;
+  background: var(--red);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 320ms var(--ease-settle);
 }
 
 .dispatches__jump:hover,
 .dispatches__jump:focus-visible {
-  color: var(--sumi);
-  border-bottom-color: var(--shu);
+  color: var(--ink);
 }
 
-/* ————— Recto: the manifesto, then quiet ————— */
-
-.dispatches__credo {
-  margin-top: 3cqh;
-  font-family: var(--font-body);
-  font-size: clamp(12px, 2.4cqw, 16px);
-  line-height: 1.6;
-  color: var(--sumi);
-  max-width: 30ch;
+.dispatches__jump:hover::before,
+.dispatches__jump:focus-visible::before {
+  transform: scaleX(1);
 }
 
-.dispatches__footnote {
-  margin-top: 2.4cqh;
-  font-size: max(9px, 1.7cqw);
-  color: var(--gray-warm);
-}
+/* ————— Recto: one line in emptiness ————— */
 
-/* The bottom half stays empty except the rakkan and one line of wayfinding. */
-.dispatches__quiet {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.dispatches[data-face="recto"] {
   align-items: center;
   justify-content: center;
-  gap: 2.4cqh;
+  gap: 3.2cqh;
 }
 
-.dispatches__seal {
-  width: clamp(26px, 7cqw, 44px);
-  height: clamp(26px, 7cqw, 44px);
+.dispatches__credo {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(13px, 2.8cqw, 20px);
+  line-height: 1.4;
+  color: var(--ink);
+  text-align: center;
+  max-width: 24ch;
 }
 
-.dispatches__next {
-  font-size: max(9px, 1.7cqw);
-  color: var(--gray-warm);
+.dispatches__asterisk {
+  color: var(--red);
+  font-size: clamp(12px, 2.6cqw, 19px);
+  line-height: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dispatches__jump {
+  .dispatches__jump::before {
     transition: none;
   }
 }

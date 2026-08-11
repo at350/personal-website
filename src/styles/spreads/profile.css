@@ -1,11 +1,12 @@
-/* THE PROFILE — pages 06–07. About part 2, the Gentlewoman treatment.
-   Verso: grotesk headline bled off the fore-edge, jibang ledger, contact sheet.
-   Recto: full-bleed hutong photo. Zero vermilion on this spread by design. */
+/* V2 THE PROFILE — pages 06–07. White paper, black ink, one red.
+   Verso: Fett statement flush left, numbered ledger stepped right, loose
+   prints scattered on the lower third (the draggable signature).
+   Recto: full-bleed hutong photo, mono caption plate. */
 
 .profile {
   position: absolute;
   inset: 0;
-  background: var(--washi);
+  background: var(--paper);
   overflow: hidden;
 }
 
@@ -14,37 +15,39 @@
 .profile[data-face="verso"] {
   display: flex;
   flex-direction: column;
-  padding: 7.5cqh 7cqw 9.5cqh; /* deep foot margin keeps captions clear of the folio */
+  padding: 8.5cqw 7cqw 7cqw;
 }
 
-/* Flush to the head margin; the stepped ledger below is the grid break.
-   (An earlier fore-edge bleed amputated word beginnings — reverted.) */
-.profile__headline {
+.profile__statement {
   font-family: var(--font-ui);
   font-weight: 700;
-  font-size: clamp(22px, 6.8cqw, 50px);
-  line-height: 1.04;
-  letter-spacing: -0.012em;
-  color: var(--sumi);
+  font-size: clamp(19px, 6.5cqw, 54px);
+  line-height: 1.03;
+  letter-spacing: -0.015em;
+  color: var(--ink);
 }
 
-.profile__headline-line {
+.profile__statement-line {
   display: block;
 }
 
-/* Q&A as ledger: numbered entries stepped right; emptiness holds the left. */
+.profile__dot {
+  color: var(--red);
+}
+
+/* The four notes as a ledger, stepped right; emptiness holds the left. */
 .profile__ledger {
-  margin-top: 3.2cqh;
-  margin-left: 18cqw;
+  margin-top: 5cqw;
+  margin-left: 27cqw;
   font-feature-settings: "lnum" 1;
 }
 
 .profile__entry {
   display: grid;
-  grid-template-columns: 5cqw 1fr;
-  column-gap: 2cqw;
+  grid-template-columns: max(22px, 5cqw) 1fr;
+  column-gap: max(8px, 2cqw);
   align-items: baseline;
-  padding: 0.9cqh 0 1.1cqh;
+  padding: max(6px, 1.4cqw) 0 max(7px, 1.7cqw);
   border-top: 1px solid var(--hairline);
 }
 
@@ -52,72 +55,87 @@
   border-bottom: 1px solid var(--hairline);
 }
 
-.profile__entry-num {
+.profile__num {
   font-family: var(--font-mono);
-  font-size: max(9px, 1.7cqw);
+  font-size: max(8.5px, 1.7cqw);
   letter-spacing: 0.08em;
-  color: var(--gray-warm);
+  color: var(--red);
 }
 
-.profile__entry-label {
-  font-size: max(9px, 1.7cqw);
-  color: var(--sumi);
-}
-
-.profile__entry-text {
-  grid-column: 2;
-  margin-top: 0.7cqh;
+.profile__note {
   font-family: var(--font-body);
-  font-size: clamp(11.5px, 2.2cqw, 15px);
+  font-size: clamp(11px, 2.05cqw, 14.5px);
   line-height: 1.5;
-  color: var(--sumi-2);
+  color: var(--ink-2);
 }
 
-/* Contact-sheet strip: three prints laid on the desk, not quite square. */
-.profile__sheet {
+/* The desk: loose prints live here; one rides up past the band. */
+.profile__desk {
+  position: relative;
   margin-top: auto;
-  padding-top: 2.6cqh;
-  display: flex;
-  align-items: flex-start;
-  gap: 2.6cqw;
+  height: 34cqw;
 }
 
-.profile__frame {
-  width: 14.5cqw;
-  margin: 0;
-  min-width: 0;
+.profile__print {
+  position: absolute;
+  background: var(--paper);
+  border: 4px solid var(--paper);
+  outline: 1px solid var(--hairline);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 480ms var(--ease-settle);
+  will-change: transform;
 }
 
-.profile__frame:nth-child(odd) {
-  transform: rotate(-0.5deg);
+.profile__print.is-dragging {
+  cursor: grabbing;
 }
 
-.profile__frame:nth-child(even) {
-  transform: rotate(0.5deg);
+.profile__print:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
 }
 
-.profile__frame img {
+.profile__print img {
   display: block;
   width: 100%;
   aspect-ratio: 3 / 4;
   object-fit: cover;
-  border: 1px solid var(--hairline);
-  background: var(--washi-deep);
+  pointer-events: none;
 }
 
-.profile__frame figcaption {
-  margin-top: 0.7cqh;
-  font-family: var(--font-mono);
-  font-size: max(8px, 1.5cqw);
-  line-height: 1.4;
-  letter-spacing: 0.02em;
-  color: var(--gray-warm);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Reduced motion: the prints rest in a neat row. */
+.profile__sheet {
+  margin-top: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: max(10px, 2.5cqw);
 }
 
-/* ————— Recto (p.07): the photo is the statement ————— */
+.profile__flat {
+  width: 20cqw;
+  margin: 0;
+  background: var(--paper);
+  border: 4px solid var(--paper);
+  outline: 1px solid var(--hairline);
+}
+
+.profile__flat img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile__print {
+    transition: none;
+  }
+}
+
+/* ————— Recto (p.07): the photo is the page ————— */
 
 .profile__bleed {
   position: absolute;
@@ -130,26 +148,16 @@
 .profile__plate {
   position: absolute;
   left: 6cqw;
-  bottom: 6cqh;
-  max-width: 46cqw;
-  padding: 1.2cqw 1.8cqw;
-  background: var(--washi-hi);
-  color: var(--sumi-2);
-  font-size: max(9px, 1.7cqw);
-  line-height: 1.6;
+  bottom: 6cqw;
+  display: inline-flex;
+  align-items: baseline;
+  gap: max(8px, 1.6cqw);
+  padding: max(6px, 1.1cqw) max(10px, 1.8cqw);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: max(8.5px, 1.6cqw);
 }
 
-/* 散歩 — a stroll, standing quietly in the lantern light. */
-.profile__tategaki {
-  position: absolute;
-  top: 9cqh;
-  right: 3.2cqw;
-  writing-mode: vertical-rl;
-  text-orientation: upright;
-  font-family: var(--font-jp);
-  font-weight: 500;
-  font-size: clamp(14px, 3cqw, 22px);
-  letter-spacing: 0.55em;
-  color: var(--washi-hi);
-  mix-blend-mode: soft-light;
+.profile__plate-no {
+  color: var(--red);
 }

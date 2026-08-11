@@ -1,20 +1,45 @@
+import { useRef } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { about } from "@/lib/content";
 import { Marginalia } from "@/components/furniture/Marginalia";
 import { EndMark } from "@/components/furniture/EndMark";
+import { motionOK } from "@/lib/motion";
 import "@/styles/spreads/letter.css";
 
-/* The two asides that float in the verso's empty margin. */
+/* The two ✳ asides in the verso's wide margin. */
 const marginNotes = [about.notes[1], about.notes[2]];
 const portrait = about.photos[0];
 
-/** Pages 04–05 — The Editor's Letter (About, part 1). */
+/** Pages 04–05 — a letter (verso) and the portrait plate (recto). */
 export function EditorsLetter({ face }: SpreadFaceProps) {
+  const plateRef = useRef<HTMLElement>(null);
+
+  /* transitions.dev "3D tilt with glare": pointer drives ±3deg of tilt and
+     the sheen's x position. Mouse only; reduced motion kills it in CSS too. */
+  const onPlateMove = (e: ReactPointerEvent<HTMLElement>) => {
+    const plate = plateRef.current;
+    if (!plate || e.pointerType !== "mouse" || !motionOK()) return;
+    const rect = plate.getBoundingClientRect();
+    const nx = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+    const ny = Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1);
+    plate.style.setProperty("--tx", (nx * 2 - 1).toFixed(3));
+    plate.style.setProperty("--ty", (ny * 2 - 1).toFixed(3));
+    plate.style.setProperty("--gx", nx.toFixed(3));
+  };
+
+  const onPlateLeave = () => {
+    const plate = plateRef.current;
+    if (!plate) return;
+    plate.style.setProperty("--tx", "0");
+    plate.style.setProperty("--ty", "0");
+  };
+
   if (face === "verso") {
     return (
       <div className="letter" data-face="verso">
-        <section className="letter__column" aria-label="The editor's letter">
-          <p className="letter__eyebrow mono-label">{about.eyebrow}</p>
+        <section className="letter__column" aria-label="A letter">
+          <p className="letter__eyebrow">a letter</p>
           <h2 className="letter__heading">{about.heading}</h2>
           <p className="letter__body drop-cap">{about.lede}</p>
           {about.paragraphs.map((paragraph) => (
@@ -47,14 +72,22 @@ export function EditorsLetter({ face }: SpreadFaceProps) {
 
   return (
     <div className="letter" data-face="recto">
-      <figure className="letter__plate">
-        <img
-          className="letter__portrait"
-          src={portrait.src}
-          alt={portrait.alt}
-          decoding="async"
-        />
-        <figcaption className="letter__plate-caption mono-label">
+      <figure
+        className="letter__plate"
+        ref={plateRef}
+        onPointerMove={onPlateMove}
+        onPointerLeave={onPlateLeave}
+      >
+        <span className="letter__plate-tilt">
+          <img
+            className="letter__portrait"
+            src={portrait.src}
+            alt={portrait.alt}
+            decoding="async"
+          />
+          <span className="letter__glare" aria-hidden />
+        </span>
+        <figcaption className="letter__plate-caption">
           {portrait.caption}
         </figcaption>
       </figure>
@@ -62,10 +95,6 @@ export function EditorsLetter({ face }: SpreadFaceProps) {
       <blockquote className="letter__pull">
         <p>{about.pullQuote}</p>
       </blockquote>
-
-      <p className="letter__plate-no mono-label">
-        Plate 01 — The official version
-      </p>
     </div>
   );
 }

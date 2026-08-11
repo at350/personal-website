@@ -1,49 +1,55 @@
-/* THE EDITOR'S LETTER — pp. 04–05. About, part 1.
-   Verso: the letter, set right of a wide empty margin (the fukinsei gesture).
-   Recto: the portrait plate. Vermilion budget: the ✳ marks only. */
+/* A LETTER — pp. 04–05. V2.
+   Verso: one 34ch column set flush against the right margin; the heading is
+   the grid-break, crossing back into the wide empty margin where only two
+   red ✳ notes hang. Recto: the portrait plate rides the spine and carries
+   the tilt + glare. Geometry in cqw so book and reader pages agree. */
 
 .letter {
   position: absolute;
   inset: 0;
-  background: var(--washi);
+  background: var(--paper);
 }
 
 /* ————— Verso (p. 04): the letter ————— */
 
 .letter[data-face="verso"] {
-  padding: 6.5cqh 8cqw 6cqh 0;
+  padding: 8cqw 8cqw 8cqw 0;
 }
 
-/* The single narrow column, pushed off the wide empty left margin. */
+/* Hard right: margin-left auto pins the column to the right page margin. */
 .letter__column {
-  margin-left: 31cqw;
-  max-width: 61cqw;
+  margin-left: auto;
+  max-width: 34ch;
+  font-size: clamp(10px, 2.15cqw, 15.5px);
 }
 
 .letter__eyebrow {
-  color: var(--gray-warm);
-  font-size: max(9px, 1.7cqw);
-  margin-bottom: 1.6cqh;
+  font-family: var(--font-mono);
+  font-size: max(8.5px, 1.7cqw);
+  letter-spacing: 0.2em;
+  color: var(--ink-3);
+  font-feature-settings: "lnum" 1;
+  margin-bottom: 3cqw;
 }
 
+/* The page's one grid-break: display type escapes the column into the margin. */
 .letter__heading {
   font-family: var(--font-display);
-  font-weight: 800;
-  font-size: clamp(19px, 4.8cqw, 40px);
-  line-height: 1.06;
-  letter-spacing: -0.01em;
-  color: var(--sumi);
-  max-width: 20ch; /* holds the heading to three lines */
+  font-weight: 900;
+  font-size: clamp(16px, 5cqw, 46px);
+  line-height: 1.03;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  max-width: 18ch;
+  margin-left: -26cqw;
+  margin-bottom: 4.5cqw;
   text-wrap: balance;
-  margin-bottom: 2.4cqh;
 }
 
 .letter__body {
   font-family: var(--font-body);
-  font-size: clamp(10.5px, 2.25cqw, 16px);
-  line-height: 1.7;
-  color: var(--sumi-2);
-  max-width: 35ch;
+  line-height: 1.52;
+  color: var(--ink-2);
   font-feature-settings: "onum" 1, "liga" 1;
 }
 
@@ -55,80 +61,137 @@
   font-family: var(--font-display);
   font-style: italic;
   font-weight: 500;
-  font-size: clamp(13px, 3cqw, 24px);
+  font-size: clamp(13px, 3cqw, 25px);
   line-height: 1.2;
-  color: var(--sumi);
-  margin-top: 2cqh;
+  color: var(--ink);
+  margin-top: 4.5cqw;
 }
 
-/* Two ✳ asides floating in the margin at different heights —
-   this spread's only vermilion. */
+/* Two ✳ asides at staggered heights — this page's only red. */
 .letter__aside {
   position: absolute;
-  font-size: clamp(13px, 2.6cqw, 19px);
+  font-size: clamp(13px, 2.7cqw, 20px);
   line-height: 1;
 }
 
 .letter__aside--one {
-  top: 33cqh;
-  left: 10cqw;
+  top: 48cqw;
+  left: 11cqw;
 }
 
 .letter__aside--two {
-  top: 59cqh;
-  left: 15.5cqw;
+  top: 84cqw;
+  left: 22cqw;
+}
+
+/* Small book faces (height-capped): pull the px floors down so the letter
+   still fits the page. Height queries are false in the reader, where paper
+   grows instead. */
+@container (max-width: 470px) and (max-height: 640px) {
+  .letter__column {
+    font-size: clamp(9px, 2.15cqw, 15.5px);
+    line-height: 1.45;
+  }
+
+  .letter__heading {
+    font-size: clamp(14px, 5cqw, 46px);
+    margin-bottom: 3.5cqw;
+  }
+
+  .letter__signoff {
+    margin-top: 3.5cqw;
+  }
 }
 
 /* ————— Recto (p. 05): the portrait plate ————— */
 
 .letter[data-face="recto"] {
-  padding: 6.5cqh 8cqw 7cqh;
+  padding: 8cqw 8cqw 8cqw 0;
 }
 
-/* The matted plate, upper-center-left, hung a breath off square. */
+/* The plate ignores the margin grid and rides the spine. */
 .letter__plate {
-  width: 72cqw; /* 64cqw image + 4cqw mat each side */
-  margin-left: 5cqw;
-  padding: 4cqw;
-  background: var(--washi-hi);
-  box-shadow:
-    0 1px 2px rgba(28, 26, 23, 0.06),
-    0 10px 28px rgba(28, 26, 23, 0.1);
-  transform: rotate(-0.4deg);
+  --tilt-max: 3deg;
+
+  width: 78cqw;
+  margin: 0;
+  perspective: 1000px;
+}
+
+.letter__plate-tilt {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  transform: rotateX(calc(var(--ty, 0) * (var(--tilt-max, 3deg) * -1)))
+    rotateY(calc(var(--tx, 0) * var(--tilt-max, 3deg)));
+  transition: transform 260ms var(--ease-settle);
+  will-change: transform;
 }
 
 .letter__portrait {
   width: 100%;
 }
 
-.letter__plate-caption {
-  margin-top: 2.4cqw;
-  color: var(--gray-warm);
-  font-size: max(9px, 1.7cqw);
+/* The glare: a blurred white band, not a gradient. --gx sweeps it across. */
+.letter__glare {
+  position: absolute;
+  top: -30%;
+  bottom: -30%;
+  left: 0;
+  width: 34%;
+  background: rgba(255, 255, 255, 0.3);
+  filter: blur(24px);
+  transform: translateX(calc(var(--gx, 0.5) * 294% - 50%)) rotate(14deg);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 320ms var(--ease-settle),
+    transform 260ms var(--ease-settle);
 }
 
-/* The pull, offset right beneath the plate. */
+@media (hover: hover) and (pointer: fine) {
+  .letter__plate:hover .letter__glare {
+    opacity: 1;
+  }
+}
+
+/* The caption obeys the margin the plate ignored. */
+.letter__plate-caption {
+  font-family: var(--font-mono);
+  font-size: max(8.5px, 1.7cqw);
+  letter-spacing: 0.14em;
+  text-transform: lowercase;
+  color: var(--ink-3);
+  font-feature-settings: "lnum" 1;
+  margin-top: 3cqw;
+  margin-left: 8cqw;
+}
+
+/* The pull, below-right, under a 2px ink rule. */
 .letter__pull {
-  margin-top: 4.5cqh;
-  margin-left: 34cqw;
-  max-width: 48cqw;
-  border-top: 1px solid var(--hairline);
-  padding-top: 2cqh;
+  margin-top: 7cqw;
+  margin-left: 48cqw;
+  width: 44cqw;
+  border-top: 2px solid var(--ink);
+  padding-top: 3.5cqw;
 }
 
 .letter__pull p {
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-style: italic;
-  font-size: clamp(14px, 3cqw, 24px);
-  line-height: 1.5;
-  color: var(--sumi);
-  font-feature-settings: "onum" 1, "liga" 1;
+  font-weight: 500;
+  font-size: clamp(13px, 3.2cqw, 27px);
+  line-height: 1.4;
+  color: var(--ink);
 }
 
-.letter__plate-no {
-  position: absolute;
-  right: 8cqw;
-  bottom: 6.5cqh;
-  color: var(--gray-faint);
-  font-size: max(9px, 1.7cqw);
+@media (prefers-reduced-motion: reduce) {
+  .letter__plate-tilt {
+    transform: none !important;
+    transition: none;
+  }
+
+  .letter__glare {
+    display: none;
+  }
 }
