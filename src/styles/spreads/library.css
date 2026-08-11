@@ -58,7 +58,7 @@
   font-family: var(--font-condensed);
   font-size: 19cqw;
   line-height: 0.84;
-  letter-spacing: 0.002em;
+  letter-spacing: -0.004em;
   color: var(--ink);
   white-space: nowrap;
   animation: library-display-swap 300ms var(--ease-settle) backwards;
@@ -244,8 +244,9 @@ a.media-plate:focus-visible .media-plate__title {
 .media-plate__excerpt {
   margin-top: 0.8cqh;
   font-family: var(--font-body);
+  line-height: 1.58;
   font-size: max(11px, 1.75cqw);
-  line-height: 1.5;
+  
   color: var(--ink-2);
   display: -webkit-box;
   -webkit-box-orient: vertical;

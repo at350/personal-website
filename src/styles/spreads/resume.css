@@ -34,7 +34,7 @@
   font-weight: 400;
   font-size: 15cqw;
   line-height: 0.8;
-  letter-spacing: 0.002em;
+  letter-spacing: -0.004em;
   white-space: nowrap;
   color: var(--ink);
 }
@@ -120,8 +120,9 @@
 
 .resume2__edu-prog {
   font-family: var(--font-body);
+  line-height: 1.58;
   font-size: max(10.5px, 1.9cqw);
-  line-height: 1.35;
+  
   color: var(--ink-2);
 }
 
@@ -206,8 +207,9 @@
 
 .resume2__summary {
   font-family: var(--font-body);
+  line-height: 1.58;
   font-size: max(11px, 1.8cqw);
-  line-height: 1.35;
+  
   color: var(--ink-3);
   white-space: nowrap;
   overflow: hidden;
@@ -287,6 +289,7 @@
 
 .resume2__rec-no {
   font-family: var(--font-condensed);
+  letter-spacing: -0.004em;
   font-weight: 400;
   font-size: max(22px, 5cqw);
   line-height: 0.8;

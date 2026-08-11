@@ -64,8 +64,9 @@
 
 .profile__note {
   font-family: var(--font-body);
+  line-height: 1.58;
   font-size: clamp(11px, 2.05cqw, 14.5px);
-  line-height: 1.5;
+  
   color: var(--ink-2);
 }
 
@@ -203,7 +204,7 @@
   font-size: clamp(26px, 8.6cqw, 76px);
   line-height: 0.98;
   color: var(--paper);
-  letter-spacing: 0.01em;
+  letter-spacing: -0.004em;
   white-space: nowrap;
 }
 

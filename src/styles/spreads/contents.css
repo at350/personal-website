@@ -40,6 +40,7 @@
 .contents2__no {
   justify-self: end;
   font-family: var(--font-condensed);
+  letter-spacing: -0.004em;
   font-weight: 400;
   font-size: 9cqw;
   line-height: 0.85;
@@ -110,6 +111,7 @@
   display: grid;
   place-items: center;
   font-family: var(--font-display);
+  letter-spacing: -0.012em;
   font-size: 26cqw;
   line-height: 1;
   color: var(--red);
@@ -189,8 +191,9 @@
 .contents2__intro {
   margin-top: 1.6cqh;
   font-family: var(--font-body);
+  line-height: 1.58;
   font-size: clamp(11px, 2.3cqw, 15px);
-  line-height: 1.65;
+  
   color: var(--ink-2);
 }
 

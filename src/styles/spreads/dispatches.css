@@ -39,6 +39,7 @@
 
 .dispatches__no {
   font-family: var(--font-condensed);
+  letter-spacing: -0.004em;
   font-weight: 400;
   font-size: clamp(26px, 7cqw, 52px);
   line-height: 0.82;

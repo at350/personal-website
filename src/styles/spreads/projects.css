@@ -4,10 +4,9 @@
 /* ————— p.8 · the count ————— */
 
 .proj-count {
-  background: var(--ink);
   position: absolute;
   inset: 0;
-  background: var(--paper);
+  background: var(--ink);
   display: flex;
   flex-direction: column;
   padding: 0 8cqw 9cqh;
@@ -20,7 +19,7 @@
   font-weight: 400;
   font-size: 38cqw;
   line-height: 0.8;
-  letter-spacing: 0.002em;
+  letter-spacing: -0.004em;
   color: var(--paper);
 }
 
@@ -72,6 +71,7 @@
 .proj-index__no {
   margin-left: -3.2cqw;
   font-family: var(--font-condensed);
+  letter-spacing: -0.004em;
   font-size: 6cqw;
   line-height: 1;
   color: var(--ink-3);
@@ -137,8 +137,9 @@
 
 .proj-index__summary {
   font-family: var(--font-body);
+  line-height: 1.58;
   font-size: clamp(12px, 2.1cqw, 16px);
-  line-height: 1.5;
+  
   color: var(--ink-2);
   max-width: 56cqw;
 }
@@ -246,6 +247,7 @@
 
 .proj-feature__no {
   font-family: var(--font-condensed);
+  letter-spacing: -0.004em;
   font-size: 9cqw;
   line-height: 0.85;
   color: var(--ink);
@@ -270,8 +272,9 @@
 .proj-feature__summary {
   margin-top: 2.2cqh;
   font-family: var(--font-body);
+  line-height: 1.58;
   font-size: clamp(13px, 2.3cqw, 17px);
-  line-height: 1.55;
+  
   color: var(--ink);
   max-width: 62cqw;
 }
@@ -334,6 +337,7 @@
 
 .proj-rest__no {
   font-family: var(--font-condensed);
+  letter-spacing: -0.004em;
   font-size: max(11px, 2.2cqw);
   line-height: 1;
   color: var(--ink-3);
@@ -348,4 +352,19 @@
   .proj-feature__link {
     transition: none;
   }
+}
+
+/* The census: five of forty weekends, printed. */
+.proj-count__census {
+  margin-top: 4cqh;
+  width: 56cqw;
+}
+
+/* Figures inside the features sit in the lower half, sized to the column. */
+.proj-feature .fig {
+  margin-top: max(10px, 1.8cqh);
+}
+
+.proj-feature .fig__art {
+  padding-top: max(10px, 1.6cqh);
 }

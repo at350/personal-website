@@ -19,6 +19,8 @@ export interface BookMotion {
   velocity: number;
   /** Spring target when settling, or null while dragging. */
   target: number | null;
+  /** Where the hand wants the leaf while dragging; the leaf springs after it. */
+  dragTarget: number;
   dragging: boolean;
   /** True when the current settle came from a released drag (snappier spring). */
   released: boolean;
@@ -42,9 +44,15 @@ export interface BookMotion {
 
 const TOTAL_LEAVES = SPREADS.length - 1;
 const LEAF_THICKNESS = 2.3;
-/** Softer spring for choreographed turns; snappier when a drag is released. */
-const SPRING_K_AUTO = 52;
-const SPRING_K_RELEASE = 110;
+/** Softer spring for choreographed turns; snappier when a drag is released.
+    Damping sits just under critical — paper flexes at the end of a turn,
+    it does not clunk into place like a stone. */
+const SPRING_K_AUTO = 46;
+const SPRING_K_RELEASE = 95;
+const SPRING_DAMPING = 0.9;
+/** While dragging, the leaf CHASES the hand through its own little spring —
+    paper is compliant, not a rod welded to the pointer. */
+const DRAG_FOLLOW_K = 420;
 
 function edgeTexture(): THREE.CanvasTexture {
   const c = document.createElement("canvas");
@@ -241,9 +249,17 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 30);
     clockRef.current += dt;
-    if (!motion.dragging && motion.target !== null && motion.leaf !== null) {
+    if (motion.dragging && motion.leaf !== null) {
+      // Compliant drag: progress springs after the pointer's target with a
+      // short lag, so the sheet visibly flexes with the hand.
+      const k = DRAG_FOLLOW_K;
+      const c = 2 * Math.sqrt(k);
+      const a = k * (motion.dragTarget - motion.progress) - c * motion.velocity;
+      motion.velocity += a * dt;
+      motion.progress = Math.min(1, Math.max(0, motion.progress + motion.velocity * dt));
+    } else if (motion.target !== null && motion.leaf !== null) {
       const k = motion.released ? SPRING_K_RELEASE : SPRING_K_AUTO;
-      const c = 2 * Math.sqrt(k) * 1.02; // a touch overdamped: paper, not rubber
+      const c = 2 * Math.sqrt(k) * SPRING_DAMPING;
       const a = k * (motion.target - motion.progress) - c * motion.velocity;
       motion.velocity += a * dt;
       motion.progress += motion.velocity * dt;

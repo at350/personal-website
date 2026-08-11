@@ -96,6 +96,7 @@ export function EditorsLetter({ face }: SpreadFaceProps) {
       <blockquote className="letter__pull">
         <p>{about.pullQuote}</p>
       </blockquote>
+
     </div>
   );
 }

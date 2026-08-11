@@ -59,6 +59,7 @@
 
 .letter__signoff {
   font-family: var(--font-display);
+  letter-spacing: -0.012em;
   font-style: italic;
   font-weight: 500;
   font-size: clamp(13px, 3cqw, 25px);
@@ -178,6 +179,7 @@
 
 .letter__pull p {
   font-family: var(--font-display);
+  letter-spacing: -0.012em;
   font-style: italic;
   font-weight: 500;
   font-size: clamp(13px, 3.2cqw, 27px);
@@ -194,4 +196,10 @@
   .letter__glare {
     display: none;
   }
+}
+
+/* The record strip anchors the plate page's foot. */
+.letter__record {
+  margin-top: auto;
+  width: 78cqw;
 }

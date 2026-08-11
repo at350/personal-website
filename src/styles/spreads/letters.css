@@ -133,8 +133,9 @@
 
 .colophon__desc {
   font-family: var(--font-body);
+  line-height: 1.58;
   font-size: clamp(10px, 1.95cqw, 14px);
-  line-height: 1.55;
+  
   color: var(--ink);
   max-width: 44ch;
   font-feature-settings: "lnum" 1; /* hex values and dates read as data */

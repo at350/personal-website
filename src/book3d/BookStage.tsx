@@ -82,6 +82,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       progress: 0,
       velocity: 0,
       target: null,
+      dragTarget: 0,
       dragging: false,
       released: false,
       shift: 0,
@@ -180,19 +181,13 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       window.getSelection()?.removeAllRanges();
       const startProgress = edge === "fore" ? 0 : 1;
       motion.progress = startProgress;
+      motion.dragTarget = startProgress;
       motion.velocity = 0;
       motion.dragging = true;
-      let lastX = startX;
-      let lastT = performance.now();
       const width = pw * 2;
       const move = (ev: PointerEvent) => {
-        const now = performance.now();
-        const dt = Math.max(now - lastT, 1);
-        motion.velocity = (-(ev.clientX - lastX) / width) * (1000 / dt);
-        lastX = ev.clientX;
-        lastT = now;
         const delta = (startX - ev.clientX) / (width * 0.82);
-        motion.progress = Math.min(1, Math.max(0, startProgress + delta));
+        motion.dragTarget = Math.min(1, Math.max(0, startProgress + delta));
       };
       const up = () => {
         window.removeEventListener("pointermove", move);
@@ -206,7 +201,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         }
         motion.dragging = false;
         dispatch({ type: "DRAG_MOVE", progress: motion.progress });
-        dispatch({ type: "DRAG_END", velocity: motion.velocity / 2.5 });
+        dispatch({ type: "DRAG_END", velocity: motion.velocity / 3 });
       };
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
