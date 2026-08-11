@@ -1,0 +1,297 @@
+/* The stage: a stark white void with one object in it. */
+.stage {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  position: relative;
+  background: var(--void);
+  overflow: clip;
+}
+
+.book {
+  /* Page geometry: 3:4 pages, two of them. */
+  --page-w: min(44vw, 62vh);
+  --page-h: calc(var(--page-w) * 4 / 3);
+  --p: 0;
+  position: relative;
+  width: calc(var(--page-w) * 2);
+  height: var(--page-h);
+  perspective: calc(var(--page-w) * 4.2);
+  perspective-origin: 50% 50%;
+  transition: transform 700ms var(--ease-settle);
+}
+
+.book--at-cover {
+  transform: translateX(calc(var(--page-w) * -0.5));
+}
+
+.book--at-back {
+  transform: translateX(calc(var(--page-w) * 0.5));
+}
+
+/* Stacked fore-edge strata — the closed book's remaining pages. */
+.book__edges {
+  position: absolute;
+  top: 4px;
+  bottom: 2px;
+  width: calc(min(var(--n), 6) * 1.5px);
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--washi-deep) 0px,
+      var(--washi-hi) 0.5px,
+      var(--washi-deep) 1.5px
+    );
+  border-radius: 1px;
+  transition: width 400ms var(--ease-settle);
+}
+
+.book__edges--left {
+  right: 100%;
+  transform-origin: right center;
+  box-shadow: -1px 2px 6px rgba(28, 26, 23, 0.12);
+}
+
+.book__edges--right {
+  left: 100%;
+  box-shadow: 1px 2px 6px rgba(28, 26, 23, 0.12);
+}
+
+/* Static pages. */
+.page {
+  position: absolute;
+  top: 0;
+  width: var(--page-w);
+  height: var(--page-h);
+  background: var(--washi);
+  overflow: hidden;
+}
+
+.page--verso {
+  left: 0;
+  border-radius: 2px 0 0 2px;
+  box-shadow:
+    0 14px 44px rgba(28, 26, 23, 0.16),
+    0 2px 10px rgba(28, 26, 23, 0.1);
+}
+
+.page--recto {
+  left: var(--page-w);
+  border-radius: 0 2px 2px 0;
+  box-shadow:
+    0 14px 44px rgba(28, 26, 23, 0.16),
+    0 2px 10px rgba(28, 26, 23, 0.1);
+}
+
+.page--void {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Gutter shading — the paper diving into the spine. */
+.page--verso::after,
+.page--recto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.page--verso::after {
+  background: linear-gradient(
+    to left,
+    var(--gutter-shadow),
+    transparent 9%
+  );
+}
+
+.page--recto::after {
+  background: linear-gradient(
+    to right,
+    var(--gutter-shadow),
+    transparent 9%
+  );
+}
+
+.page--void::after {
+  content: none;
+}
+
+/* A page's inner face. */
+.page-face {
+  position: absolute;
+  inset: 0;
+  background: var(--washi);
+  overflow: hidden;
+}
+
+/* The sheet in flight. */
+.sheet {
+  position: absolute;
+  top: 0;
+  left: var(--page-w);
+  width: var(--page-w);
+  height: var(--page-h);
+  transform-origin: left center;
+  transform: rotateY(calc(var(--p) * -180deg));
+  transform-style: preserve-3d;
+  z-index: 5;
+  pointer-events: none;
+  will-change: transform;
+  filter: drop-shadow(
+    calc((0.5 - max(var(--p) - 0.5, min(var(--p), 0.5))) * 24px) 10px 18px
+      rgba(28, 26, 23, calc(0.24 * (1 - abs(var(--p) * 2 - 1))))
+  );
+}
+
+.sheet__face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--washi);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.sheet__face--front {
+  transform: rotateY(0deg) translateZ(0.4px);
+  border-radius: 0 2px 2px 0;
+}
+
+.sheet__face--back {
+  transform: rotateY(180deg) translateZ(0.4px);
+  border-radius: 2px 0 0 2px;
+}
+
+/* Curvature light: a moving sheen on the lifting sheet. */
+.sheet__shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    to left,
+    rgba(28, 26, 23, 0.22),
+    rgba(28, 26, 23, 0.02) 34%,
+    transparent 55%
+  );
+  opacity: calc(1 - abs(var(--p) * 2 - 1));
+}
+
+.sheet__light {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.55),
+    rgba(255, 255, 255, 0.08) 30%,
+    transparent 60%
+  );
+  opacity: calc(1 - abs(var(--p) * 2 - 1));
+}
+
+/* Shadow the sheet casts on the page beneath it. */
+.book__cast {
+  position: absolute;
+  top: 0;
+  left: var(--page-w);
+  width: var(--page-w);
+  height: var(--page-h);
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    rgba(28, 26, 23, 0.28),
+    transparent calc(20% + (1 - var(--p)) * 60%)
+  );
+  opacity: calc(0.9 * (1 - abs(var(--p) * 2 - 1)));
+}
+
+/* Drag hotzones along the fore-edges. */
+.hotzone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: clamp(56px, 8%, 96px);
+  z-index: 8;
+  cursor: grab;
+  touch-action: none;
+}
+
+.book--dragging .hotzone {
+  cursor: grabbing;
+}
+
+.hotzone--fore {
+  right: 0;
+}
+
+.hotzone--back {
+  left: 0;
+}
+
+.book--at-cover .hotzone--back,
+.book--at-back .hotzone--fore {
+  display: none;
+}
+
+/* Teleport crossfade (long TOC jumps). */
+.stage--teleported .page-face {
+  animation: page-teleport 320ms var(--ease-settle);
+}
+
+@keyframes page-teleport {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Calm mode: reduced motion crossfades. */
+.book--calm .page-face {
+  animation: page-teleport 200ms ease;
+}
+
+/* Stage chrome. */
+.stage__nav {
+  position: absolute;
+  bottom: clamp(16px, 3vh, 36px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--gray-warm);
+}
+
+.stage__where {
+  letter-spacing: 0.18em;
+  font-size: 10.5px;
+}
+
+.stage__turn {
+  font-size: 15px;
+  padding: 6px 10px;
+  color: var(--sumi-2);
+  transition: color 200ms ease, transform 300ms var(--ease-settle);
+}
+
+.stage__turn:hover:not(:disabled) {
+  color: var(--shu);
+  transform: translateX(2px);
+}
+
+.stage__turn--prev:hover:not(:disabled) {
+  transform: translateX(-2px);
+}
+
+.stage__turn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}

@@ -1,7 +1,13 @@
+import { useCallback, useState } from "react";
+import { Magazine } from "./magazine/Magazine";
+
 export default function App() {
+  const [target, setTarget] = useState(0);
+  const onSettled = useCallback((index: number) => setTarget(index), []);
   return (
-    <main>
-      <p className="mono-label">field notes — issue no. 01 — under construction</p>
-    </main>
+    <>
+      <Magazine targetSpread={target} onSpreadSettled={onSettled} />
+      <div className="grain" aria-hidden />
+    </>
   );
 }

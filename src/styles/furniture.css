@@ -1,0 +1,213 @@
+/* Folios & running heads — the reader's GPS. */
+.folio {
+  position: absolute;
+  bottom: calc(var(--page-pad) * 0.45);
+  color: var(--gray-warm);
+  font-size: 10.5px;
+  z-index: 4;
+}
+
+.folio--verso {
+  left: var(--page-pad);
+}
+
+.folio--recto {
+  right: var(--page-pad);
+}
+
+.folio__page {
+  color: var(--sumi);
+}
+
+.running-head {
+  position: absolute;
+  top: calc(var(--page-pad) * 0.45);
+  color: var(--gray-warm);
+  font-size: 10px;
+  z-index: 4;
+}
+
+.running-head--verso {
+  left: var(--page-pad);
+}
+
+.running-head--recto {
+  right: var(--page-pad);
+}
+
+/* Seal */
+.seal {
+  transform: rotate(1.5deg);
+  display: block;
+}
+
+/* End mark */
+.end-mark {
+  display: inline-block;
+  color: var(--shu);
+  font-size: 0.8em;
+  margin-inline-start: 0.4em;
+  transform: translateY(-0.05em);
+}
+
+/* Barcode */
+.barcode {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 108px;
+  background: var(--washi-hi);
+  padding: 6px 6px 4px;
+}
+
+.barcode__caption {
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  color: var(--sumi-2);
+  text-align: center;
+}
+
+/* Printer's proof overlay */
+.grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  color: rgba(0, 160, 233, 0.65);
+}
+
+.grid-overlay__columns {
+  position: absolute;
+  inset: var(--page-pad);
+  background: repeating-linear-gradient(
+    to right,
+    rgba(0, 160, 233, 0.07) 0,
+    rgba(0, 160, 233, 0.07) calc(100% / 12 - 8px),
+    transparent calc(100% / 12 - 8px),
+    transparent calc(100% / 12)
+  );
+}
+
+.grid-overlay__baselines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(236, 0, 140, 0.14) 0,
+    rgba(236, 0, 140, 0.14) 1px,
+    transparent 1px,
+    transparent var(--baseline)
+  );
+}
+
+.grid-overlay__crop {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+}
+
+.grid-overlay__crop--tl {
+  top: 2px;
+  left: 2px;
+}
+
+.grid-overlay__crop--br {
+  bottom: 2px;
+  right: 2px;
+}
+
+.grid-overlay__reg {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 14px;
+  height: 14px;
+}
+
+.grid-overlay__cmyk {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+}
+
+.grid-overlay__cmyk i {
+  width: 10px;
+  height: 6px;
+  display: block;
+  opacity: 0.75;
+}
+
+/* Marginalia — the ✳ asides. */
+.marginalia {
+  position: relative;
+  display: inline-block;
+}
+
+.marginalia__mark {
+  color: var(--shu);
+  font-size: 0.95em;
+  line-height: 1;
+  padding: 2px 4px;
+  transition: transform 300ms var(--ease-settle);
+}
+
+.marginalia:hover .marginalia__mark,
+.marginalia[data-open] .marginalia__mark {
+  transform: rotate(45deg) scale(1.15);
+}
+
+.marginalia__note {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  width: 200px;
+  background: var(--washi-hi);
+  border-left: 2px solid var(--shu);
+  box-shadow: 0 6px 24px rgba(28, 26, 23, 0.14);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 30;
+  /* Appear-only delay; instant exit. */
+  transition:
+    opacity 220ms var(--ease-settle) 0ms,
+    transform 260ms var(--ease-settle) 0ms,
+    visibility 0ms 0ms;
+}
+
+.marginalia:hover .marginalia__note,
+.marginalia:focus-within .marginalia__note,
+.marginalia[data-open] .marginalia__note {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+  transition-delay: 120ms, 120ms, 120ms;
+}
+
+.marginalia__label {
+  color: var(--shu);
+  font-size: 9.5px;
+}
+
+.marginalia__text {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--sumi-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marginalia__note,
+  .marginalia__mark,
+  .stage__turn {
+    transition: none;
+  }
+}
