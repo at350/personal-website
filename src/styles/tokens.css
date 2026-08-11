@@ -1,25 +1,34 @@
-/* Field Notes design tokens — the only file allowed to contain raw values. */
+/* V2 tokens — stark newsmagazine. The only file allowed raw values.
+   Paper is white. Ink is near-black. There is exactly one red. */
 
 :root {
   /* Paper & ink */
-  --void: #ffffff;
-  --washi: #f7f3ea;
-  --washi-hi: #fbf9f3;
-  --washi-deep: #efe9db;
-  --sumi: #1c1a17;
-  --sumi-2: #2c2925;
-  --gray-warm: #8a857c;
-  --gray-faint: #b8b2a6;
-  --hairline: rgba(28, 26, 23, 0.18);
-  --shu: #d9333f;
+  --paper: #ffffff;
+  --paper-shade: #f6f6f4; /* page-edge striation only — never a background */
+  --ink: #0e0e0c;
+  --ink-2: #55524c;
+  --ink-3: #98948c;
+  --hairline: rgba(14, 14, 12, 0.14);
+  --red: #e8351a;
+
+  /* Legacy aliases (spread CSS migrates off these; keep mapped to v2) */
+  --void: var(--paper);
+  --washi: var(--paper);
+  --washi-hi: var(--paper);
+  --washi-deep: var(--paper-shade);
+  --sumi: var(--ink);
+  --sumi-2: var(--ink-2);
+  --gray-warm: var(--ink-3);
+  --gray-faint: #c4c1ba;
+  --shu: var(--red);
 
   /* Type families */
   --font-display: "Zodiak", georgia, "Times New Roman", serif;
+  --font-condensed: "Tanker", "Arial Narrow", sans-serif;
   --font-body: "Newsreader Variable", charter, georgia, serif;
   --font-ui: "Apfel Grotezk", "Helvetica Neue", arial, system-ui, sans-serif;
   --font-ui-brukt: "Apfel Grotezk Brukt", "Apfel Grotezk", sans-serif;
   --font-mono: "Server Mono", ui-monospace, "SF Mono", menlo, monospace;
-  --font-jp: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
 
   /* Rhythm */
   --baseline: 28px;
@@ -49,5 +58,4 @@
   /* Book geometry */
   --page-ratio: 3 / 4;
   --page-pad: clamp(28px, 3.2vw, 56px);
-  --gutter-shadow: rgba(28, 26, 23, 0.08);
 }

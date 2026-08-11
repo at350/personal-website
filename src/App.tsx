@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router";
-import { Magazine } from "./magazine/Magazine";
+import { BookStage } from "./book3d/BookStage";
 import { isKnownRoute, routeForSpread, spreadForRoute } from "./magazine/folio";
 import { useViewportMode } from "./magazine/useViewportMode";
 import { ReaderView } from "./routes/ReaderView";
@@ -37,7 +37,7 @@ function BookView() {
     [location.pathname, navigate],
   );
 
-  return <Magazine targetSpread={target} onSpreadSettled={onSettled} />;
+  return <BookStage targetSpread={target} onSpreadSettled={onSettled} />;
 }
 
 function ReaderRoute() {

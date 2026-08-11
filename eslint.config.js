@@ -27,4 +27,14 @@ export default tseslint.config(
     extends: [js.configs.recommended],
     languageOptions: { globals: globals.node },
   },
+  {
+    // react-three-fiber is an imperative, mutation-driven world; the react
+    // compiler's immutability rules do not apply to per-frame scene graph work.
+    files: ["src/book3d/**/*.tsx", "src/book3d/**/*.ts"],
+    rules: {
+      "react-hooks/immutability": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/use-memo": "off",
+    },
+  },
 );

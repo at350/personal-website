@@ -1,0 +1,112 @@
+.bstage {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--paper);
+  overflow: clip;
+}
+
+.bstage__canvas {
+  position: absolute !important;
+  inset: 0;
+}
+
+/* The live spread. Sits exactly over the flat mesh; carries a whisper of
+   pointer tilt at rest (the mesh matches it once paper starts moving). */
+.bstage__spread {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  transform-style: preserve-3d;
+  perspective: 2400px;
+  transition: opacity 90ms linear;
+  box-shadow: 0 1px 0 rgba(14, 14, 12, 0.04);
+}
+
+.bstage__spread--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ov-face {
+  position: relative;
+  overflow: hidden;
+  background: var(--paper);
+  container-type: size;
+}
+
+.ov-face--void {
+  background: transparent;
+}
+
+/* Gutter ambient occlusion — the one derived shadow the DOM layer keeps. */
+.ov-face--verso::after,
+.ov-face--recto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.ov-face--verso::after {
+  background: linear-gradient(to left, rgba(14, 14, 12, 0.05), transparent 7%);
+}
+
+.ov-face--recto::after {
+  background: linear-gradient(to right, rgba(14, 14, 12, 0.05), transparent 7%);
+}
+
+/* Fore-edge drag zones. */
+.bstage__edge {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 64px;
+  height: min(78vh, 900px);
+  z-index: 10;
+  cursor: grab;
+  touch-action: none;
+}
+
+.bstage__edge:active {
+  cursor: grabbing;
+}
+
+/* Chrome. */
+.bstage__nav {
+  position: absolute;
+  bottom: clamp(14px, 2.6vh, 30px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  z-index: 12;
+}
+
+.bstage__folio {
+  color: var(--ink-3);
+  letter-spacing: 0.22em;
+  font-size: 10.5px;
+  min-width: 64px;
+  text-align: center;
+}
+
+.bstage__arrow {
+  color: var(--ink-2);
+  font-size: 15px;
+  padding: 6px 10px;
+  transition: color 160ms ease, transform 240ms var(--ease-settle);
+}
+
+.bstage__arrow:hover:not(:disabled) {
+  color: var(--red);
+}
+
+.bstage__arrow:disabled {
+  opacity: 0.22;
+  cursor: default;
+}
