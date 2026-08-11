@@ -1,0 +1,34 @@
+/* Paper grain — tiled SVG turbulence, sits over everything, never intercepts. */
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.rule {
+  border: 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.rule--shu {
+  border-top-color: var(--shu);
+}
+
+/* Drop cap: 3-line Zodiak, optically aligned. */
+.drop-cap::first-letter {
+  font-family: var(--font-display);
+  font-weight: 800;
+  float: left;
+  font-size: 4.6em;
+  line-height: 0.78;
+  padding: 0.06em 0.12em 0 0;
+  color: var(--sumi);
+}
+
+.lead-in {
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.08em;
+}

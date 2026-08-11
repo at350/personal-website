@@ -1,0 +1,61 @@
+/* Self-hosted editorial faces.
+   Zodiak — Indian Type Foundry, via Fontshare (ITF Free Font License).
+   Apfel Grotezk — Luigi Gorlero, Collletttivo (SIL OFL 1.1).
+   Server Mono — Internet Development Studio Co. + Blaze Type (SIL OFL 1.1).
+   Newsreader (Production Type) + Shippori Mincho B1 (FONTDASU) arrive via @fontsource. */
+
+@font-face {
+  font-family: "Zodiak";
+  src: url("/fonts/Zodiak-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Zodiak";
+  src: url("/fonts/Zodiak-VariableItalic.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Apfel Grotezk";
+  src: url("/fonts/ApfelGrotezk-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Apfel Grotezk";
+  src: url("/fonts/ApfelGrotezk-Mittel.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Apfel Grotezk";
+  src: url("/fonts/ApfelGrotezk-Fett.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Apfel Grotezk Brukt";
+  src: url("/fonts/ApfelGrotezk-Brukt.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Server Mono";
+  src: url("/fonts/ServerMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

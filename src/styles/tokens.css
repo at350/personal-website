@@ -1,0 +1,53 @@
+/* Field Notes design tokens — the only file allowed to contain raw values. */
+
+:root {
+  /* Paper & ink */
+  --void: #ffffff;
+  --washi: #f7f3ea;
+  --washi-hi: #fbf9f3;
+  --washi-deep: #efe9db;
+  --sumi: #1c1a17;
+  --sumi-2: #2c2925;
+  --gray-warm: #8a857c;
+  --gray-faint: #b8b2a6;
+  --hairline: rgba(28, 26, 23, 0.18);
+  --shu: #d9333f;
+
+  /* Type families */
+  --font-display: "Zodiak", georgia, "Times New Roman", serif;
+  --font-body: "Newsreader Variable", charter, georgia, serif;
+  --font-ui: "Apfel Grotezk", "Helvetica Neue", arial, system-ui, sans-serif;
+  --font-ui-brukt: "Apfel Grotezk Brukt", "Apfel Grotezk", sans-serif;
+  --font-mono: "Server Mono", ui-monospace, "SF Mono", menlo, monospace;
+  --font-jp: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
+
+  /* Rhythm */
+  --baseline: 28px;
+  --space-1: 0.5em;
+  --space-2: 1em;
+  --space-3: 2em;
+  --space-4: 4em;
+  --space-5: 8em;
+  --space-6: 16em;
+
+  /* Type scale */
+  --text-meta: 11.5px;
+  --text-caption: 13px;
+  --text-ui: 14px;
+  --text-body: 17px;
+  --text-dek: clamp(19px, 1.6vw, 24px);
+  --text-head: clamp(26px, 2.6vw, 38px);
+  --text-display: clamp(56px, 9vw, 150px);
+
+  /* Motion */
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-page: cubic-bezier(0.4, 0.05, 0.2, 1);
+  --dur-settle: 750ms;
+  --dur-turn: 800ms;
+  --dur-swap: 240ms;
+
+  /* Book geometry */
+  --page-ratio: 3 / 4;
+  --page-pad: clamp(28px, 3.2vw, 56px);
+  --gutter-shadow: rgba(28, 26, 23, 0.08);
+}

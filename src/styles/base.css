@@ -1,0 +1,97 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--void);
+  color: var(--sumi);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: 1.7;
+  font-optical-sizing: auto;
+  font-feature-settings: "onum" 1, "liga" 1;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+img,
+video {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--shu);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--shu);
+  color: var(--washi-hi);
+}
+
+:focus-visible {
+  outline: 2px solid var(--shu);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: inherit;
+  font-size: inherit;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-feature-settings: "lnum" 1;
+}
+
+.small-caps {
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.06em;
+}
+
+.u-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
