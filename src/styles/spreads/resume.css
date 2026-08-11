@@ -274,6 +274,26 @@
   margin-top: max(12px, 2cqh);
 }
 
+/* The recto carries three dense ledgers. Keep their rhythm explicit instead
+   of letting the last recognition row run under the trim at shorter stages. */
+.resume2--recto {
+  padding-top: max(30px, 4.2cqh);
+  padding-bottom: max(24px, 3.8cqh);
+}
+
+.resume2--recto .resume2__head {
+  margin-bottom: max(7px, 1.1cqh);
+}
+
+.resume2--recto .resume2__group,
+.resume2--recto .resume2__recognition {
+  margin-top: max(9px, 1.35cqh);
+}
+
+.resume2--recto .resume2__row {
+  padding: max(4px, 0.68cqh) 0;
+}
+
 .resume2__recs {
   border-bottom: 1px solid var(--hairline);
 }
@@ -282,9 +302,13 @@
   display: grid;
   grid-template-columns: 9cqw minmax(0, 1fr);
   column-gap: 2cqw;
-  align-items: baseline;
+  align-items: start;
   padding: max(8px, 1.3cqh) 0 max(5px, 0.8cqh);
   border-top: 1px solid var(--hairline);
+}
+
+.resume2--recto .resume2__rec {
+  padding: max(6px, 0.9cqh) 0 max(4px, 0.55cqh);
 }
 
 .resume2__rec-no {
@@ -313,6 +337,7 @@
 .resume2__rec-meta {
   color: var(--ink-3);
   font-size: max(11px, 1.4cqw);
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

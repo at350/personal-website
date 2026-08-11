@@ -51,7 +51,7 @@ export function Cover({ face, mode }: SpreadFaceProps) {
     <div className="cover2" ref={rootRef}>
       <header className="cover2__issue mono-label">
         <span>A PERSONAL ISSUE</span>
-        <span>NO. 01 — 2026</span>
+        <span>NO. 01 / 2026</span>
       </header>
 
       <h1 className="cover2__masthead">
@@ -65,9 +65,15 @@ export function Cover({ face, mode }: SpreadFaceProps) {
         </span>
       </h1>
 
-      <div className="cover2__rule" aria-hidden />
+      <figure className="cover2__art" aria-hidden>
+        <img
+          src="/images/editorial/cover-fold.webp"
+          alt=""
+          decoding="async"
+        />
+      </figure>
 
-      <p className="cover2__dek">Builds things. Writes them down.</p>
+      <div className="cover2__rule" aria-hidden />
 
       <nav className="cover2__lines" aria-label="In this issue">
         {COVER_LINES.map((line) => (
@@ -95,7 +101,7 @@ export function BackCover({ face, mode }: SpreadFaceProps) {
       <p className="back2__mark" aria-hidden>
         T<span className="back2__a">A</span>I
       </p>
-      <p className="back2__issue mono-label">NO. 01 — 2026</p>
+      <p className="back2__issue mono-label">NO. 01 / 2026</p>
       <div className="back2__barcode">
         <Barcode text="ALANTAI.01" height={22} />
       </div>

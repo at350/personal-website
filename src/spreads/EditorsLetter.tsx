@@ -48,7 +48,7 @@ export function EditorsLetter({ face }: SpreadFaceProps) {
             </p>
           ))}
           <p className="letter__signoff">
-            — alan
+            alan
             <EndMark />
           </p>
         </section>

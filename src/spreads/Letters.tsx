@@ -31,7 +31,7 @@ const COLOPHON_ENTRIES: ReadonlyArray<{ term: string; desc: ReactNode }> = [
     term: "Proofs",
     desc: (
       <>
-        <kbd className="colophon__key">g</kbd> &mdash; printer&rsquo;s proof
+        <kbd className="colophon__key">g</kbd> / printer&rsquo;s proof
       </>
     ),
   },

@@ -13,11 +13,11 @@ export function Folio({ page, side }: FolioProps) {
     <p className={`folio folio--${side} mono-label`} aria-hidden>
       {side === "verso" ? (
         <>
-          <span className="folio__page">{number}</span> — ALAN TAI
+          <span className="folio__page">{number}</span> / ALAN TAI
         </>
       ) : (
         <>
-          NO. 01 — <span className="folio__page">{number}</span>
+          NO. 01 / <span className="folio__page">{number}</span>
         </>
       )}
     </p>

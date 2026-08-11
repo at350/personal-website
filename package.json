@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Field Notes — the personal magazine of Alan Tai. Issue No. 01.",
+  "description": "Alan Tai. Issue No. 01.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/build-feeds.mjs",

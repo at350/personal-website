@@ -23,7 +23,7 @@ function DispatchIndex() {
               <h3 className="dispatches__title">{d.title}</h3>
               <p className="dispatches__dek">{d.dek}</p>
               <Link className="dispatches__jump" to={`/writing/${d.id}`}>
-                /writing/{d.id}
+                read dispatch
               </Link>
             </div>
           </article>

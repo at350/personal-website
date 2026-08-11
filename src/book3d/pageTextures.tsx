@@ -13,11 +13,32 @@ import { Folio } from "@/components/furniture/Folio";
 import { RunningHead } from "@/components/furniture/RunningHead";
 
 export const CAPTURE_W = 640;
-export const CAPTURE_H = 853; // 3:4
+export const CAPTURE_H = (CAPTURE_W * 4) / 3;
+
+export function pageRasterLayout(visiblePageWidth: number) {
+  return {
+    pageWidth: CAPTURE_W,
+    pageHeight: CAPTURE_H,
+    spreadWidth: CAPTURE_W * 2,
+    scale: visiblePageWidth / CAPTURE_W,
+  };
+}
 
 const cache = new Map<string, THREE.CanvasTexture>();
-const inFlight = new Set<string>();
+const inFlight = new Map<string, Promise<boolean>>();
 const listeners = new Set<() => void>();
+const progressListeners = new Set<(progress: TextureProgress) => void>();
+let preloadPromise: Promise<TextureProgress> | null = null;
+let completedCaptures = 0;
+
+const IMAGE_PLACEHOLDER =
+  "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+
+export interface TextureProgress {
+  completed: number;
+  loaded: number;
+  total: number;
+}
 
 export const pageKey = (spread: number, face: "verso" | "recto") =>
   `${spread}:${face}`;
@@ -31,21 +52,65 @@ export function onTexturesChanged(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
-async function capture(key: string) {
-  if (cache.has(key) || inFlight.has(key)) return;
-  const el = document.querySelector<HTMLElement>(
-    `[data-capture-key="${CSS.escape(key)}"]`,
+function isRenderableFace(spread: number, face: "verso" | "recto") {
+  const kind = SPREADS[spread]?.kind;
+  return !(
+    (kind === "cover" && face === "verso") ||
+    (kind === "back" && face === "recto")
   );
-  if (!el) return;
-  inFlight.add(key);
-  try {
+}
+
+export const ALL_PAGE_KEYS = SPREADS.flatMap((_, spread) =>
+  (["verso", "recto"] as const)
+    .filter((face) => isRenderableFace(spread, face))
+    .map((face) => pageKey(spread, face)),
+);
+
+export function getTextureProgress(): TextureProgress {
+  return {
+    completed: completedCaptures,
+    loaded: ALL_PAGE_KEYS.filter((key) => cache.has(key)).length,
+    total: ALL_PAGE_KEYS.length,
+  };
+}
+
+function emitProgress() {
+  const progress = getTextureProgress();
+  progressListeners.forEach((fn) => fn(progress));
+}
+
+function capture(key: string): Promise<boolean> {
+  if (cache.has(key)) return Promise.resolve(true);
+  const existing = inFlight.get(key);
+  if (existing) return existing;
+
+  const task = (async () => {
+    const el = document.querySelector<HTMLElement>(
+      `[data-capture-key="${CSS.escape(key)}"]`,
+    );
+    if (!el) return false;
+
     await document.fonts.ready;
-    const canvas = await toCanvas(el, {
+    const options = {
       pixelRatio: 2,
       width: CAPTURE_W,
       height: CAPTURE_H,
       backgroundColor: "#ffffff",
-    });
+      imagePlaceholder: IMAGE_PLACEHOLDER,
+    } as const;
+
+    let canvas: HTMLCanvasElement;
+    try {
+      canvas = await toCanvas(el, options);
+    } catch {
+      // Remote thumbnails must never hold the book hostage. A second pass
+      // preserves all typography and layout while omitting only failed images.
+      canvas = await toCanvas(el, {
+        ...options,
+        filter: (node) => !(node instanceof HTMLImageElement),
+      });
+    }
+
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 8;
@@ -53,11 +118,60 @@ async function capture(key: string) {
     texture.minFilter = THREE.LinearMipmapLinearFilter;
     cache.set(key, texture);
     listeners.forEach((fn) => fn());
-  } catch {
-    // A failed capture just means the leaf shows blank paper for that turn.
-  } finally {
+    return true;
+  })().catch(() => {
+    // Last-resort paper still counts as a texture. The entry screen must never
+    // trap a reader because one page contains an uncooperative remote asset.
+    const canvas = document.createElement("canvas");
+    canvas.width = CAPTURE_W * 2;
+    canvas.height = CAPTURE_H * 2;
+    const context = canvas.getContext("2d");
+    if (context) {
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    cache.set(key, texture);
+    listeners.forEach((fn) => fn());
+    return true;
+  }).finally(() => {
     inFlight.delete(key);
+  });
+
+  inFlight.set(key, task);
+  return task;
+}
+
+/** Capture every printable face with two workers to limit main-thread spikes. */
+export function preloadAllPageTextures(
+  onProgress?: (progress: TextureProgress) => void,
+): Promise<TextureProgress> {
+  if (onProgress) {
+    progressListeners.add(onProgress);
+    onProgress(getTextureProgress());
   }
+
+  if (!preloadPromise) {
+    const pendingKeys = ALL_PAGE_KEYS.filter((key) => !cache.has(key));
+    completedCaptures = ALL_PAGE_KEYS.length - pendingKeys.length;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < pendingKeys.length) {
+        const index = cursor;
+        cursor += 1;
+        await capture(pendingKeys[index]!);
+        completedCaptures += 1;
+        emitProgress();
+      }
+    };
+    preloadPromise = Promise.all([worker(), worker()]).then(() => getTextureProgress());
+  }
+
+  return preloadPromise.finally(() => {
+    if (onProgress) progressListeners.delete(onProgress);
+  });
 }
 
 /** Rasterize the faces around `spread` so the next turn is always ready. */
@@ -68,6 +182,7 @@ export function prefetchAround(spread: number) {
     wanted.push(pageKey(s, "verso"), pageKey(s, "recto"));
   }
   wanted.forEach((key, i) => {
+    if (!ALL_PAGE_KEYS.includes(key)) return;
     window.setTimeout(() => void capture(key), i * 40);
   });
 }
@@ -76,7 +191,10 @@ export function prefetchAround(spread: number) {
 export function dropAllTextures() {
   cache.forEach((t) => t.dispose());
   cache.clear();
+  preloadPromise = null;
+  completedCaptures = 0;
   listeners.forEach((fn) => fn());
+  emitProgress();
 }
 
 function FarmFace({ spread, face }: { spread: number; face: "verso" | "recto" }) {
@@ -109,8 +227,24 @@ function FarmFace({ spread, face }: { spread: number; face: "verso" | "recto" })
 }
 
 /** Offscreen live copies of every page, kept out of the a11y tree. */
-export function CaptureFarm() {
-  useEffect(() => () => dropAllTextures(), []);
+export function CaptureFarm({
+  onProgress,
+  onReady,
+}: {
+  onProgress?: (progress: TextureProgress) => void;
+  onReady?: (progress: TextureProgress) => void;
+}) {
+  useEffect(() => {
+    let active = true;
+    void preloadAllPageTextures((progress) => {
+      if (active) onProgress?.(progress);
+    }).then((progress) => {
+      if (active) onReady?.(progress);
+    });
+    return () => {
+      active = false;
+    };
+  }, [onProgress, onReady]);
   return (
     <div
       aria-hidden

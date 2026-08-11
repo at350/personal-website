@@ -14,6 +14,18 @@ function Count() {
     <div className="proj-count">
       <h2 className="proj-count__word">FIVE</h2>
       <p className="proj-count__sub">working prototypes</p>
+      <ol className="proj-count__plates" aria-label="Project image index">
+        {projects.map((project, index) => (
+          <li className="proj-count__plate" key={project.id}>
+            {project.image ? (
+              <img src={project.image} alt="" decoding="async" />
+            ) : null}
+            <span className="proj-count__plate-no" aria-hidden>
+              {String(index + 1).padStart(2, "0")}
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

@@ -26,8 +26,8 @@ const FEATURES: readonly Feature[] = [
     no: "06",
     route: "/profile",
     title: "the profile",
-    dek: "in photographs",
-    image: null,
+    dek: "work habits and off-hours notes",
+    image: "/images/editorial/cover-fold.webp",
   },
   {
     no: "08",
@@ -41,7 +41,7 @@ const FEATURES: readonly Feature[] = [
     route: "/resume",
     title: "the annotated resume",
     dek: "the work, plus what did not fit",
-    image: null,
+    image: "/images/editorial/paper-fiber.webp",
   },
 ];
 

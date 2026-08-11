@@ -156,62 +156,6 @@ export const CURATED_MEDIA_SEED: MediaItem[] = MediaItemSchema.array().parse([
 
 export const LOCAL_PHOTO_SEED: MediaItem[] = MediaItemSchema.array().parse([
   {
-    id: "photo:great-wall",
-    source: "local",
-    kind: "photo",
-    title: "The long way up",
-    url: "/about",
-    image: {
-      src: "/images/about/alan-great-wall.webp",
-      alt: "Alan taking a selfie on the Great Wall under a clear blue sky",
-      width: 1600,
-      height: 2134,
-    },
-    tags: ["Travel", "China"],
-  },
-  {
-    id: "photo:hutong",
-    source: "local",
-    kind: "photo",
-    title: "Lantern logic",
-    url: "/about",
-    image: {
-      src: "/images/about/alan-hutong.webp",
-      alt: "Alan standing in a lantern-lined hutong",
-      width: 1600,
-      height: 2125,
-    },
-    tags: ["Travel", "China"],
-  },
-  {
-    id: "photo:mountain",
-    source: "local",
-    kind: "photo",
-    title: "Cloud level",
-    url: "/about",
-    image: {
-      src: "/images/about/alan-mountain.webp",
-      alt: "Alan in front of a misty green mountain",
-      width: 1600,
-      height: 2134,
-    },
-    tags: ["Travel", "Outdoors"],
-  },
-  {
-    id: "photo:shanghai",
-    source: "local",
-    kind: "photo",
-    title: "Shanghai after dark",
-    url: "/about",
-    image: {
-      src: "/images/about/alan-shanghai.webp",
-      alt: "Alan in front of Shanghai's illuminated skyline at night",
-      width: 1600,
-      height: 2134,
-    },
-    tags: ["Travel", "Shanghai"],
-  },
-  {
     id: "photo:headshot",
     source: "local",
     kind: "photo",
@@ -232,4 +176,3 @@ export const MEDIA_SEED: MediaItem[] = [
   ...CURATED_MEDIA_SEED,
   ...LOCAL_PHOTO_SEED,
 ];
-

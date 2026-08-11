@@ -3,13 +3,13 @@ import { dispatches } from "@/lib/content";
 
 const BASE_TITLE = "Alan Tai";
 const BASE_DESCRIPTION =
-  "Alan Tai — builds things, writes them down. Software, research, early-stage products. Issue No. 01.";
+  "Alan Tai builds software, research, and early-stage products. Issue No. 01.";
 
 const ROUTE_META: Record<string, { title: string; description: string }> = {
   "/": { title: BASE_TITLE, description: BASE_DESCRIPTION },
   "/contents": { title: `Contents · ${BASE_TITLE}`, description: "What's in Issue No. 01." },
   "/about": { title: `Letter · ${BASE_TITLE}`, description: "A short letter from Alan." },
-  "/profile": { title: `Profile · ${BASE_TITLE}`, description: "Photographs, hobbies, places." },
+  "/profile": { title: `Profile · ${BASE_TITLE}`, description: "Work habits and off-hours notes." },
   "/projects": { title: `Projects · ${BASE_TITLE}`, description: "Five working prototypes across energy, supply chains, and public health." },
   "/resume": { title: `Resume · ${BASE_TITLE}`, description: "The annotated resume." },
   "/library": { title: `Library · ${BASE_TITLE}`, description: "Films, articles, posts." },

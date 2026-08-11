@@ -31,7 +31,7 @@ export const AboutSchema = z.object({
   notes: z
     .array(z.object({ label: z.string(), text: z.string() }))
     .min(3),
-  photos: z.array(PhotoSchema).min(4),
+  photos: z.array(PhotoSchema).min(1),
 });
 export type AboutContent = z.infer<typeof AboutSchema>;
 

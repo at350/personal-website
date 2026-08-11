@@ -10,7 +10,7 @@ const byKind = (kind: ResumeEntry["kind"]) =>
 
 /* "Apr 2026 to Present" → "apr 2026–now" */
 const compactDates = (dates: string) =>
-  dates.replace(" to ", "–").replace("Present", "now").toLowerCase();
+  dates.replace(" to ", "-").replace("Present", "now").toLowerCase();
 
 /** Right-aligned mono date. Digits rise once through masks — the
     transitions.dev number pop-in, pure CSS, reduced-motion guarded. */
@@ -54,7 +54,7 @@ function SpreadWord({ face, mode }: SpreadFaceProps) {
         <p className="resume2__legend">
           <span className="resume2__legend-mark" aria-hidden>
           </span>{" "}
-          notes 01–13 live in the margins
+          notes 01-13 live in the margins
         </p>
       ) : null}
       {face === "verso" ? (
@@ -114,7 +114,7 @@ function LedgerGroup({
             <span className="resume2__main" key="main">
               <span className="resume2__org">
                 {entry.organization}
-                <em className="resume2__role"> — {entry.role}</em>
+                <em className="resume2__role">, {entry.role}</em>
               </span>
               {summaries ? (
                 <span className="resume2__summary">{entry.summary}</span>

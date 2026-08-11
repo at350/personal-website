@@ -6,14 +6,18 @@ Reconstructed 2026-08-11 for Alan Tai's personal website.
 
 The useful idea was never “make a website that looks vaguely like a magazine.” It was to borrow the decision-making discipline of good editorial objects: one strong cover concept, a real issue system, sharply different pacing from spread to spread, and physical behavior that earns the book metaphor.
 
-The reference set has four roles:
+The reference set has six roles:
 
 1. **Cover thinking:** The New York Times Magazine, Coverjunkie, and Eye.
 2. **Spread pacing:** The Gentlewoman and POPEYE.
 3. **Object presentation:** Stripe Press.
 4. **Digital translation:** mymind and Jim Bang.
+5. **Interaction and motion:** the live sites traced through Craftwork, Recent, Landing Love, Okay Dev, Showreel, and Awwwards.
+6. **Personal editorial memory:** Alan's private “Design Inspiration” mymind space, including student publications, issue archives, cover collections, page layouts, and interaction references.
 
 Scholastic's archive adds a fifth role: direct, high-energy newsmagazine hierarchy. It is the counterweight to tasteful minimalism.
+
+The aggregate galleries are deliberately not treated as the final evidence. They were used to discover and compare candidates; the motion conclusions come from opening the featured sites, moving through them, and capturing entry, scroll, hover, cursor, and layout-change states.
 
 This is a research archive, not an asset library for production. Source artwork remains copyrighted by its publishers, photographers, illustrators, and designers.
 
@@ -30,6 +34,13 @@ This is a research archive, not an asset library for production. Source artwork 
 | Stripe Press | Present the publication as an object: spine, edge, thickness, materials, and light are visible and meaningful. | A flat rectangle merely tilted in 3D. |
 | mymind | Type at conceptual scale, short declarative copy, and motion that makes a digital surface feel authored. | Its soft gradient palette, pill UI, or other recognizable brand details. |
 | Jim Bang | Numbered ledger navigation, tiny metadata, sparse prose, and a portfolio whose information architecture is visible immediately. | Copying the dark theme or personal identity. |
+| Prime Intellect | A persistent technical-journal grammar: numbered navigation, figure labels, hairline grids, and product evidence that changes as the reader scrolls. | Copying its AI imagery, dark palette, or terminal styling. |
+| Rectangles.fm | Torn-paper collage, a fixed masthead, and chapters that arrive like successive posters in one issue. | Treating scrapbook texture as a shortcut to personality. |
+| Studio K95 | The same project archive can morph between spatial arrangements; layout itself becomes an explicit, user-controlled state. | A 3D cloud with no navigational purpose. |
+| Ricardo Chance | A cursor-reactive WebGL atmosphere gives pointer movement visible consequence before the project index appears. | A decorative cursor follower that changes nothing else. |
+| PP Neue Montreal | A type specimen becomes a scroll-driven travelogue with a stable chapter rail, radical scale shifts, and changing weights. | Oversized type without a reading sequence. |
+| MCKP | Object motion is divided into meaningful verbs—enter, breathe, loop, follow, zoom, shake, dolly—and tied to triggers. | Moving a 3D object continuously just because it can move. |
+| Alan's saved archive | Student publication systems, issue covers, inside pages, collage, print archives, and news sites reveal a preference for authored hierarchy and many compositional speeds. | Publishing private screenshots or flattening the set into one “magazine aesthetic.” |
 
 ## Source notes
 
@@ -210,6 +221,101 @@ Local evidence:
 
 Source: [Jim Bang](https://www.jibang.me/)
 
+## 10. Discovery galleries — useful indexes, not answers
+
+The six supplied galleries contribute different forms of discovery:
+
+- **Craftwork Curated** is a broad, filterable pool. Its restrained grid led to Prime Intellect and MCKP, but the gallery itself supplies little motion evidence.
+- **Recent.design** plays small motion and interaction studies directly in the feed. It is best for isolating primitives such as a hide-on-scroll nav or a scrubbed transition.
+- **Landing Love** records full web pages, which makes it possible to judge tempo and chapter order instead of only the hero.
+- **Okay Dev** separates a small curated sequence from its community stream. The distinction between “pick” and “feed” is editorially useful.
+- **Showreel.design** makes movement the browsing substrate. Ten-second loops and optional sound expose cut density and energy immediately.
+- **Awwwards Sites of the Day** is relatively poster-first, but its winner pages expose component-level motion records and direct links to the current sites.
+
+Local overview evidence is stored under `assets/screenshots/web-galleries/`. The actual sites below are the basis for the conclusions.
+
+## 11. Live-site motion field notes
+
+### Prime Intellect — a technical journal that persists while evidence changes
+
+The hero opens as an atmospheric image, but the site quickly settles into a more durable grammar: a persistent numbered navigation rail, thin grid lines, “FIG.” labels, product diagrams, and a section title that behaves like a journal chapter. The key idea is stability around change. Scrolling replaces the evidence and focus without replacing the entire interface language.
+
+For this site:
+
+- Keep folios, running heads, and spread controls stable while the compositions change.
+- Use diagrams and project evidence as editorial figures, not generic cards.
+- Let a chapter title arrive decisively, then get out of the way of the material.
+
+### Rectangles.fm — the site as a constructed issue
+
+Rectangles opens with a direct condensed headline, then a visibly assembled paper object intrudes into the viewport. On scroll, the masthead remains while the collage exits and the next chapter arrives: “Livestreams,” a brief deck, and another editorial image. It feels like moving down a long poster or through an issue assembled from torn artifacts.
+
+For this site:
+
+- Let chapters change image grammar, not only background color.
+- A fixed masthead can provide continuity across large compositional changes.
+- Texture should belong to real or plausible material evidence—tape, paper, print, crop—not a generic noise overlay.
+
+### Studio K95 — layout is an explicit state
+
+Studio K95 presents projects as cards in a spatial field, then lets the visitor switch between arrangements such as Rings and Spiral. The important behavior is not the 3D spectacle by itself; it is that the same archive can be reorganized while preserving object identity. The morph exposes the relationship between the states.
+
+For this site:
+
+- If the portfolio offers alternate views, preserve the same items and show the rearrangement.
+- Use depth to communicate order, adjacency, or focus.
+- Avoid free-floating project art with no readable active item or return path.
+
+### Ricardo Chance — cursor movement gains consequence
+
+The initial field is intentionally quiet. Pointer movement and time gather particles into a visible form, making the hero feel responsive before the work index appears. The pointer is not merely replaced by a decorative dot; it influences the scene.
+
+For this site:
+
+- Cursor effects should alter an object, camera, or readable state.
+- A reactive field may be appropriate for one cover or opening moment, not every spread.
+- The interface needs an immediate skip or route into content so atmosphere never traps the reader.
+
+### PP Neue Montreal — a type specimen as travelogue
+
+The font is introduced as an “Official Travel Guide.” A sticky chapter rail holds the navigation grammar while words become image-scale compositions. Weight, color, cropping, and pacing change by chapter. The page teaches the family through use rather than through a static matrix alone.
+
+For this site:
+
+- Typography can carry a whole spread if the words, weight, and crop belong to the chapter.
+- Keep a quiet wayfinding rail when display type consumes the viewport.
+- Use scale changes to articulate a sequence, not to make every heading shout.
+
+### MCKP — motion verbs and triggers
+
+MCKP distinguishes object behaviors: enter, breathe, loop, follow, zoom, shake, and dolly. It also names the triggers—click, hover, scroll, cursor. That vocabulary is useful because it connects the movement to a cause and a job.
+
+For this site:
+
+- Define the verb and trigger before choosing an animation.
+- Page turns and book settling should feel heavier than controls and tooltips.
+- Ambient motion should be subtle enough that a triggered motion still reads as an event.
+
+The complete observation matrix, including the galleries, interaction states, implementation relevance, and risks, is in `sources/motion-observations.md`.
+
+## 12. Alan's private “Design Inspiration” archive
+
+The supplied mymind Smart Space was read only within the exact private URL provided by the user. It contains a much broader and more specific editorial memory than the original reconstruction captured:
+
+- publication profiles and issue archives from Spark, Marquette Messenger, Ladue Publications, The Nueva Current, Lion's Tale, HiLite, The Communicator, Verde, The Fourcast, and many other student publications;
+- saved cover and front-page sources such as Coverjunkie and FrontPages;
+- specific cover concepts, NYT Magazine imagery, political collage, portrait treatments, quote-led pages, interview diagrams, and literary-journal covers;
+- collegiate publication references including Saddleback College WALL, Elon Colonnades, Collegian Times, Amarillo College Magazine, Lane Community College Magazine, SCAD Atlanta SCAN, and University of Oregon Flux;
+- a small interaction cluster, including character-selection demos, alongside the editorial material.
+
+The live publication sites reinforce three durable lessons:
+
+1. **Issues and eras matter.** Spark's archive groups covers by school year instead of flattening the work into one recency feed.
+2. **Dense pages need unequal story weight.** HiLite combines a lead package, section bands, author lines, and secondary cards without pretending every item is equally important.
+3. **A publication needs recurring entry points.** The Communicator uses Photo of the Day, Trending, Top Stories, Recent Stories, and a print flipbook as different reading speeds under one masthead.
+
+Private-board composites are stored in `assets/screenshots/personal-mymind/` and may contain private context and third-party artwork. They are for local analysis only and must never be moved into the deployed site, public documentation, or a shareable asset bundle.
+
 ## Project-specific synthesis
 
 ### Cover
@@ -218,7 +324,7 @@ Use **NYT Magazine + Coverjunkie + Eye**. One concept dominates; the issue syste
 
 ### Contents and library
 
-Use **POPEYE + Eye + Jim Bang**. Allow density, but make numbering, labels, categories, and reading order exact.
+Use **POPEYE + Eye + Jim Bang + Alan's saved publication archives**. Allow density, but make numbering, labels, categories, years, and reading order exact. Treat projects as issues or editions when chronology genuinely matters.
 
 ### Editor's letter and profile
 
@@ -234,7 +340,7 @@ Use **Stripe Press**. A physical stance needs readable spine/edge/thickness and 
 
 ### Digital motion and copy
 
-Use **mymind + Jim Bang**. Large conceptual statements, sparse supporting language, and a small number of purposeful transitions.
+Use **Prime Intellect + Rectangles.fm + PP Neue Montreal** for chapter pacing, **Studio K95** for state-preserving rearrangement, and **MCKP + Recent** for causal motion vocabulary. Large statements and dramatic movements stay rare; navigation, folios, and exits remain immediate.
 
 ## Non-negotiable design implications
 
@@ -245,7 +351,9 @@ Use **mymind + Jim Bang**. Large conceptual statements, sparse supporting langua
 5. Empty space must be earned by the thing it frames.
 6. The book must look physical before it moves.
 7. Motion must expose cause, hierarchy, or state.
-8. Source artwork never ships in the public site.
+8. Gallery pages identify candidates; claims about behavior require a live site or playable recording.
+9. The reader must never be trapped behind an atmospheric intro or long loader.
+10. Source artwork and private mymind captures never ship in the public site.
 
 ## Usage and rights notes
 
@@ -254,9 +362,11 @@ Use **mymind + Jim Bang**. Large conceptual statements, sparse supporting langua
 - Do not trace illustrations, copy cover compositions, or ship these files in `public/`.
 - The archive intentionally contains only a small representative set rather than a bulk scrape.
 - Source URLs, retrieval date, confidence, and rights notes are also recorded in `brand.json` and `sources/source-index.md`.
+- The private mymind space was captured only because the user explicitly supplied that exact space for this local research task. Its screenshots are not redistributable.
 
 ## Open questions
 
-- The exact three to five NYT Magazine covers from the original saved set remain unidentified.
+- Which saved private-board references should influence the finished public site most strongly: issue archives, inside-page composition, student-news density, or interaction experiments?
+- Which three to five NYT Magazine covers should be elevated from the private saved set into a smaller, named analysis?
 - The original personal inspiration board may have included specific Coverjunkie items not recoverable from the implementation documents.
 - This reconstruction can be tightened further if Alan recognizes a missing publication or cover from the moodboard.

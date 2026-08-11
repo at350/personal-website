@@ -6,9 +6,15 @@ import "@/styles/spreads/projects.css";
 /** Alt text written from the actual plates. */
 const PLATE_ALT: Record<string, string> = {
   architec:
-    "Architec's landing page: the headline 'Your building is wasting $200,000 a year' over a night skyline, beside an audit panel of ranked upgrades.",
+    "Conceptual Architec study with layered architectural planes, a black building volume, and a red translucent energy plane.",
   greenchain:
-    "The GreenChain wordmark, half dark and half green lowercase type, on a pale ground with leaf outlines.",
+    "Conceptual GreenChain study with black paper nodes, taut threads, white platforms, and one red route through the network.",
+  prophis:
+    "Conceptual Prophis study with layered vellum timelines aligned by a red acetate tab.",
+  "vox-vera":
+    "Conceptual Vox Vera study with black paper channels and white tokens converging on a red crop frame.",
+  terrablade:
+    "Conceptual TerraBlade study with a pale clay slab, black guide rails, and a broad red pulling grip.",
 };
 
 /** Pages 10–11 — the well: Architec verso, GreenChain recto, mirrored. */

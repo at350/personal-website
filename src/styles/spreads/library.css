@@ -16,6 +16,7 @@
 
 .library__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 2cqw;
@@ -31,6 +32,7 @@
 
 .library__chips {
   display: flex;
+  max-width: 100%;
   align-items: baseline;
   gap: 1.8cqw;
 }
@@ -332,22 +334,30 @@ a.media-plate:focus-visible .media-plate__title {
   grid-row: span 2;
 }
 
-/* Image tiles: the picture is the tile; type sits on a small paper chip. */
+/* Image tiles keep their metadata and captions on paper, outside the image.
+   Live-feed thumbnails often contain their own type; overlaying more type on
+   top made unrelated words read as collisions. */
 .media-cell--photo .media-plate,
 .media-cell--video .media-plate,
 .media-cell--film .media-plate {
   position: absolute;
   inset: 0;
-  display: block;
-  border: none;
-  padding: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: max(4px, 0.7cqh);
+  border: 1px solid var(--hairline);
+  padding: max(6px, 1.1cqw);
+  overflow: hidden;
 }
 
 .media-cell--photo .media-plate__media,
 .media-cell--video .media-plate__media,
 .media-cell--film .media-plate__media {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  inset: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
   aspect-ratio: auto !important;
 }
 
@@ -362,29 +372,27 @@ a.media-plate:focus-visible .media-plate__title {
 .media-cell--photo .media-plate__meta,
 .media-cell--video .media-plate__meta,
 .media-cell--film .media-plate__meta {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 2;
-  background: var(--paper);
-  padding: 3px 6px;
+  position: static;
+  background: transparent;
+  padding: 0;
   margin: 0;
 }
 
 .media-cell--photo .media-plate__title,
 .media-cell--video .media-plate__title,
 .media-cell--film .media-plate__title {
-  position: absolute;
-  left: 6px;
-  bottom: 6px;
-  right: 6px;
-  z-index: 2;
-  background: var(--paper);
-  width: max-content;
-  max-width: calc(100% - 12px);
-  padding: 4px 7px;
+  position: static;
+  background: transparent;
+  width: auto;
+  max-width: none;
+  padding: 0;
   font-size: max(11px, 1.6cqw);
   line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .media-cell--photo .media-plate__source,
@@ -396,12 +404,10 @@ a.media-plate:focus-visible .media-plate__title {
 }
 
 .media-cell--film .media-plate__rating {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  z-index: 2;
-  background: var(--paper);
-  padding: 3px 6px;
+  position: static;
+  background: transparent;
+  padding: 0;
+  margin: 0;
   color: var(--red);
 }
 
@@ -437,9 +443,16 @@ a.media-plate:focus-visible .media-plate__title {
   background: var(--paper-shade);
 }
 
-.media-cell--post .media-plate__excerpt {
+.media-wall--mosaic .media-plate__excerpt {
+  display: none;
+}
+
+.media-cell--post .media-plate__source,
+.media-cell--article .media-plate__source,
+.media-cell--link .media-plate__source {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
 }

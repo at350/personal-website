@@ -9,16 +9,16 @@ import type {
 
 export const siteMeta = {
   name: "Alan Tai",
-  title: "Alan Tai | Field Notes",
+  title: "Alan Tai",
   description:
-    "The personal magazine of Alan Tai, a Northwestern student building software, research, and early-stage products.",
+    "Alan Tai is a Northwestern student building software, research, and early-stage products.",
   intro:
     "I've been building software since middle school. Now I'm studying Industrial Engineering and Artificial Intelligence at Northwestern, and I still just want to make things that work.",
   location: "Evanston, Illinois",
   issue: {
     number: "01",
-    title: "Field Notes",
-    label: "A personal magazine",
+    title: "Issue No. 01",
+    label: "A personal issue",
   },
 } satisfies SiteMeta;
 
@@ -58,30 +58,6 @@ export const about = {
       caption: "The official version.",
       shape: "square",
     },
-    {
-      src: "/images/about/alan-hutong.webp",
-      alt: "Alan standing in a narrow Beijing hutong beneath rows of lanterns and shop signs.",
-      caption: "Following the lanterns through a Beijing hutong.",
-      shape: "portrait",
-    },
-    {
-      src: "/images/about/alan-great-wall.webp",
-      alt: "Alan taking a selfie on the Great Wall under a clear blue sky.",
-      caption: "The Great Wall, which kept getting steeper.",
-      shape: "portrait",
-    },
-    {
-      src: "/images/about/alan-mountain.webp",
-      alt: "Alan at a wooden lookout above misty green mountains near Hangzhou.",
-      caption: "A misty mountain stop near Hangzhou.",
-      shape: "portrait",
-    },
-    {
-      src: "/images/about/alan-shanghai.webp",
-      alt: "Alan by the water with the illuminated Shanghai skyline behind him.",
-      caption: "Shanghai turning its skyline into a light test.",
-      shape: "portrait",
-    },
   ],
 } satisfies AboutContent;
 
@@ -91,7 +67,7 @@ export const projects = [
     name: "Architec",
     discipline: "Energy systems",
     year: "2026",
-    image: "/images/projects/architec.webp",
+    image: "/images/projects/editorial/architec-study.webp",
     summary:
       "An energy-audit tool that turns commercial-building utility bills into ranked upgrades, projected savings, and payback estimates.",
     detail:
@@ -109,7 +85,7 @@ export const projects = [
     name: "GreenChain",
     discipline: "Supply chains",
     year: "2026",
-    image: "/images/projects/greenchain.webp",
+    image: "/images/projects/editorial/greenchain-study.webp",
     summary:
       "A supply-chain sustainability platform that researches suppliers, estimates emissions, and makes relationships visible on a globe.",
     detail:
@@ -126,6 +102,7 @@ export const projects = [
     name: "Prophis",
     discipline: "Public health",
     year: "2026",
+    image: "/images/projects/editorial/prophis-study.webp",
     summary:
       "Patient-context intelligence that turns a fragmented history into a readable clinical timeline and a wider public-health picture.",
     detail:
@@ -141,6 +118,7 @@ export const projects = [
     name: "Vox Vera",
     discipline: "Go-to-market strategy",
     year: "2026",
+    image: "/images/projects/editorial/vox-vera-study.webp",
     summary:
       "A client strategy project that turned a dense channel dataset into a clearer acquisition and segmentation story.",
     detail:
@@ -152,6 +130,7 @@ export const projects = [
     name: "TerraBlade",
     discipline: "Accessible product design",
     year: "2025",
+    image: "/images/projects/editorial/terrablade-study.webp",
     summary:
       "An accessible clay slab-forming device built with Envision Unlimited for artists with physical disabilities.",
     detail:
@@ -188,7 +167,7 @@ export const resume = {
       marginalia: {
         label: "A note from the build",
         ariaLabel: "Read a personal note about Ember Studios",
-        text: "the work is nda'd. the question — what makes a machine conversation worth keeping — is not.",
+        text: "the work is nda'd. the question of what makes a machine conversation worth keeping is not.",
       },
     },
     {
@@ -474,7 +453,7 @@ export const dispatches = [
     id: "why-a-magazine",
     status: "Site sample",
     label: "Editorial note for Issue 01",
-    title: "Why this site opens like a magazine",
+    title: "Why this site opens like a book",
     dek: "A small note about the structure of the thing you are reading.",
     body: [
       "Most portfolios behave like filing cabinets. I wanted this one to feel closer to an issue you can wander through: a cover, a contents page, features, and notes in the margins.",

@@ -4,17 +4,41 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
+import * as THREE from "three";
 import { ISSUE } from "@/magazine/issue-map";
 import { SPREADS, pageLabel, spreadPages } from "@/magazine/folio";
 import { initialEngineState, reduce, type EngineEvent } from "@/magazine/engine";
 import { BookScene, type BookMotion } from "./BookScene";
-import { CaptureFarm, prefetchAround } from "./pageTextures";
+import { normalizeBookPointer } from "./bookPose";
+import {
+  CaptureFarm,
+  pageRasterLayout,
+  getTextureProgress,
+  prefetchAround,
+  type TextureProgress,
+} from "./pageTextures";
 import { Folio } from "@/components/furniture/Folio";
 import { RunningHead } from "@/components/furniture/RunningHead";
 import { GridOverlay } from "@/components/furniture/GridOverlay";
 import "@/styles/book-stage.css";
 
 const TOTAL = SPREADS.length;
+
+function EntryLoader({ progress }: { progress: TextureProgress }) {
+  const ratio = progress.total === 0 ? 0 : progress.completed / progress.total;
+  return (
+    <div className="entry-loader" role="status" aria-live="polite">
+      <p className="entry-loader__name">ALAN TAI</p>
+      <div className="entry-loader__track" aria-hidden>
+        <span style={{ transform: `scaleX(${ratio})` }} />
+      </div>
+      <p className="entry-loader__count mono-label">
+        {String(progress.completed).padStart(2, "0")}/
+        {String(progress.total).padStart(2, "0")}
+      </p>
+    </div>
+  );
+}
 
 function usePageSize() {
   const compute = () => {
@@ -67,6 +91,10 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   const { pw, ph } = usePageSize();
   const [showGrid, setShowGrid] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
+  const [textureProgress, setTextureProgress] = useState(getTextureProgress);
+  const [texturesReady, setTexturesReady] = useState(
+    () => textureProgress.total > 0 && textureProgress.loaded === textureProgress.total,
+  );
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -84,12 +112,28 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       target: null,
       dragTarget: 0,
       dragging: false,
+      grabY: 0,
+      grabOffsetY: 0,
+      turnDirection: 1,
       released: false,
-      shift: 0,
+      shift:
+        targetSpread === 0
+          ? -pw / 2
+          : targetSpread === TOTAL - 1
+            ? pw / 2
+            : 0,
+      turnShift:
+        targetSpread === 0
+          ? -pw / 2
+          : targetSpread === TOTAL - 1
+            ? pw / 2
+            : 0,
       pointerX: 0,
       pointerY: 0,
       poseTarget: touchOnly ? 1 : 0,
       pose: touchOnly ? 1 : 0,
+      turnPose: touchOnly ? 1 : 0,
+      handoff: touchOnly ? 1 : 0,
       onPose: null,
       onSettled: null,
     }),
@@ -98,6 +142,13 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   );
 
   const busy = state.sheet !== null || state.dragging;
+  const onTextureProgress = useCallback((progress: TextureProgress) => {
+    setTextureProgress(progress);
+  }, []);
+  const onTexturesReady = useCallback((progress: TextureProgress) => {
+    setTextureProgress(progress);
+    setTexturesReady(progress.loaded === progress.total);
+  }, []);
 
   // Mirror reducer state into the mutable motion channel.
   useEffect(() => {
@@ -108,9 +159,12 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       if (motion.target === null) {
         motion.released = motion.progress !== 0 && motion.progress !== 1;
         if (!motion.released) {
+          motion.grabY = 0;
+          motion.grabOffsetY = 0;
           motion.progress = state.direction === 1 ? 0 : 1;
           motion.velocity = state.direction === 1 ? 1.1 : -1.1;
         }
+        motion.turnDirection = state.direction === -1 ? -1 : 1;
       }
       motion.target = state.settleTarget;
       motion.onSettled = () => dispatch({ type: "TICK_COMPLETE" });
@@ -119,12 +173,11 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.target = null;
       motion.progress = 0;
       motion.velocity = 0;
+      motion.grabOffsetY = 0;
     }
     motion.poseTarget =
       state.sheet !== null || state.dragging
-        ? touchOnly
-          ? 0.5
-          : 0.3
+        ? motion.turnPose
         : touchOnly
           ? 1
           : hoverRef.current
@@ -132,11 +185,11 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
             : 0;
   }, [dispatch, motion, pw, state, touchOnly]);
 
-  // Shift is pure derivation — computed in render so the overlay and the mesh
-  // always agree on where the book sits.
-  const atCover = state.current === 0 && state.sheet === null;
-  const atBack = state.current === TOTAL - 1 && state.sheet === null;
-  motion.shift = atCover ? -pw / 2 : atBack ? pw / 2 : 0;
+  // The overlay only appears once the landed mesh reaches its new resting
+  // center. During the turn, BookScene keeps the original spine under the hand.
+  const atCover = state.current === 0;
+  const atBack = state.current === TOTAL - 1;
+  const restingShift = atCover ? -pw / 2 : atBack ? pw / 2 : 0;
 
   // Texture prefetch around the action.
   useEffect(() => {
@@ -152,15 +205,25 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     prevTarget.current = targetSpread;
     if (targetSpread === state.current) return;
     if (busy) pendingTarget.current = targetSpread;
-    else dispatch({ type: "TURN", to: targetSpread });
-  }, [busy, state, targetSpread]);
+    else {
+      motion.turnPose = motion.pose;
+      motion.poseTarget = motion.turnPose;
+      motion.turnShift = motion.shift;
+      dispatch({ type: "TURN", to: targetSpread });
+    }
+  }, [busy, motion, state, targetSpread]);
 
   useEffect(() => {
     if (busy || pendingTarget.current === null) return;
     const to = pendingTarget.current;
     pendingTarget.current = null;
-    if (to !== state.current) dispatch({ type: "TURN", to });
-  }, [busy, state]);
+    if (to !== state.current) {
+      motion.turnPose = motion.pose;
+      motion.poseTarget = motion.turnPose;
+      motion.turnShift = motion.shift;
+      dispatch({ type: "TURN", to });
+    }
+  }, [busy, motion, state]);
 
   useEffect(() => {
     if (!busy) onSpreadSettled?.(state.current);
@@ -168,7 +231,12 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
 
   // One drag engine for edge zones (instant) and the page surface (threshold).
   const beginDrag = useCallback(
-    (edge: "fore" | "back", startX: number, pointerId: number) => {
+    (
+      edge: "fore" | "back",
+      startX: number,
+      startY: number,
+      pointerId: number,
+    ) => {
       if (motion.leaf !== null && motion.target !== null) return;
       dispatch({ type: "DRAG_START", edge });
       const stage = stageRef.current;
@@ -184,10 +252,27 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.dragTarget = startProgress;
       motion.velocity = 0;
       motion.dragging = true;
+      motion.grabOffsetY = 0;
+      motion.turnPose = motion.pose;
+      motion.poseTarget = motion.turnPose;
+      motion.turnShift = motion.shift;
+      motion.turnDirection = edge === "fore" ? 1 : -1;
+      const paperRect = overlayRef.current?.getBoundingClientRect();
+      const paperCenterY = paperRect
+        ? paperRect.top + paperRect.height / 2
+        : window.innerHeight / 2;
+      motion.grabY = Math.min(
+        1,
+        Math.max(-1, (paperCenterY - startY) / (ph / 2)),
+      );
       const width = pw * 2;
       const move = (ev: PointerEvent) => {
         const delta = (startX - ev.clientX) / (width * 0.82);
         motion.dragTarget = Math.min(1, Math.max(0, startProgress + delta));
+        motion.grabOffsetY = Math.min(
+          ph * 0.2,
+          Math.max(-ph * 0.2, startY - ev.clientY),
+        );
       };
       const up = () => {
         window.removeEventListener("pointermove", move);
@@ -200,6 +285,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
           /* released with the pointer */
         }
         motion.dragging = false;
+        motion.grabOffsetY = 0;
         dispatch({ type: "DRAG_MOVE", progress: motion.progress });
         dispatch({ type: "DRAG_END", velocity: motion.velocity / 3 });
       };
@@ -207,13 +293,13 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       window.addEventListener("pointerup", up);
       window.addEventListener("pointercancel", up);
     },
-    [motion, pw],
+    [motion, ph, pw],
   );
 
   const onEdgeDown = useCallback(
     (edge: "fore" | "back") => (e: React.PointerEvent) => {
       e.preventDefault();
-      beginDrag(edge, e.clientX, e.pointerId);
+      beginDrag(edge, e.clientX, e.clientY, e.pointerId);
     },
     [beginDrag],
   );
@@ -222,6 +308,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   // becomes a page turn; a plain click stays a click. Never selects text.
   const onSurfaceDown = useCallback(
     (e: React.PointerEvent) => {
+      if (!texturesReady) return;
       if (e.button !== 0) return;
       if (motion.leaf !== null || motion.dragging) return;
       const downX = e.clientX;
@@ -247,7 +334,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
             },
             { capture: true, once: true },
           );
-          beginDrag(edge, downX, pointerId);
+          beginDrag(edge, downX, downY, pointerId);
         }
       };
       const cleanup = () => {
@@ -259,26 +346,32 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       window.addEventListener("pointerup", cleanup);
       window.addEventListener("pointercancel", cleanup);
     },
-    [beginDrag, motion, state],
+    [beginDrag, motion, state, texturesReady],
   );
 
   // Pose choreography: the book rests as a display object and flattens for
   // reading when the pointer reaches it. One damped channel, no state pops.
   const hoverRef = useRef(false);
   const desiredPose = useCallback(() => {
-    if (motion.leaf !== null || motion.dragging) return touchOnly ? 0.5 : 0.3;
+    if (motion.leaf !== null || motion.dragging) return motion.turnPose;
     if (touchOnly) return 1;
     return hoverRef.current ? 1 : 0;
   }, [motion, touchOnly]);
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
-      const nx = (e.clientX / window.innerWidth) * 2 - 1;
-      const ny = (e.clientY / window.innerHeight) * 2 - 1;
-      motion.pointerX = nx;
-      motion.pointerY = ny;
       const cx = window.innerWidth / 2 + motion.shift;
       const cy = window.innerHeight / 2;
+      const pointer = normalizeBookPointer({
+        x: e.clientX,
+        y: e.clientY,
+        centerX: cx,
+        centerY: cy,
+        halfWidth: pw + 48,
+        halfHeight: ph / 2 + 48,
+      });
+      motion.pointerX = pointer.x;
+      motion.pointerY = pointer.y;
       hoverRef.current =
         Math.abs(e.clientX - cx) < pw + 48 && Math.abs(e.clientY - cy) < ph / 2 + 48;
       motion.poseTarget = desiredPose();
@@ -286,18 +379,15 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     [desiredPose, motion, ph, pw],
   );
 
-  // The scene reports pose every frame; the overlay melts in and out of the
-  // mesh through it (imperative style writes — no React churn at 60fps).
+  // The scene reports exact transform alignment every frame. The DOM only
+  // replaces the canvas once rotation, scale, and center are all subpixel.
   useEffect(() => {
-    motion.onPose = (pose: number) => {
+    motion.onPose = (_pose: number, handoff: number) => {
       const el = overlayRef.current;
       if (!el) return;
-      const turning = motion.leaf !== null;
-      const t = Math.min(1, Math.max(0, (pose - 0.86) / 0.14));
-      const opacity = turning ? 0 : t * t * (3 - 2 * t);
-      el.style.opacity = String(opacity);
-      el.style.visibility = opacity < 0.02 ? "hidden" : "visible";
-      el.style.pointerEvents = opacity > 0.9 ? "auto" : "none";
+      el.style.opacity = String(handoff);
+      el.style.visibility = handoff < 0.02 ? "hidden" : "visible";
+      el.style.pointerEvents = handoff > 0.98 ? "auto" : "none";
     };
     return () => {
       motion.onPose = null;
@@ -307,16 +397,23 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   // Queued turn helper: never drop an intent because paper was moving.
   const go = useCallback(
     (to: number) => {
+      if (!texturesReady) return;
       const clamped = Math.min(Math.max(to, 0), TOTAL - 1);
       if (busy) pendingTarget.current = clamped;
-      else dispatch({ type: "TURN", to: clamped });
+      else {
+        motion.turnPose = motion.pose;
+        motion.poseTarget = motion.turnPose;
+        motion.turnShift = motion.shift;
+        dispatch({ type: "TURN", to: clamped });
+      }
     },
-    [busy],
+    [busy, motion, texturesReady],
   );
 
   // Keyboard.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!texturesReady) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && /^(input|textarea|select)$/i.test(t.tagName)) return;
@@ -331,29 +428,40 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, state]);
+  }, [go, state, texturesReady]);
 
   const pages = spreadPages(state.current);
+  const rasterLayout = pageRasterLayout(pw);
   const folioLine = pages
-    ? `${String(pages[0]).padStart(2, "0")}–${String(pages[1]).padStart(2, "0")}`
+    ? `${String(pages[0]).padStart(2, "0")}-${String(pages[1]).padStart(2, "0")}`
     : state.current === 0
       ? "COVER"
       : "END";
 
-  const shift = motion.shift;
+  const shift = restingShift;
 
   return (
-    <div className="bstage" ref={stageRef} onPointerMove={onPointerMove}>
-      <Canvas
-        className="bstage__canvas"
-        shadows
-        gl={{ antialias: true, alpha: true }}
-        dpr={[1, 2]}
-      >
-        <Suspense fallback={null}>
-          <BookScene motion={motion} pw={pw} ph={ph} />
-        </Suspense>
-      </Canvas>
+    <div
+      className="bstage"
+      ref={stageRef}
+      onPointerMove={onPointerMove}
+      aria-busy={!texturesReady}
+    >
+      {texturesReady ? (
+        <Canvas
+          className="bstage__canvas"
+          shadows
+          gl={{ antialias: true, alpha: true }}
+          onCreated={({ gl }) => {
+            gl.shadowMap.type = THREE.PCFShadowMap;
+          }}
+          dpr={[1, 2]}
+        >
+          <Suspense fallback={null}>
+            <BookScene motion={motion} pw={pw} ph={ph} />
+          </Suspense>
+        </Canvas>
+      ) : null}
 
       <div
         ref={overlayRef}
@@ -366,8 +474,17 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
           transform: `translate(calc(-50% + ${shift}px), -50%)`,
         }}
       >
-        <OverlayFace spread={state.current} face="verso" showGrid={showGrid} />
-        <OverlayFace spread={state.current} face="recto" showGrid={showGrid} />
+        <div
+          className="bstage__spread-pages"
+          style={{
+            width: rasterLayout.spreadWidth,
+            height: rasterLayout.pageHeight,
+            transform: `scale(${rasterLayout.scale})`,
+          }}
+        >
+          <OverlayFace spread={state.current} face="verso" showGrid={showGrid} />
+          <OverlayFace spread={state.current} face="recto" showGrid={showGrid} />
+        </div>
       </div>
 
       {/* Fore-edge drag zones sit over everything at the page edges. */}
@@ -424,7 +541,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
                   }}
                 >
                   <span className="mono-label bstage__toc-no">
-                    {p ? String(p[0]).padStart(2, "0") : i === 0 ? "—" : "··"}
+                    {p ? String(p[0]).padStart(2, "0") : i === 0 ? "-" : "··"}
                   </span>
                   <span className="bstage__toc-label">{def.label.toLowerCase()}</span>
                 </button>
@@ -438,7 +555,9 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         {`${pageLabel(state.current)} · ${SPREADS[state.current]?.label ?? ""}`}
       </div>
 
-      <CaptureFarm />
+      {!texturesReady ? <EntryLoader progress={textureProgress} /> : null}
+
+      <CaptureFarm onProgress={onTextureProgress} onReady={onTexturesReady} />
     </div>
   );
 }

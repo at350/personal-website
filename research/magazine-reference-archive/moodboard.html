@@ -19,7 +19,14 @@
       html { background: var(--paper); color: var(--ink); }
       body { margin: 0; }
       a { color: inherit; text-underline-offset: 0.18em; }
-      img { display: block; width: 100%; height: auto; background: #f4f4f2; }
+      img,
+      video { display: block; width: 100%; height: auto; background: #f4f4f2; }
+
+      video {
+        aspect-ratio: 16 / 10;
+        object-fit: cover;
+        background: var(--ink);
+      }
 
       .shell {
         width: min(1500px, calc(100% - 40px));
@@ -150,6 +157,86 @@
       .text-card .card-copy p { color: rgba(255,255,255,.7); }
       .red { color: var(--red); }
 
+      .gallery-card img,
+      .site-study img {
+        aspect-ratio: 16 / 10;
+        object-fit: cover;
+        object-position: top;
+      }
+
+      .site-study.tall img {
+        aspect-ratio: 4 / 5;
+      }
+
+      .motion-card video {
+        border: 1px solid rgba(14, 14, 12, 0.1);
+      }
+
+      .private-field {
+        background: #15171e;
+        color: var(--paper);
+        margin-inline: calc(50% - 50vw);
+        padding-inline: max(20px, calc((100vw - min(1500px, calc(100vw - 40px))) / 2));
+      }
+
+      .private-field .section-head,
+      .private-field figure {
+        border-color: rgba(255,255,255,.28);
+      }
+
+      .private-field .section-note,
+      .private-field .caption-copy p {
+        color: rgba(255,255,255,.66);
+      }
+
+      .private-field a { color: inherit; }
+
+      .private-label {
+        display: inline-flex;
+        width: fit-content;
+        padding: 7px 10px;
+        margin-bottom: 18px;
+        border: 1px solid currentColor;
+        font: 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+      }
+
+      .motion-ledger {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin-top: 44px;
+        border-top: 1px solid var(--ink);
+      }
+
+      .motion-ledger article {
+        min-height: 230px;
+        padding: 18px 22px 26px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .motion-ledger h3 {
+        max-width: 12ch;
+        margin-top: 54px;
+        font: 700 28px/1 Georgia, serif;
+        letter-spacing: -.035em;
+      }
+
+      .motion-ledger p {
+        max-width: 31ch;
+        margin: 0;
+        color: var(--muted);
+        font: 15px/1.45 Georgia, serif;
+      }
+
+      .audit-note {
+        margin-top: 34px;
+        padding: 18px 0;
+        border-top: 1px solid var(--ink);
+        color: var(--muted);
+        font: 15px/1.45 Georgia, serif;
+      }
+
       .mapping {
         width: 100%;
         border-collapse: collapse;
@@ -212,6 +299,23 @@
         .mapping, .mapping tbody, .mapping tr, .mapping th, .mapping td { display: block; }
         .mapping th { width: auto; padding-bottom: 4px; }
         .mapping td { border-top: 0; padding-top: 0; }
+        .motion-ledger { grid-template-columns: 1fr; }
+        .private-field { margin-inline: -20px; padding-inline: 20px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        video { display: none; }
+        .motion-card::before {
+          content: "Motion preview hidden because reduced motion is enabled.";
+          display: grid;
+          min-height: 240px;
+          place-items: center;
+          padding: 30px;
+          background: var(--ink);
+          color: var(--paper);
+          font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          text-align: center;
+        }
       }
     </style>
   </head>
@@ -399,7 +503,149 @@
 
         <section class="section">
           <div class="section-head">
-            <span class="meta red">05 · Translation</span>
+            <span class="meta red">05 · Discovery</span>
+            <h2>Indexes point. Sites teach.</h2>
+            <p class="section-note">Craftwork, Recent, Landing Love, Okay Dev, Showreel, and Awwwards were used as discovery surfaces. Their grids are evidence about browsing; the conclusions below come from opening the work itself.</p>
+          </div>
+          <div class="grid">
+            <figure class="span-4 gallery-card">
+              <img src="assets/screenshots/web-galleries/craftwork-curated-rest-2026-08-11.jpg" alt="Craftwork curated websites gallery" />
+              <figcaption><span class="number">14</span><div class="caption-copy"><h3>Craftwork · broad source pool</h3><p>Dense filtering and calm cards make it useful for selection, but the grid itself is mostly static. It led to Prime Intellect and MCKP.</p></div></figcaption>
+            </figure>
+            <figure class="span-4 gallery-card">
+              <img src="assets/screenshots/web-galleries/recent-design-rest-2026-08-11.jpg" alt="Recent Design motion and web gallery" />
+              <figcaption><span class="number">15</span><div class="caption-copy"><h3>Recent · motion inside the feed</h3><p>Short loops begin in place, so behavior is part of the artifact before a click. Useful for interaction primitives, not whole-site judgment.</p></div></figcaption>
+            </figure>
+            <figure class="span-4 gallery-card">
+              <img src="assets/screenshots/web-galleries/landing-love-hover-2026-08-11.jpg" alt="Landing Love website recording playing on hover" />
+              <figcaption><span class="number">16</span><div class="caption-copy"><h3>Landing Love · recorded journeys</h3><p>Full-page recordings answer a better question than a screenshot: what does the page feel like across time?</p></div></figcaption>
+            </figure>
+            <figure class="span-4 gallery-card">
+              <img src="assets/screenshots/web-galleries/okaydev-gallery-carousel-2026-08-11.jpg" alt="Okay Dev curated projects carousel" />
+              <figcaption><span class="number">17</span><div class="caption-copy"><h3>Okay Dev · curated sequence</h3><p>A small editorial pick sits above the community stream. The slider suggests judgment and order instead of endless equivalence.</p></div></figcaption>
+            </figure>
+            <figure class="span-4 gallery-card">
+              <img src="assets/screenshots/web-galleries/showreel-design-hover-2026-08-11.jpg" alt="Showreel Design preview grid in motion" />
+              <figcaption><span class="number">18</span><div class="caption-copy"><h3>Showreel · movement first</h3><p>Ten-second previews, optional sound, and immediate playback make tempo, cut density, and visual energy filterable.</p></div></figcaption>
+            </figure>
+            <figure class="span-4 gallery-card">
+              <img src="assets/screenshots/web-galleries/awwwards-sotd-rest-2026-08-11.jpg" alt="Awwwards Sites of the Day index" />
+              <figcaption><span class="number">19</span><div class="caption-copy"><h3>Awwwards SOTD · poster first</h3><p>The index is comparatively still. Its value is the trail into current winners and element-level motion records.</p></div></figcaption>
+            </figure>
+          </div>
+          <p class="audit-note">Research correction: the archive does not treat aggregate screenshots as proof of a design pattern. Each live-site note names the behavior observed after following the feature to its source.</p>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <span class="meta red">06 · Live sites</span>
+            <h2>The page has a body and a pulse.</h2>
+            <p class="section-note">These are the actual featured sites, observed at entry and after interaction. The lesson is not “add animation”; it is that motion assigns weight, sequence, and physical character.</p>
+          </div>
+          <div class="grid">
+            <figure class="span-7 site-study">
+              <img src="assets/screenshots/web-galleries/site-prime-intellect-scroll.jpg" alt="Prime Intellect technical journal-like section after scrolling" />
+              <figcaption><span class="number">20</span><div class="caption-copy"><h3>Prime Intellect · technical journal</h3><p>Persistent numbered navigation, figure labels, hairline grids, and live product diagrams make the page read like a lab report. Scroll changes the evidence, not the basic grammar.</p></div></figcaption>
+            </figure>
+            <figure class="span-5 site-study tall">
+              <img src="assets/screenshots/web-galleries/site-rectangles-fm-scroll.jpg" alt="Rectangles.fm editorial collage and livestream chapter" />
+              <figcaption><span class="number">21</span><div class="caption-copy"><h3>Rectangles.fm · issue as collage</h3><p>A fixed masthead sits over torn-paper imagery. Scrolling feels like moving down a constructed poster: hero, object, then chapter title and story image.</p></div></figcaption>
+            </figure>
+            <figure class="span-8 site-study">
+              <img src="assets/screenshots/web-galleries/site-studio-k95-spiral.jpg" alt="Studio K95 portfolio cards arranged in a 3D spiral" />
+              <figcaption><span class="number">22</span><div class="caption-copy"><h3>Studio K95 · layout becomes an instrument</h3><p>The same project set morphs between Rings and Spiral. Depth and camera arrangement are navigational states, not ornamental particles.</p></div></figcaption>
+            </figure>
+            <figure class="span-4 site-study tall">
+              <img src="assets/screenshots/web-galleries/site-ricardo-chance-scroll.jpg" alt="Ricardo Chance cursor-reactive purple particle form" />
+              <figcaption><span class="number">23</span><div class="caption-copy"><h3>Ricardo Chance · responsive atmosphere</h3><p>The WebGL field starts as quiet space, then gathers into a form around movement. It gives the pointer consequence before presenting work.</p></div></figcaption>
+            </figure>
+            <figure class="span-6 site-study">
+              <img src="assets/screenshots/web-galleries/site-neue-montreal-scroll.jpg" alt="Neue Montreal type specimen with oversized scroll composition" />
+              <figcaption><span class="number">24</span><div class="caption-copy"><h3>Neue Montreal · a specimen becomes a trip</h3><p>A type family is staged as an “official travel guide.” Oversized phrases, a sticky chapter rail, and changing weights turn scrolling into editorial sampling.</p></div></figcaption>
+            </figure>
+            <figure class="span-6 site-study">
+              <img src="assets/screenshots/web-galleries/site-mckp-hero.jpg" alt="MCKP interactive device mockup in a dark scene" />
+              <figcaption><span class="number">25</span><div class="caption-copy"><h3>MCKP · object motion has mass</h3><p>The product is demonstrated through a live 3D object. Enter, breathe, loop, follow, zoom, shake, and dolly are treated as different verbs with different causes.</p></div></figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <span class="meta red">07 · Motion</span>
+            <h2>Motion is editorial pacing.</h2>
+            <p class="section-note">The local clips below are research copies of previews exposed by the cited galleries. They are not production assets. Play, pause, and compare their timing—not their surface styling.</p>
+          </div>
+          <div class="grid">
+            <figure class="span-6 motion-card">
+              <video autoplay muted loop playsinline controls preload="metadata" src="assets/motion/landing-love-rectangles.mp4"></video>
+              <figcaption><span class="number">26</span><div class="caption-copy"><h3>Full-page recording · Landing Love</h3><p>Useful for judging the whole sequence: entry, chapter cadence, pauses, and how often the composition genuinely changes.</p></div></figcaption>
+            </figure>
+            <figure class="span-6 motion-card">
+              <video autoplay muted loop playsinline controls preload="metadata" src="assets/motion/okaydev-neue-montreal.mp4"></video>
+              <figcaption><span class="number">27</span><div class="caption-copy"><h3>Specimen journey · Okay Dev</h3><p>Type scale, pinning, and spatial cuts do the narrative work. The page avoids animating every label independently.</p></div></figcaption>
+            </figure>
+            <figure class="span-4 motion-card">
+              <video autoplay muted loop playsinline controls preload="metadata" src="assets/motion/recent-hide-nav-on-scroll.mp4"></video>
+              <figcaption><span class="number">28</span><div class="caption-copy"><h3>Scroll response · Recent</h3><p>A tiny behavior with a clear cause: chrome leaves when reading begins and returns when direction changes.</p></div></figcaption>
+            </figure>
+            <figure class="span-4 motion-card">
+              <video autoplay muted loop playsinline controls preload="metadata" src="assets/motion/recent-genie-effect.mp4"></video>
+              <figcaption><span class="number">29</span><div class="caption-copy"><h3>Direct manipulation · Recent</h3><p>The transition can be scrubbed mid-flight. Input and output remain visibly connected.</p></div></figcaption>
+            </figure>
+            <figure class="span-4 motion-card">
+              <video autoplay muted loop playsinline controls preload="metadata" src="assets/motion/showreel-alberto-vergara.mp4"></video>
+              <figcaption><span class="number">30</span><div class="caption-copy"><h3>Cut density · Showreel</h3><p>A ten-second reel demonstrates how fast motion can be legible when each beat has a decisive silhouette.</p></div></figcaption>
+            </figure>
+          </div>
+          <div class="motion-ledger">
+            <article><span class="meta red">Entry</span><h3>Promise, then release.</h3><p>A loader earns its time only when it establishes the visual rule or protects a necessary 3D setup. Long logo-only waits are a warning, not a reference to imitate.</p></article>
+            <article><span class="meta red">Scroll</span><h3>Move between chapters.</h3><p>Use pinning, masking, or density changes to mark editorial sections. Constant parallax produces activity without hierarchy.</p></article>
+            <article><span class="meta red">Hover</span><h3>Preview, do not perform.</h3><p>Hover should expose the next state—play a sample, lift an object, reveal a caption—without stealing the page from the reader.</p></article>
+            <article><span class="meta red">Cursor</span><h3>Give the pointer consequence.</h3><p>Cursor effects work when they alter an object, camera, or readable state. A decorative follower alone is weak evidence of interaction.</p></article>
+            <article><span class="meta red">Transition</span><h3>Preserve continuity.</h3><p>The best morphs show where an object came from and where it went. Page turns, FLIP-like rearrangements, and scrubbed minimization all keep that causal thread.</p></article>
+            <article><span class="meta red">Tempo</span><h3>Several speeds, one issue.</h3><p>UI response stays quick; type reveals are measured; the publication object moves with weight; feature moments are rare enough to remain memorable.</p></article>
+          </div>
+        </section>
+
+        <section class="section private-field">
+          <div class="section-head">
+            <span class="meta red">08 · Alan's archive</span>
+            <h2>The private board is the editorial backbone.</h2>
+            <p class="section-note">Captured from the single “Design Inspiration” Smart Space the user supplied in Edge. These composites may contain saved third-party work and remain private research material; they must not be published.</p>
+          </div>
+          <span class="private-label">Private input · local research only</span>
+          <div class="grid">
+            <figure class="span-8 site-study">
+              <img src="assets/screenshots/personal-mymind/design-inspiration-01.jpg" alt="Private mymind board with Spark, Marquette Messenger, Ladue, Nueva Current, and magazine imagery" />
+              <figcaption><span class="number">31</span><div class="caption-copy"><h3>The saved set is not one aesthetic</h3><p>It joins school publications, issue archives, Photoshop/collage ideas, NYT Magazine covers, and experimental imagery. The common thread is authored hierarchy, not a single look.</p></div></figcaption>
+            </figure>
+            <figure class="span-4 site-study tall">
+              <img src="assets/screenshots/personal-mymind/design-inspiration-09.jpg" alt="Private mymind board with student newspaper spreads and literary journal covers" />
+              <figcaption><span class="number">32</span><div class="caption-copy"><h3>Inside pages matter</h3><p>Interview maps, political collage, photo-led news grids, large pull quotes, and literary covers show that a magazine identity needs several compositional gears.</p></div></figcaption>
+            </figure>
+            <figure class="span-6 site-study">
+              <img src="assets/screenshots/personal-mymind/design-inspiration-05.jpg" alt="Private mymind board with student publication archives and newspaper websites" />
+              <figcaption><span class="number">33</span><div class="caption-copy"><h3>A publication is also an archive</h3><p>The saved Issuu profiles and news sites emphasize chronology, issue covers, section identity, and the pleasure of seeing many editions together.</p></div></figcaption>
+            </figure>
+            <figure class="span-6 site-study">
+              <img src="assets/screenshots/personal-mymind/site-spark-issues.jpg" alt="Spark Newsmagazine live issue archive" />
+              <figcaption><span class="number">34</span><div class="caption-copy"><h3>Spark · issues over feeds</h3><p>The live archive groups years and preserves covers as objects. A personal site can similarly foreground editions and eras instead of flattening everything into “recent work.”</p></div></figcaption>
+            </figure>
+            <figure class="span-6 site-study">
+              <img src="assets/screenshots/personal-mymind/site-hilite-home.jpg" alt="HiLite live publication homepage" />
+              <figcaption><span class="number">35</span><div class="caption-copy"><h3>HiLite · dense but directional</h3><p>A breaking-news rail, section bands, lead package, author lines, and supporting cards make a busy page scannable without pretending every story is equal.</p></div></figcaption>
+            </figure>
+            <figure class="span-6 site-study">
+              <img src="assets/screenshots/personal-mymind/site-communicator-home.jpg" alt="The Communicator live publication homepage" />
+              <figcaption><span class="number">36</span><div class="caption-copy"><h3>The Communicator · recurring modules</h3><p>Photo of the day, trending, top stories, recent stories, and a print flipbook create several entry speeds while keeping the masthead stable.</p></div></figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <span class="meta red">09 · Translation</span>
             <h2>Where each reference belongs.</h2>
             <p class="section-note">A reference only helps when it has a defined job. These mappings prevent the moodboard from becoming an aesthetic soup.</p>
           </div>
@@ -410,14 +656,16 @@
               <tr><th>Letter / profile</th><td>The Gentlewoman: real photography, asymmetry across the gutter, quiet captioning, earned white space.</td></tr>
               <tr><th>Projects / resume</th><td>Scholastic + POPEYE + Jim Bang: direct section hierarchy, evidence-led rows, clear dates, minimal explanation.</td></tr>
               <tr><th>Book pose</th><td>Stripe Press: readable spine, edge, thickness, coherent light, and a continuous move into the flat reading pose.</td></tr>
-              <tr><th>Motion / copy</th><td>mymind + Jim Bang: large conceptual statements, short support copy, one meaningful interaction per spread.</td></tr>
+              <tr><th>Motion / copy</th><td>Prime Intellect + Rectangles.fm + Neue Montreal: move between editorial chapters; keep the navigation grammar stable while the evidence and composition change.</td></tr>
+              <tr><th>Interaction</th><td>Studio K95 + MCKP + Recent: make input and output visibly causal; arrange, scrub, settle, reveal, or move the camera for a reason.</td></tr>
+              <tr><th>Archive</th><td>Alan's mymind set + Spark + HiLite + The Communicator: organize by issue, era, section, and story weight instead of one undifferentiated project feed.</td></tr>
             </tbody>
           </table>
         </section>
 
         <section class="section">
           <div class="section-head">
-            <span class="meta red">06 · Rules</span>
+            <span class="meta red">10 · Rules</span>
             <h2>What the research actually requires.</h2>
             <p class="section-note">These are the audit criteria. A visual flourish that contradicts them is not supported by the reference set.</p>
           </div>
@@ -429,6 +677,7 @@
             <li>Empty space must give something authority.</li>
             <li>The book looks physical before it moves.</li>
             <li>Motion reveals cause, hierarchy, or state.</li>
+            <li>Aggregate galleries suggest candidates; live sites supply conclusions.</li>
             <li>Source artwork never ships in the public site.</li>
           </ol>
         </section>
@@ -439,5 +688,16 @@
         <a class="meta" href="brand.md">Read the full synthesis →</a>
       </footer>
     </div>
+    <script>
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const syncMotion = () => {
+        document.querySelectorAll('video').forEach((video) => {
+          if (reducedMotion.matches) video.pause();
+          else video.play().catch(() => {});
+        });
+      };
+      reducedMotion.addEventListener?.('change', syncMotion);
+      syncMotion();
+    </script>
   </body>
 </html>

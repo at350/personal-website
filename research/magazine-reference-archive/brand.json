@@ -59,6 +59,76 @@
       "retrieved_at": "2026-08-11",
       "supports": ["concept-first covers", "editorial art direction", "photography-typography-illustration range"],
       "rights_notes": "No local screenshot was captured because browser access was blocked. Reference through cited design-industry coverage; all NYT artwork remains rights-controlled."
+    },
+    {
+      "title": "Prime Intellect",
+      "url": "https://www.primeintellect.ai/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["persistent numbered navigation", "technical-journal figures", "stable grammar across scroll chapters"],
+      "rights_notes": "Live-site screenshots are private research evidence. Site design and imagery remain proprietary."
+    },
+    {
+      "title": "MCKP",
+      "url": "https://mckp.live/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["3D object weight", "named motion verbs", "cursor and scroll triggers"],
+      "rights_notes": "Live 3D site and product imagery are proprietary. Research only."
+    },
+    {
+      "title": "Rectangles.fm",
+      "url": "https://rectangles.fm/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["fixed masthead", "scroll chapters", "torn-paper editorial collage"],
+      "rights_notes": "Site design and photography are proprietary. Research only."
+    },
+    {
+      "title": "Ricardo Chance",
+      "url": "https://www.ricardochance.com/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["cursor-reactive WebGL", "atmospheric entry", "pointer consequence"],
+      "rights_notes": "Personal-site design and WebGL scene belong to the creator. Research only."
+    },
+    {
+      "title": "PP Neue Montreal",
+      "url": "https://neuemontreal.com/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["scroll-driven type specimen", "sticky chapter rail", "typographic scale as sequence"],
+      "rights_notes": "Type specimen and font identity belong to Pangram Pangram. Research only."
+    },
+    {
+      "title": "Studio K95",
+      "url": "https://k95.it",
+      "retrieved_at": "2026-08-11",
+      "supports": ["state-preserving layout morph", "3D archive navigation", "Rings and Spiral modes"],
+      "rights_notes": "Site and project imagery are proprietary. Research only."
+    },
+    {
+      "title": "NOTHIN'",
+      "url": "https://www.noth.in",
+      "retrieved_at": "2026-08-11",
+      "supports": ["identity loader", "mouse-reactive hero shaders", "manifesto-to-work chapter sequence"],
+      "rights_notes": "The live capture remained in a long loader. Site design remains proprietary; research only."
+    },
+    {
+      "title": "Spark — Issues",
+      "url": "https://lakotaeastsparkonline.com/issues/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["issue archive by year", "cover-as-object", "edition chronology"],
+      "rights_notes": "Publication cover art is third-party material. Research only."
+    },
+    {
+      "title": "HiLite",
+      "url": "https://hilite.org/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["unequal story weight", "section bands", "dense publication homepage"],
+      "rights_notes": "Publication content and photography remain with HiLite and its contributors."
+    },
+    {
+      "title": "The Communicator",
+      "url": "https://chscommunicator.com/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["recurring story modules", "multiple reading speeds", "print flipbook integration"],
+      "rights_notes": "Publication content and photography remain with The Communicator and its contributors."
     }
   ],
   "secondary_sources": [
@@ -96,6 +166,57 @@
       "retrieved_at": "2026-08-11",
       "supports": ["cover concept development", "editorial image commissioning"],
       "rights_notes": "Secondary editorial coverage; linked, not downloaded."
+    },
+    {
+      "title": "Craftwork Curated Websites",
+      "url": "https://craftwork.design/curated/websites",
+      "retrieved_at": "2026-08-11",
+      "supports": ["broad website discovery", "filterable reference pool"],
+      "rights_notes": "Discovery index only; featured work remains with its creators."
+    },
+    {
+      "title": "Recent.design",
+      "url": "https://recent.design/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["motion previews in feed", "interaction primitives", "microinteraction taxonomy"],
+      "rights_notes": "Preview loops are third-party research material and must not ship."
+    },
+    {
+      "title": "Landing Love",
+      "url": "https://www.landing.love/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["full-page website recordings", "temporal sequence", "hover previews"],
+      "rights_notes": "Recordings support private temporal analysis; source sites retain all rights."
+    },
+    {
+      "title": "Okay Dev Gallery",
+      "url": "https://okaydev.co/gallery",
+      "retrieved_at": "2026-08-11",
+      "supports": ["curated project sequence", "editorial pick versus community stream"],
+      "rights_notes": "Featured-project media remains with its creators. Research only."
+    },
+    {
+      "title": "Showreel.design",
+      "url": "https://showreel.design/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["motion-first browsing", "ten-second preview loops", "tempo and cut-density comparison"],
+      "rights_notes": "Showreel media remains with its creators. Research only."
+    },
+    {
+      "title": "Awwwards Sites of the Day",
+      "url": "https://www.awwwards.com/websites/sites_of_the_day/",
+      "retrieved_at": "2026-08-11",
+      "supports": ["current featured sites", "element-level motion records", "direct live-site discovery"],
+      "rights_notes": "Awards index and third-party screenshots are research-only."
+    }
+  ],
+  "private_sources": [
+    {
+      "title": "Alan's Design Inspiration mymind Smart Space",
+      "url": "https://access.mymind.com/spaces/00000000xQsglovheLBAgv",
+      "retrieved_at": "2026-08-11",
+      "supports": ["saved student publications", "issue archives", "cover references", "inside-page composition", "interaction references"],
+      "rights_notes": "User-authorized access to this exact private space for local research only. Never publish screenshots, signed media URLs, account details, or unrelated cards."
     }
   ],
   "identity": {
@@ -108,11 +229,17 @@
       "Scholastic classroom magazines",
       "Stripe Press",
       "mymind",
-      "Jim Bang"
+      "Jim Bang",
+      "Prime Intellect",
+      "Rectangles.fm",
+      "Studio K95",
+      "PP Neue Montreal",
+      "MCKP",
+      "Alan's saved publication archive"
     ],
     "taglines": [],
     "tone": ["editorial", "specific", "restrained", "tactile", "direct", "curious"],
-    "visual_keywords": ["concept-first cover", "physical issue", "folio", "ledger", "catalog density", "asymmetric spread", "object lighting", "print furniture"]
+    "visual_keywords": ["concept-first cover", "physical issue", "folio", "ledger", "catalog density", "asymmetric spread", "object lighting", "print furniture", "scroll chapter", "state-preserving morph", "cursor consequence", "motion verb", "issue archive"]
   },
   "colors": [
     {
@@ -302,6 +429,102 @@
       "source_url": "https://www.jibang.me/",
       "rights_notes": "Personal-site design; research only.",
       "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "Prime Intellect scroll chapter",
+      "path": "assets/screenshots/web-galleries/site-prime-intellect-scroll.jpg",
+      "source_url": "https://www.primeintellect.ai/",
+      "rights_notes": "Live-site screenshot for private research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "Rectangles.fm editorial chapter",
+      "path": "assets/screenshots/web-galleries/site-rectangles-fm-scroll.jpg",
+      "source_url": "https://rectangles.fm/",
+      "rights_notes": "Live-site screenshot for private research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "Studio K95 Spiral layout",
+      "path": "assets/screenshots/web-galleries/site-studio-k95-spiral.jpg",
+      "source_url": "https://k95.it",
+      "rights_notes": "Live-site screenshot containing creator-owned project imagery; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "PP Neue Montreal scroll specimen",
+      "path": "assets/screenshots/web-galleries/site-neue-montreal-scroll.jpg",
+      "source_url": "https://neuemontreal.com/",
+      "rights_notes": "Type specimen and font identity are proprietary; research only.",
+      "confidence": "official"
+    },
+    {
+      "type": "screenshot",
+      "name": "Alan's private Design Inspiration overview",
+      "path": "assets/screenshots/personal-mymind/design-inspiration-01.jpg",
+      "source_url": "https://access.mymind.com/spaces/00000000xQsglovheLBAgv",
+      "rights_notes": "Private user-supplied context containing third-party work. Never publish or redistribute.",
+      "confidence": "private"
+    },
+    {
+      "type": "screenshot",
+      "name": "Alan's private publication archive cluster",
+      "path": "assets/screenshots/personal-mymind/design-inspiration-05.jpg",
+      "source_url": "https://access.mymind.com/spaces/00000000xQsglovheLBAgv",
+      "rights_notes": "Private user-supplied context containing third-party work. Never publish or redistribute.",
+      "confidence": "private"
+    },
+    {
+      "type": "screenshot",
+      "name": "Alan's private inside-page cluster",
+      "path": "assets/screenshots/personal-mymind/design-inspiration-09.jpg",
+      "source_url": "https://access.mymind.com/spaces/00000000xQsglovheLBAgv",
+      "rights_notes": "Private user-supplied context containing third-party work. Never publish or redistribute.",
+      "confidence": "private"
+    },
+    {
+      "type": "video",
+      "name": "Landing Love Rectangles full-page preview",
+      "path": "assets/motion/landing-love-rectangles.mp4",
+      "source_url": "https://www.landing.love/sites/rectangles/",
+      "rights_notes": "Third-party research preview. Never ship or redistribute.",
+      "confidence": "secondary"
+    },
+    {
+      "type": "video",
+      "name": "Okay Dev PP Neue Montreal preview",
+      "path": "assets/motion/okaydev-neue-montreal.mp4",
+      "source_url": "https://okaydev.co/gallery",
+      "rights_notes": "Third-party research preview. Never ship or redistribute.",
+      "confidence": "secondary"
+    },
+    {
+      "type": "video",
+      "name": "Recent hide-nav-on-scroll study",
+      "path": "assets/motion/recent-hide-nav-on-scroll.mp4",
+      "source_url": "https://recent.design/i/xtmk7aq-hide-on-scroll-navbar",
+      "rights_notes": "Third-party research preview. Never ship or redistribute.",
+      "confidence": "secondary"
+    },
+    {
+      "type": "video",
+      "name": "Recent Genie Effect study",
+      "path": "assets/motion/recent-genie-effect.mp4",
+      "source_url": "https://recent.design/i/bfmltw8-genie-effect-for-the-web",
+      "rights_notes": "Third-party research preview. Never ship or redistribute.",
+      "confidence": "secondary"
+    },
+    {
+      "type": "video",
+      "name": "Showreel Alberto Vergara preview",
+      "path": "assets/motion/showreel-alberto-vergara.mp4",
+      "source_url": "https://showreel.design/",
+      "rights_notes": "Third-party research preview. Never ship or redistribute.",
+      "confidence": "secondary"
     }
   ],
   "style_guidance": {
@@ -309,7 +532,9 @@
       "Give each spread one governing composition rather than repeating a card grid everywhere.",
       "Use a persistent folio and issue system, then permit controlled exceptions for full-bleed pages.",
       "Treat density as a deliberate mode: POPEYE-like catalog pages can be dense, while Gentlewoman-like profiles need air.",
-      "Show the book as a physical object only when spine, top edge, thickness, and light make the pose legible."
+      "Show the book as a physical object only when spine, top edge, thickness, and light make the pose legible.",
+      "Keep a stable navigational grammar while each scroll chapter changes its evidence, as Prime Intellect does with numbered anchors and figure labels.",
+      "Organize publication archives by issue and year so the cover sequence reads as a body of work rather than an undifferentiated feed."
     ],
     "imagery": [
       "Prefer a single commissioned-feeling idea on the cover over several equal-weight promotional lines.",
@@ -321,16 +546,23 @@
       "Keep UI icons subordinate to the publication object."
     ],
     "motion": [
-      "Motion should reveal physical cause, hierarchy, or state: a page turns, a book settles, a cover concept assembles.",
-      "Use one memorable interaction per spread and keep all other motion quiet.",
-      "Preserve immediate exits and restrained entrances for tooltips and marginalia."
+      "Name the verb and its trigger before animating: enter, settle, turn, gather, preview, zoom, or morph—caused by load, scroll, hover, cursor, or selection.",
+      "Use scroll to mark chapters and change reading mode, not to apply constant parallax to every surface.",
+      "Let hover disclose a useful preview or alternate state; do not animate solely to prove that an element is interactive.",
+      "Give cursor-reactive work a legible consequence, such as gathering a form or changing the camera—not an ambient wobble.",
+      "Preserve origin and destination during layout transitions, following Studio K95's Rings-to-Spiral morph instead of teleporting items.",
+      "Use one memorable interaction per spread and keep metadata, marginalia, and secondary controls on a quieter tempo.",
+      "Honor reduced-motion preferences with still poster frames, direct state changes, and skippable entrances."
     ],
     "avoid": [
       "Do not copy the palette of any source; the project stays white, near-black, and one red.",
       "Do not borrow mymind's gradient language or the first version's beige editorial styling.",
       "Do not imitate covers literally or republish source artwork.",
       "Do not make every spread equally sparse or equally dense.",
-      "Do not use a 3D pose that reads as a flat rectangle rotated in space."
+      "Do not use a 3D pose that reads as a flat rectangle rotated in space.",
+      "Do not infer a site's behavior from an aggregate thumbnail when the live site can be observed.",
+      "Do not trap the reader behind a long logo-only loader.",
+      "Do not publish screenshots or media from Alan's private mymind space."
     ]
   },
   "remotion": {
@@ -353,16 +585,25 @@
     "composition_ideas": [
       "Object-first issue reveal inspired by Stripe Press product presentation.",
       "Conceptual cover-title build followed by quiet folio metadata.",
-      "Alternation between dense POPEYE-like catalogs and airy Gentlewoman-like profiles."
+      "Alternation between dense POPEYE-like catalogs and airy Gentlewoman-like profiles.",
+      "A stable numbered chapter rail whose surrounding evidence changes from cover to spread to archive.",
+      "A cover archive that can morph between chronological shelf, thematic cluster, and selected-issue focus while preserving object identity."
     ],
     "title_card": "White paper, near-black type, one red mark; the title behaves like cover art.",
     "lower_third": "Server Mono issue metadata with a single hairline; no rounded container.",
-    "transitions": ["critically damped page settle", "hard typographic cut", "brief masked reveal"],
+    "transitions": [
+      "critically damped page settle",
+      "hard typographic cut between editorial modes",
+      "brief masked reveal with a visible destination",
+      "state-preserving archive morph",
+      "cursor-gathered cover detail with a still reduced-motion fallback"
+    ],
     "asset_import_notes": ["All collected source imagery is research-only and must not ship in the public site."]
   },
   "open_questions": [
     "Which three to five exact NYT Magazine covers were in the user's original saved set?",
-    "Were there additional saved Coverjunkie examples beyond the typographic and impact categories?",
+    "Which saved student-publication references are personal favorites rather than useful taxonomy examples?",
+    "Which motion behaviors should become signature interactions, and which should remain research context only?",
     "Should the finished site expose any research-process colophon, or should this archive remain internal only?"
   ]
 }

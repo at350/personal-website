@@ -4,7 +4,7 @@
 :root {
   /* Paper & ink */
   --paper: #ffffff;
-  --paper-shade: #f6f6f4; /* page-edge striation only — never a background */
+  --paper-shade: #f6f6f4; /* page-edge striation only - never a background */
   --ink: #0e0e0c;
   --ink-2: #55524c;
   --ink-3: #98948c;
@@ -12,7 +12,7 @@
   --red: #d7261e;
 
   /* Legacy aliases (spread CSS migrates off these; keep mapped to v2) */
-  --void: var(--paper);
+  --void: #f7f7f5;
   --washi: var(--paper);
   --washi-hi: var(--paper);
   --washi-deep: var(--paper-shade);

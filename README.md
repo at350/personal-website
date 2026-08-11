@@ -1,8 +1,8 @@
-# ALAN TAI — Issue No. 01
+# ALAN TAI / Issue No. 01
 
 Alan Tai's personal site as one printed object: a stark white void, a bound
 issue you can drag, flick, and keyboard through. Every spread is live,
-art-directed HTML — the resume keeps its margin notes, the library restocks
+art-directed HTML: the resume keeps its margin notes, the library restocks
 itself, the colophon tells the truth.
 
 ## Run
@@ -22,12 +22,16 @@ npm run lint
 
 - **Book** — `src/book3d/`: a WebGL book built on three.js via
   `@react-three/fiber` (+ drei, maath). Pages are meshes with real thickness
-  that bend along a curve (`bend.ts`); one warm key light plus ambient fill,
-  a contact shadow under the book — all shading comes from the lighting
-  model, never from CSS. Page faces are rendered from the real DOM spreads
-  with `html-to-image` at 2× and cached (`pageTextures.tsx`). At rest the
-  flat spread swaps to a perfectly aligned live DOM overlay, so every page
-  stays a fully interactive website.
+  and a 28-by-16 constrained Verlet/PBD sheet (`paperPhysics.ts`). Structural,
+  shear, and bending resistance keep it paper-like while the recorded pointer
+  height anchors the live grab, so a corner peel and mid-edge curl propagate
+  differently through the whole page. One warm key light, ambient fill, contact shadow,
+  and a generated paper-fiber bump map give the object its material response.
+  Page faces are rendered from the real DOM spreads with `html-to-image` at 2×
+  and cached (`pageTextures.tsx`). A minimal entry gate pre-captures all 20
+  printable faces before the book becomes interactive. At rest the flat spread
+  swaps to a perfectly aligned live DOM overlay, so every page stays a fully
+  interactive website.
 - **Engine** — `src/magazine/engine.ts`: a pure state machine drives turns;
   drag maps the pointer to leaf angle and releases into a critically damped
   spring. Reduced-motion and small screens get the stacked **reader**
@@ -39,12 +43,15 @@ npm run lint
   `src/lib/content.ts` (verified — no invented facts).
 - **Media library** — `src/lib/media/`: a verified seed merged with
   `live.json`, refreshed by `npm run refresh-media` (see below).
+- **Editorial art** — generated concept still lifes live in
+  `public/images/editorial/` and `public/images/projects/editorial/`. Their
+  reproducible prompt set is in `docs/assets/editorial-image-prompts.md`.
 
 ## Library refresh
 
 `.github/workflows/refresh-media.yml` runs daily and commits a new
 `src/lib/media/live.json` when feeds change. Configure repo secrets
-(all optional — the seed keeps the page alive without them):
+(all optional; the seed keeps the page alive without them):
 
 | Secret | Purpose |
 |---|---|
@@ -63,4 +70,4 @@ Studio Co.). All licenses permit self-hosted web embedding; files live in
 ## Paper
 
 White `#FFFFFF`. Ink `#0E0E0C`. One red: `#E8351A`. Hairlines at 14% ink.
-No gradients — the book's lighting does the shading.
+No gradients. The book's lighting does the shading.

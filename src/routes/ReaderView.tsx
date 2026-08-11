@@ -28,10 +28,10 @@ export function ReaderView({ canOpenBook, onOpenBook }: ReaderViewProps) {
   return (
     <main className="reader">
       <header className="reader__mast">
-        <p className="mono-label">ALAN TAI — NO. 01</p>
+        <p className="mono-label">ALAN TAI / NO. 01</p>
         {canOpenBook ? (
           <button className="mono-label reader__open" onClick={onOpenBook}>
-            open as magazine
+            open as book
           </button>
         ) : null}
       </header>
@@ -72,7 +72,7 @@ export function ReaderView({ canOpenBook, onOpenBook }: ReaderViewProps) {
 
       <footer className="reader__foot">
         <Link to="/" className="mono-label">
-          ALAN TAI · NO. 01 · 2026
+          ALAN TAI / NO. 01 / 2026
         </Link>
       </footer>
     </main>

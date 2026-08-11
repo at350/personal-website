@@ -4,7 +4,11 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { LEAF_SEGMENTS, leafColumns } from "./bend";
+import { LEAF_ROWS, LEAF_SEGMENTS, leafSurface } from "./bend";
+import { PaperSheet } from "./paperPhysics";
+import { handoffOpacity } from "./handoff";
+import { bookPoseAngles } from "./bookPose";
+import { paperTurnActivity } from "./paperMaterial";
 import { getPageTexture, onTexturesChanged, pageKey } from "./pageTextures";
 import { SPREADS } from "@/magazine/folio";
 
@@ -22,10 +26,18 @@ export interface BookMotion {
   /** Where the hand wants the leaf while dragging; the leaf springs after it. */
   dragTarget: number;
   dragging: boolean;
+  /** Recorded pointer height, -1 bottom edge to +1 top edge. */
+  grabY: number;
+  /** Live vertical travel of the held point in local paper pixels. */
+  grabOffsetY: number;
+  /** Physical turn direction so the grabbed row leads in either direction. */
+  turnDirection: 1 | -1;
   /** True when the current settle came from a released drag (snappier spring). */
   released: boolean;
   /** Horizontal book shift in px (centers the closed cover). */
   shift: number;
+  /** Screen-space spine position recorded at turn start. */
+  turnShift: number;
   /** Pointer position -1..1 for parallax. */
   pointerX: number;
   pointerY: number;
@@ -37,8 +49,12 @@ export interface BookMotion {
   poseTarget: number;
   /** Smoothed pose value, written by the scene each frame. */
   pose: number;
-  /** Scene → stage: report pose so the overlay can fade at the right moment. */
-  onPose: ((pose: number) => void) | null;
+  /** Pose recorded when a turn begins; the stage stays fixed while paper moves. */
+  turnPose: number;
+  /** Exact geometric readiness of the WebGL-to-DOM handoff. */
+  handoff: number;
+  /** Scene to stage: report pose and subpixel handoff readiness. */
+  onPose: ((pose: number, handoff: number) => void) | null;
   onSettled: (() => void) | null;
 }
 
@@ -47,12 +63,12 @@ const LEAF_THICKNESS = 2.3;
 /** Softer spring for choreographed turns; snappier when a drag is released.
     Damping sits just under critical — paper flexes at the end of a turn,
     it does not clunk into place like a stone. */
-const SPRING_K_AUTO = 46;
-const SPRING_K_RELEASE = 95;
-const SPRING_DAMPING = 0.9;
+const SPRING_K_AUTO = 55;
+const SPRING_K_RELEASE = 115;
+const SPRING_DAMPING = 0.88;
 /** While dragging, the leaf CHASES the hand through its own little spring —
     paper is compliant, not a rod welded to the pointer. */
-const DRAG_FOLLOW_K = 420;
+const DRAG_FOLLOW_K = 520;
 
 function edgeTexture(): THREE.CanvasTexture {
   const c = document.createElement("canvas");
@@ -70,26 +86,81 @@ function edgeTexture(): THREE.CanvasTexture {
   return t;
 }
 
-/* Paper must read as paper at every angle: a pure lambert surface goes gray
-   the moment it tilts from the key light, so the print carries part of its
-   own brightness (emissive through the same texture). Turns still model
-   light — the directional term and cast shadows ride on top. */
-const EMISSIVE_LIFT = 0.72;
+function usePaperBumpTexture() {
+  return useMemo(() => {
+    const texture = new THREE.TextureLoader().load("/images/editorial/paper-fiber.webp");
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(5, 7);
+    texture.colorSpace = THREE.NoColorSpace;
+    texture.anisotropy = 4;
+    return texture;
+  }, []);
+}
 
-function usePageMaterial(key: string | null, mirror = false, unlit = false) {
+function usePageMaterial(
+  key: string | null,
+  mirror = false,
+  unlit = false,
+  paperBump?: THREE.Texture,
+) {
   const mat = useMemo(() => {
     if (unlit) {
       // Static pages are exactly the DOM's pixels: no lighting math at all.
-      return new THREE.MeshBasicMaterial({ color: 0xffffff }) as unknown as THREE.MeshStandardMaterial;
+      return new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        toneMapped: false,
+      });
     }
-    const m = new THREE.MeshStandardMaterial({
+    const m = new THREE.MeshPhysicalMaterial({
       color: 0xffffff,
-      roughness: 0.94,
+      roughness: 0.55,
       metalness: 0,
+      bumpMap: paperBump,
+      bumpScale: 0.08,
+      sheen: 0.16,
+      sheenColor: new THREE.Color(0xffffff),
+      sheenRoughness: 0.56,
+      clearcoat: 0.38,
+      clearcoatRoughness: 0.24,
+      specularIntensity: 0.52,
+      ior: 1.45,
     });
-    m.emissive = new THREE.Color(1, 1, 1).multiplyScalar(EMISSIVE_LIFT);
+    m.userData.paperActivity = 0;
+    // The clearcoat/specular response rises only while the page is airborne.
+    // At both landing frames this resolves to the exact captured texture, so
+    // the physical leaf and the unlit stack/DOM cannot shift color on swap.
+    m.onBeforeCompile = (shader) => {
+      shader.uniforms.paperActivity = {
+        value: Number(m.userData.paperActivity ?? 0),
+      };
+      m.userData.paperShader = shader;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "void main() {",
+        "uniform float paperActivity;\nvoid main() {",
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;",
+        `
+          float pageAlbedoLuma = max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.035);
+          float pageLightLuma = dot(totalDiffuse, vec3(0.2126, 0.7152, 0.0722)) / pageAlbedoLuma;
+          float pageLight = smoothstep(0.25, 1.05, pageLightLuma);
+          float movingShade = mix(0.94, 1.012, pageLight);
+          float paperShade = mix(1.0, movingShade, paperActivity);
+          float paperFresnel = pow(
+            1.0 - saturate(dot(geometryNormal, geometryViewDir)),
+            2.0
+          );
+          vec3 paperGleam =
+            totalSpecular * (0.9 * paperActivity) +
+            vec3(paperFresnel * 0.065 * paperActivity);
+          vec3 outgoingLight = diffuseColor.rgb * paperShade + paperGleam;
+        `,
+      );
+    };
+    m.customProgramCacheKey = () => "editorial-paper-lighting-v2";
     return m;
-  }, [unlit]);
+  }, [paperBump, unlit]);
   const applied = useRef<string | null>(null);
   useEffect(() => {
     const apply = () => {
@@ -102,12 +173,10 @@ function usePageMaterial(key: string | null, mirror = false, unlit = false) {
           t.offset.x = 1;
         }
         mat.map = t;
-        if ("emissiveMap" in mat) mat.emissiveMap = t;
         mat.needsUpdate = true;
         applied.current = key;
       } else if (!texture && applied.current !== null) {
         mat.map = null;
-        if ("emissiveMap" in mat) mat.emissiveMap = null;
         mat.needsUpdate = true;
         applied.current = null;
       }
@@ -116,6 +185,16 @@ function usePageMaterial(key: string | null, mirror = false, unlit = false) {
     return onTexturesChanged(apply);
   }, [key, mat, mirror]);
   return mat;
+}
+
+function setPaperMaterialActivity(material: THREE.Material, activity: number) {
+  material.userData.paperActivity = activity;
+  const shader = material.userData.paperShader as
+    | { uniforms: { paperActivity?: { value: number } } }
+    | undefined;
+  if (shader?.uniforms.paperActivity) {
+    shader.uniforms.paperActivity.value = activity;
+  }
 }
 
 function Stack({
@@ -132,15 +211,18 @@ function Stack({
   ph: number;
 }) {
   const mesh = useRef<THREE.Mesh>(null);
+  const shadow = useRef<THREE.Mesh>(null);
+  const rim = useRef<THREE.LineSegments>(null);
   const topMat = usePageMaterial(topKey, false, true);
   const edges = useMemo(edgeTexture, []);
   const materials = useMemo(() => {
-    const paper = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const edge = new THREE.MeshBasicMaterial({ map: edges });
+    const paper = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+    const edge = new THREE.MeshBasicMaterial({ map: edges, toneMapped: false });
     // box faces: +x, -x, +y, -y, +z (camera), -z
     return [edge, edge, edge, edge, topMat, paper];
   }, [edges, topMat]);
   const geo = useMemo(() => new THREE.BoxGeometry(pw, ph, 1), [pw, ph]);
+  const rimGeo = useMemo(() => new THREE.EdgesGeometry(geo, 24), [geo]);
 
   useFrame((_, dt) => {
     const m = mesh.current;
@@ -151,42 +233,160 @@ function Stack({
     m.position.z = -m.scale.z / 2;
     m.position.x = side === "left" ? -pw / 2 : pw / 2;
     m.visible = count > 0;
+    const outline = rim.current;
+    if (outline) {
+      outline.position.copy(m.position);
+      outline.scale.copy(m.scale);
+      outline.visible = count > 0;
+    }
+    const receiver = shadow.current;
+    if (receiver) {
+      receiver.position.x = m.position.x;
+      receiver.visible = count > 0;
+    }
   });
 
   return (
-    <mesh ref={mesh} castShadow geometry={geo} material={materials} />
+    <>
+      <mesh ref={mesh} castShadow geometry={geo} material={materials} />
+      <lineSegments ref={rim} geometry={rimGeo} renderOrder={3}>
+        <lineBasicMaterial
+          color="#d2d1cc"
+          transparent
+          opacity={0.62}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </lineSegments>
+      <mesh ref={shadow} position={[0, 0, 0.16]} receiveShadow>
+        <planeGeometry args={[pw, ph]} />
+        <shadowMaterial transparent opacity={0.15} depthWrite={false} />
+      </mesh>
+    </>
+  );
+}
+
+function gutterTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 4;
+  const context = canvas.getContext("2d")!;
+  const gradient = context.createLinearGradient(0, 0, canvas.width, 0);
+  gradient.addColorStop(0, "rgba(14,14,12,0)");
+  gradient.addColorStop(0.32, "rgba(14,14,12,0.025)");
+  gradient.addColorStop(0.5, "rgba(14,14,12,0.105)");
+  gradient.addColorStop(0.68, "rgba(14,14,12,0.025)");
+  gradient.addColorStop(1, "rgba(14,14,12,0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function GutterShadow({ pw, ph }: { pw: number; ph: number }) {
+  const texture = useMemo(gutterTexture, []);
+  return (
+    <mesh position={[0, 0, 0.21]} renderOrder={2}>
+      <planeGeometry args={[pw * 0.2, ph]} />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        depthWrite={false}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+function GlossLight({ pw, ph }: { pw: number; ph: number }) {
+  const light = useRef<THREE.RectAreaLight>(null);
+  useEffect(() => {
+    light.current?.lookAt(0, 0, 0);
+  }, [ph, pw]);
+  return (
+    <rectAreaLight
+      ref={light}
+      color={0xffffff}
+      intensity={3.2}
+      width={pw * 0.9}
+      height={ph * 0.55}
+      position={[pw * 0.72, ph * 0.42, ph * 0.9]}
+    />
   );
 }
 
 function Leaf({ motion, pw, ph }: { motion: BookMotion; pw: number; ph: number }) {
   const mesh = useRef<THREE.Mesh>(null);
   const backMesh = useRef<THREE.Mesh>(null);
+  const paperBump = usePaperBumpTexture();
   const frontKey = motion.leaf !== null ? pageKey(motion.leaf, "recto") : null;
   const backKey = motion.leaf !== null ? pageKey(motion.leaf + 1, "verso") : null;
-  const frontMat = usePageMaterial(frontKey);
-  const backMat = usePageMaterial(backKey, true);
+  const frontMat = usePageMaterial(frontKey, false, false, paperBump);
+  const backMat = usePageMaterial(backKey, true, false, paperBump);
   useEffect(() => {
     frontMat.side = THREE.FrontSide;
     backMat.side = THREE.BackSide;
   }, [backMat, frontMat]);
 
   const geometry = useMemo(() => {
-    const g = new THREE.PlaneGeometry(pw, ph, LEAF_SEGMENTS, 1);
+    const g = new THREE.PlaneGeometry(pw, ph, LEAF_SEGMENTS, LEAF_ROWS);
     return g;
   }, [pw, ph]);
-
-  useFrame(() => {
-    const g = geometry;
-    const cols = leafColumns(motion.progress, pw, motion.velocity);
-    const pos = g.attributes.position as THREE.BufferAttribute;
-    // PlaneGeometry vertex order: rows top→bottom, columns left→right.
+  const outlineGeometry = useMemo(() => {
+    const outline = new THREE.BufferGeometry();
+    outline.setAttribute("position", geometry.getAttribute("position"));
+    const indices: number[] = [];
     const columns = LEAF_SEGMENTS + 1;
-    for (let row = 0; row < 2; row += 1) {
-      const y = row === 0 ? ph / 2 : -ph / 2;
-      for (let c = 0; c < columns; c += 1) {
-        const i = row * columns + c;
-        pos.setXYZ(i, cols[c]!.x, y, cols[c]!.z + 0.4);
-      }
+    for (let column = 0; column <= LEAF_SEGMENTS; column += 1) indices.push(column);
+    for (let row = 1; row <= LEAF_ROWS; row += 1) {
+      indices.push(row * columns + LEAF_SEGMENTS);
+    }
+    for (let column = LEAF_SEGMENTS - 1; column >= 0; column -= 1) {
+      indices.push(LEAF_ROWS * columns + column);
+    }
+    for (let row = LEAF_ROWS - 1; row > 0; row -= 1) indices.push(row * columns);
+    outline.setIndex(indices);
+    return outline;
+  }, [geometry]);
+  const sheet = useMemo(
+    () => new PaperSheet(pw, ph, LEAF_SEGMENTS, LEAF_ROWS),
+    [ph, pw],
+  );
+  const activeLeaf = useRef<number | null>(null);
+
+  useFrame((_, rawDt) => {
+    if (motion.leaf === null) {
+      activeLeaf.current = null;
+      return;
+    }
+    const g = geometry;
+    const target = leafSurface(
+      motion.progress,
+      pw,
+      ph,
+      motion.velocity,
+      motion.grabY,
+      motion.turnDirection,
+    );
+    if (activeLeaf.current !== motion.leaf) {
+      sheet.reset(target);
+      activeLeaf.current = motion.leaf;
+    }
+    const vertices = sheet.step(target, {
+      dt: rawDt,
+      dragging: motion.dragging,
+      grabY: motion.grabY,
+      handleOffsetY: motion.grabOffsetY,
+      velocity: motion.velocity,
+    });
+    const activity = paperTurnActivity(motion.progress);
+    setPaperMaterialActivity(frontMat, activity);
+    setPaperMaterialActivity(backMat, activity);
+    const pos = g.attributes.position as THREE.BufferAttribute;
+    for (let index = 0; index < vertices.length; index += 1) {
+      const vertex = vertices[index]!;
+      pos.setXYZ(index, vertex.x, vertex.y, vertex.z + 0.4);
     }
     pos.needsUpdate = true;
     g.computeVertexNormals();
@@ -197,6 +397,15 @@ function Leaf({ motion, pw, ph }: { motion: BookMotion; pw: number; ph: number }
     <group>
       <mesh ref={mesh} geometry={geometry} material={frontMat} castShadow receiveShadow />
       <mesh ref={backMesh} geometry={geometry} material={backMat} castShadow receiveShadow />
+      <lineLoop geometry={outlineGeometry} renderOrder={4}>
+        <lineBasicMaterial
+          color="#c9c8c3"
+          transparent
+          opacity={0.7}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </lineLoop>
     </group>
   );
 }
@@ -235,9 +444,6 @@ function Rig({ ph }: { ph: number }) {
   return null;
 }
 
-/* The display stance: spine, top edge and cover all readable at once. */
-const POSE_YAW = -0.30;
-const POSE_PITCH = 0.16;
 const POSE_DROP = 0.994; // posed book sits a breath smaller — object, not page
 
 export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; ph: number }) {
@@ -279,10 +485,20 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
     const g = group.current;
     if (!g) return;
 
+    // Keep the spine fixed under the hand for the entire pull. Closed covers
+    // and open spreads have different resting centers, so recenter only after
+    // the paper lands; the live overlay waits for this settle below.
+    const restingShift =
+      motion.current === 0
+        ? -pw / 2
+        : motion.current === SPREADS.length - 1
+          ? pw / 2
+          : 0;
+    const shiftTarget = motion.leaf === null ? restingShift : motion.turnShift;
+
     // One continuous pose channel: 0 = display stance, 1 = flat reading.
     // Everything derives from it, so no transition can ever pop.
     motion.pose = THREE.MathUtils.damp(motion.pose, motion.poseTarget, 5.2, dt);
-    motion.onPose?.(motion.pose);
     const posed = 1 - motion.pose;
 
     const airborne = motion.leaf !== null ? Math.sin(motion.progress * Math.PI) : 0;
@@ -290,16 +506,28 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
     const breatheY = Math.sin(clockRef.current * 0.55) * 4 * idle;
     const breatheR = Math.sin(clockRef.current * 0.38) * 0.012 * idle;
 
-    g.position.x = THREE.MathUtils.damp(g.position.x, motion.shift, 6.5, dt);
+    g.position.x = THREE.MathUtils.damp(g.position.x, shiftTarget, 8.5, dt);
+    motion.shift = g.position.x;
     g.position.y = THREE.MathUtils.damp(g.position.y, breatheY, 2.4, dt);
 
-    const yaw = POSE_YAW * posed + motion.pointerX * (0.02 + 0.05 * posed) + breatheR;
-    const pitch =
-      POSE_PITCH * posed - 0.055 * airborne + motion.pointerY * -(0.012 + 0.03 * posed);
-    g.rotation.x = THREE.MathUtils.damp(g.rotation.x, pitch, 6, dt);
-    g.rotation.y = THREE.MathUtils.damp(g.rotation.y, yaw, 6, dt);
+    const rotation = bookPoseAngles({
+      posed,
+      pointerX: motion.pointerX,
+      pointerY: motion.pointerY,
+      airborne,
+      breathe: breatheR,
+    });
+    g.rotation.x = THREE.MathUtils.damp(g.rotation.x, rotation.pitch, 6, dt);
+    g.rotation.y = THREE.MathUtils.damp(g.rotation.y, rotation.yaw, 6, dt);
     const scale = 1 - (1 - POSE_DROP) * posed;
     g.scale.setScalar(THREE.MathUtils.damp(g.scale.x, scale, 6, dt));
+    motion.handoff = handoffOpacity({
+      turning: motion.leaf !== null,
+      rotationError: Math.max(Math.abs(g.rotation.x), Math.abs(g.rotation.y)),
+      scaleError: Math.abs(1 - g.scale.x),
+      shiftError: Math.abs(g.position.x - restingShift),
+    });
+    motion.onPose?.(motion.pose, motion.handoff);
   });
 
   const leftCount = motion.leaf !== null ? motion.leaf : motion.current;
@@ -315,15 +543,17 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
     <>
       <Rig ph={ph} />
       <HiddenTicker />
-      <ambientLight intensity={0.2} />
+      <ambientLight intensity={0.48} />
+      <GlossLight pw={pw} ph={ph} />
       <directionalLight
         ref={light}
         position={[-pw * 0.7, ph * 0.9, ph * 1.35]}
-        intensity={0.16}
+        intensity={1.05}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-radius={9}
-        shadow-bias={-0.0003}
+        shadow-radius={4}
+        shadow-bias={-0.00008}
+        shadow-normalBias={0.2}
         shadow-camera-left={-pw * 1.7}
         shadow-camera-right={pw * 1.7}
         shadow-camera-top={ph * 1.1}
@@ -334,6 +564,7 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
       <group ref={group}>
         <Stack side="left" count={leftCount} topKey={leftTop} pw={pw} ph={ph} />
         <Stack side="right" count={rightCount} topKey={rightTop} pw={pw} ph={ph} />
+        {leftCount > 0 && rightCount > 0 ? <GutterShadow pw={pw} ph={ph} /> : null}
         <Leaf motion={motion} pw={pw} ph={ph} />
         {/* The desk: pure shadow on the white void. */}
         <mesh position={[0, 0, -TOTAL_LEAVES * LEAF_THICKNESS - 2]} receiveShadow>

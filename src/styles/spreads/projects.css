@@ -13,11 +13,11 @@
 }
 
 .proj-count__word {
-  margin-top: 15cqh;
+  margin-top: 8cqh;
   margin-left: -8cqw; /* the page's grid-break: the numeral hits the raw fore-edge */
   font-family: var(--font-condensed);
   font-weight: 400;
-  font-size: 38cqw;
+  font-size: 31cqw;
   line-height: 0.8;
   letter-spacing: -0.004em;
   color: var(--paper);
@@ -26,14 +26,71 @@
 /* Tucked into the counterform under the V. The rule is the page's one red. */
 .proj-count__sub {
   width: max-content;
-  margin-top: -2cqh;
-  margin-left: 30cqw;
+  margin-top: 1.4cqh;
+  margin-left: 18cqw;
   font-family: var(--font-mono);
   font-size: max(11px, 1.8cqw);
   letter-spacing: 0.14em;
   color: var(--paper); opacity: 0.6;
   padding-bottom: 0.9cqh;
   border-bottom: 2px solid var(--red);
+}
+
+/* Five unequal crops make the count literal. The repeated white plates turn
+   the black page into a contact sheet instead of another title card. */
+.proj-count__plates {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1.05fr 0.72fr 1.22fr 0.84fr 1fr;
+  align-items: end;
+  gap: 1cqw;
+  height: 33cqh;
+}
+
+.proj-count__plate {
+  min-width: 0;
+  height: 26cqh;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0.8cqh;
+}
+
+.proj-count__plate:nth-child(2) {
+  height: 31cqh;
+}
+
+.proj-count__plate:nth-child(3) {
+  height: 23cqh;
+}
+
+.proj-count__plate:nth-child(4) {
+  height: 29cqh;
+}
+
+.proj-count__plate:nth-child(5) {
+  height: 25cqh;
+}
+
+.proj-count__plate img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 1px solid rgb(255 255 255 / 0.35);
+}
+
+.proj-count__plate:nth-child(1) img {
+  object-position: 43% center;
+}
+
+.proj-count__plate:nth-child(4) img {
+  object-position: 75% center;
+}
+
+.proj-count__plate-no {
+  font-family: var(--font-mono);
+  font-size: max(11px, 1.35cqw);
+  color: var(--red);
+  letter-spacing: 0.08em;
 }
 
 /* ————— p.9 · the index ————— */
