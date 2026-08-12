@@ -4,7 +4,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { LEAF_ROWS, LEAF_SEGMENTS, leafSurface } from "./bend";
 import { PaperSheet } from "./paperPhysics";
 import { handoffOpacity } from "./handoff";
@@ -21,6 +21,13 @@ import {
   settleComplete,
 } from "./settle";
 import { withBasePath } from "@/lib/basePath";
+import {
+  COVER_HOLOGRAM_PATTERN_PATH,
+} from "@/magazine/coverHologram";
+import {
+  createCoverHologramMaterial,
+  updateCoverHologramMaterial,
+} from "./coverHologramMaterial";
 import { getPageTexture, onTexturesChanged, pageKey } from "./pageTextures";
 import { SPREADS } from "@/magazine/folio";
 import {
@@ -212,6 +219,78 @@ function setPaperMaterialActivity(material: THREE.Material, activity: number) {
   }
 }
 
+/** One authored UV mask, reused by both the flat cover and its bending leaf. */
+function useCoverHologramMaterial(motion: BookMotion) {
+  const pattern = useLoader(
+    THREE.TextureLoader,
+    withBasePath(COVER_HOLOGRAM_PATTERN_PATH),
+  );
+  useEffect(() => {
+    pattern.colorSpace = THREE.NoColorSpace;
+    pattern.generateMipmaps = true;
+    pattern.minFilter = THREE.LinearMipmapLinearFilter;
+    pattern.magFilter = THREE.LinearFilter;
+    pattern.anisotropy = 8;
+    pattern.needsUpdate = true;
+  }, [pattern]);
+  const material = useMemo(
+    () => createCoverHologramMaterial(pattern),
+    [pattern],
+  );
+  useEffect(() => () => material.dispose(), [material]);
+  useFrame(() => {
+    updateCoverHologramMaterial(material, {
+      pointerX: motion.pointerX,
+      pointerY: motion.pointerY,
+      progress: motion.leaf === 0 ? motion.progress : 0,
+    });
+  });
+  return material;
+}
+
+function useFastCoverHologramMaterial() {
+  const pattern = useLoader(
+    THREE.TextureLoader,
+    withBasePath(COVER_HOLOGRAM_PATTERN_PATH),
+  );
+  useEffect(() => {
+    pattern.colorSpace = THREE.NoColorSpace;
+    pattern.generateMipmaps = true;
+    pattern.minFilter = THREE.LinearMipmapLinearFilter;
+    pattern.magFilter = THREE.LinearFilter;
+    pattern.anisotropy = 8;
+    pattern.needsUpdate = true;
+  }, [pattern]);
+  const material = useMemo(
+    () => createCoverHologramMaterial(pattern),
+    [pattern],
+  );
+  useEffect(() => () => material.dispose(), [material]);
+  return material;
+}
+
+/** The posed closed book is an unlit stack, so its foil is a matching skin. */
+function RestingCoverHologram({
+  motion,
+  pw,
+  ph,
+}: {
+  motion: BookMotion;
+  pw: number;
+  ph: number;
+}) {
+  const material = useCoverHologramMaterial(motion);
+  return (
+    <mesh
+      position={[pw / 2, 0, 0.32]}
+      material={material}
+      renderOrder={3}
+    >
+      <planeGeometry args={[pw, ph]} />
+    </mesh>
+  );
+}
+
 function Stack({
   side,
   count,
@@ -317,6 +396,7 @@ function Leaf({
   const backKey = motion.leaf !== null ? pageKey(motion.leaf + 1, "verso") : null;
   const frontMat = usePageMaterial(frontKey, false, paperBump);
   const backMat = usePageMaterial(backKey, true, paperBump);
+  const hologramMat = useCoverHologramMaterial(motion);
   useEffect(() => {
     frontMat.side = THREE.FrontSide;
     backMat.side = THREE.BackSide;
@@ -400,6 +480,13 @@ function Leaf({
     <group>
       <mesh ref={mesh} geometry={geometry} material={frontMat} castShadow receiveShadow />
       <mesh ref={backMesh} geometry={geometry} material={backMat} castShadow receiveShadow />
+      {motion.leaf === 0 ? (
+        <mesh
+          geometry={geometry}
+          material={hologramMat}
+          renderOrder={3}
+        />
+      ) : null}
       <lineLoop geometry={outlineGeometry} renderOrder={4}>
         <lineBasicMaterial
           color="#c9c8c3"
@@ -427,6 +514,7 @@ interface FastLeafProps {
   count: number;
   direction: 1 | -1;
   clock: { current: number };
+  motion: BookMotion;
   paperBump: THREE.Texture;
   pw: number;
   ph: number;
@@ -439,6 +527,7 @@ function FastLeaf({
   count,
   direction,
   clock,
+  motion,
   paperBump,
   pw,
   ph,
@@ -447,6 +536,7 @@ function FastLeaf({
   const backKey = sheet === null ? null : pageKey(sheet + 1, "verso");
   const frontMat = usePageMaterial(frontKey, false, paperBump);
   const backMat = usePageMaterial(backKey, true, paperBump);
+  const hologramMat = useFastCoverHologramMaterial();
 
   useEffect(() => {
     frontMat.side = THREE.FrontSide;
@@ -482,6 +572,13 @@ function FastLeaf({
     if (sheet === null) return;
     const completion = riffleLeafCompletion(clock.current, ordinal);
     const progress = riffleLeafProgress(clock.current, ordinal, direction);
+    if (sheet === 0) {
+      updateCoverHologramMaterial(hologramMat, {
+        pointerX: motion.pointerX,
+        pointerY: motion.pointerY,
+        progress,
+      });
+    }
     const velocity = Math.sin(completion * Math.PI) * 2.6;
     const grabY = count <= 1 ? 0 : 0.14 - (ordinal / (count - 1)) * 0.28;
     const vertices = leafSurface(
@@ -518,6 +615,9 @@ function FastLeaf({
     <group visible={sheet !== null}>
       <mesh geometry={geometry} material={frontMat} castShadow receiveShadow />
       <mesh geometry={geometry} material={backMat} castShadow receiveShadow />
+      {sheet === 0 ? (
+        <mesh geometry={geometry} material={hologramMat} renderOrder={3} />
+      ) : null}
       <lineLoop geometry={outlineGeometry} renderOrder={4 + ordinal}>
         <lineBasicMaterial
           color="#c9c8c3"
@@ -582,6 +682,7 @@ function FastRiffle({
           count={transition?.visibleSheets.length ?? 0}
           direction={transition?.direction ?? 1}
           clock={clock}
+          motion={motion}
           paperBump={paperBump}
           pw={pw}
           ph={ph}
@@ -824,6 +925,9 @@ export function BookScene({
           <planeGeometry args={[pw * 2, ph]} />
           <shadowMaterial transparent opacity={0.15} depthWrite={false} />
         </mesh>
+        {motion.leaf === null && motion.current === 0 && riffle === null ? (
+          <RestingCoverHologram motion={motion} pw={pw} ph={ph} />
+        ) : null}
         <Leaf motion={motion} pw={pw} ph={ph} paperBump={paperBump} />
         <FastRiffle
           transition={riffle}

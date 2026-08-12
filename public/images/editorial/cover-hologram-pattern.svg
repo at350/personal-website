@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="853" viewBox="0 0 640 853" fill="none">
+  <defs>
+    <clipPath id="fold-a">
+      <path d="M578 244 626 772H516l-17-124h-77l-41 124H274l190-438 114-90Z"/>
+    </clipPath>
+    <clipPath id="paper-plane">
+      <path d="M465 334 578 244 516 772 274 772Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- A quiet foil ground follows the photographed paper construction. -->
+  <path d="M578 244 626 772H516l-17-124h-77l-41 124H274l190-438 114-90Z" fill="#fff" fill-opacity=".115"/>
+  <path d="M465 334 578 244 516 772 274 772Z" fill="#fff" fill-opacity=".055"/>
+
+  <!-- Concentric crease contours echo the cover's folded A. -->
+  <g stroke="#fff" stroke-linejoin="round">
+    <path d="M578 244 626 772H516l-17-124h-77l-41 124H274l190-438 114-90Z" stroke-opacity=".78" stroke-width="2.2"/>
+    <path d="m572 278 31 468h-66l-19-126h-114l-44 126h-61l179-394 94-74Z" stroke-opacity=".48" stroke-width="1.6"/>
+    <path d="m565 318 16 399h-24l-21-126H389l-47 126h-21l170-348 74-51Z" stroke-opacity=".3" stroke-width="1.2"/>
+    <path d="m557 365-2 183-49 24h-99l88-171 62-36Z" stroke-opacity=".62" stroke-width="1.4"/>
+    <path d="m420 648 79-26M381 772l41-124M499 648l17 124" stroke-opacity=".72" stroke-width="1.5"/>
+  </g>
+
+  <!-- Fine diagonal ruling catches a different band of the spectrum. -->
+  <g clip-path="url(#fold-a)" stroke="#fff" stroke-opacity=".3" stroke-width="1">
+    <path d="m222 744 410-236M229 766l410-236M245 781l396-228M268 792l372-214M298 802l342-197M331 811l309-178M365 820l275-158M401 828l239-137"/>
+    <path d="m343 370 267 154M329 393l283 163M317 417l298 172M305 441l313 181M294 466l326 188M284 493l338 195M274 520l350 202"/>
+  </g>
+
+  <!-- A second grain direction sits only on the broad front paper plane. -->
+  <g clip-path="url(#paper-plane)" stroke="#fff" stroke-opacity=".16" stroke-width="1">
+    <path d="M262 408h344M252 434h354M241 460h365M231 486h375M220 512h386M209 538h397M198 564h408M187 590h419M176 616h430M165 642h441M154 668h452M143 694h463M132 720h474"/>
+  </g>
+
+  <!-- Registration details link the foil to the red counter in the masthead. -->
+  <g transform="translate(157 350)" stroke="#fff" fill="none">
+    <path d="m0-23 20 36h-40L0-23Z" stroke-opacity=".62" stroke-width="1.5"/>
+    <path d="m0-15 13 23h-26L0-15Z" stroke-opacity=".34"/>
+    <circle r="31" stroke-opacity=".2"/>
+    <path d="M-39 0h12M27 0h12M0-39v12M0 27v12" stroke-opacity=".48"/>
+  </g>
+
+  <!-- Sparse printer's marks keep the pattern editorial, not decorative. -->
+  <g stroke="#fff" fill="none" stroke-width="1.2">
+    <path d="m350 377 13 22-13 22-13-22 13-22Z" stroke-opacity=".42"/>
+    <path d="m606 447 10 17-10 17-10-17 10-17Z" stroke-opacity=".48"/>
+    <path d="m458 723 9 15-9 15-9-15 9-15Z" stroke-opacity=".5"/>
+    <circle cx="350" cy="399" r="5" stroke-opacity=".62"/>
+    <circle cx="606" cy="464" r="4" stroke-opacity=".68"/>
+    <path d="M329 399h42M350 378v42M589 464h34M606 447v34" stroke-opacity=".24"/>
+  </g>
+</svg>
