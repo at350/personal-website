@@ -19,7 +19,7 @@ function Count() {
   const visiblePlates = projects.slice(0, 5);
 
   return (
-    <div className="proj-count">
+    <div className="proj-count" data-page-tone="dark">
       <h2
         className="proj-count__word"
         aria-label={`${projects.length} project files`}
