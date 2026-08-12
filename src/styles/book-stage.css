@@ -284,11 +284,12 @@
   transition: color 160ms ease, transform 240ms var(--ease-settle);
 }
 
-.bstage__arrow:hover:not(:disabled) {
+.bstage__arrow:hover:not(:disabled):not([aria-disabled="true"]) {
   color: var(--red);
 }
 
-.bstage__arrow:disabled {
+.bstage__arrow:disabled,
+.bstage__arrow[aria-disabled="true"] {
   opacity: 0.22;
   cursor: default;
 }

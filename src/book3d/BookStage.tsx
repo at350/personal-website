@@ -43,12 +43,6 @@ interface HeldArrowKeys {
   active: ArrowDirection | null;
 }
 
-interface AdjacentPointerArm {
-  offset: ArrowDirection;
-  pointerId: number;
-  spread: number;
-}
-
 const PERSISTENT_SPREAD_INDEX: Record<PersistentInteractionSpread, number> = {
   features: SPREADS.findIndex((def) => def.id === "features"),
   resume: SPREADS.findIndex((def) => def.id === "resume"),
@@ -146,7 +140,11 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   const textureRefreshesPending = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const adjacentPointerArm = useRef<AdjacentPointerArm | null>(null);
+  const tapQueue = useRef<ArrowDirection[]>([]);
+  const [tapRevision, wakeTapDrain] = useReducer(
+    (revision: number) => revision + 1,
+    0,
+  );
   const heldArrowKeys = useRef<HeldArrowKeys>({
     left: false,
     right: false,
@@ -214,7 +212,6 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       if (launchingTurn.current) return false;
       if (!isSpreadTextureFresh(currentSpread)) return false;
       launchingTurn.current = true;
-      adjacentPointerArm.current = null;
       motion.turnPose = motion.pose;
       motion.poseTarget = motion.turnPose;
       motion.turnShift = motion.shift;
@@ -356,8 +353,8 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   }, [interactionRevisions, trackTextureRefresh]);
 
   // Absolute navigation may arrive while paper is moving. Keep only its latest
-  // destination; adjacent page-turn input is handled separately and dropped
-  // while busy so one gesture can never spill into a second turn.
+  // destination; completed previous/next activations use their own ordered
+  // queue so every deliberate rapid tap remains one adjacent turn.
   const prevTarget = useRef(targetSpread);
   const reportedSpread = useRef<number | null>(null);
   const pendingTarget = useRef<number | null>(null);
@@ -399,7 +396,6 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       if (busy) return;
       if (motion.dragging) return;
       if (motion.leaf !== null && motion.target !== null) return;
-      adjacentPointerArm.current = null;
       dispatch({ type: "DRAG_START", edge });
       const stage = stageRef.current;
       stage?.classList.add("bstage--dragging");
@@ -627,14 +623,16 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     [busy, currentSpread, launchTurn, texturesReady],
   );
 
-  // Previous/next is a one-page action, never deferred into another turn.
+  // Held arrows advance one page at a time. Button activations use the finite
+  // queue below so each deliberate tap survives an in-flight animation.
   const goAdjacent = useCallback(
     (offset: ArrowDirection) => {
       if (
         !texturesReady ||
         busy ||
         launchingTurn.current ||
-        pendingTarget.current !== null
+        pendingTarget.current !== null ||
+        tapQueue.current.length > 0
       ) {
         return false;
       }
@@ -644,48 +642,23 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     [busy, currentSpread, launchTurn, texturesReady],
   );
 
-  const armAdjacentPointer = useCallback(
-    (e: React.PointerEvent<HTMLButtonElement>, offset: ArrowDirection) => {
-      adjacentPointerArm.current = null;
-      if (e.button !== 0 || !texturesReady || busy || launchingTurn.current) return;
-      adjacentPointerArm.current = {
-        offset,
-        pointerId: e.pointerId,
-        spread: currentSpread,
-      };
+  const enqueueAdjacent = useCallback(
+    (offset: ArrowDirection) => {
+      if (!texturesReady) return;
+      const to = Math.min(Math.max(currentSpread + offset, 0), TOTAL - 1);
+      if (
+        !busy &&
+        !launchingTurn.current &&
+        pendingTarget.current === null &&
+        tapQueue.current.length === 0 &&
+        to === currentSpread
+      ) {
+        return;
+      }
+      tapQueue.current.push(offset);
+      wakeTapDrain();
     },
     [busy, currentSpread, texturesReady],
-  );
-
-  const cancelAdjacentPointer = useCallback(
-    (e: React.PointerEvent<HTMLButtonElement>) => {
-      if (adjacentPointerArm.current?.pointerId === e.pointerId) {
-        adjacentPointerArm.current = null;
-      }
-    },
-    [],
-  );
-
-  const activateAdjacent = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>, offset: ArrowDirection) => {
-      // Keyboard and assistive clicks have no click count and do not have a
-      // preceding pointerdown to arm. Pointer clicks must originate while the
-      // same spread was idle; this rejects a press begun on a disabled arrow
-      // whose release happens just after the turn settles and re-enables it.
-      if (e.detail === 0) {
-        adjacentPointerArm.current = null;
-        goAdjacent(offset);
-        return;
-      }
-      const arm = adjacentPointerArm.current;
-      adjacentPointerArm.current = null;
-      if (arm?.offset !== offset || arm.spread !== currentSpread) {
-        e.preventDefault();
-        return;
-      }
-      goAdjacent(offset);
-    },
-    [currentSpread, goAdjacent],
   );
 
   const onRiffleComplete = useCallback(() => {
@@ -750,7 +723,6 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
 
     const clearHeldArrows = () => {
       heldArrowKeys.current = { left: false, right: false, active: null };
-      adjacentPointerArm.current = null;
       setHeldDirection(null);
     };
     const onVisibilityChange = () => {
@@ -769,24 +741,48 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     };
   }, [goAbsolute, goAdjacent, texturesReady]);
 
+  // Every completed button activation is one relative turn intent. Drain at
+  // most one valid entry per resting boundary so rapid taps remain distinct,
+  // ordered page flips instead of collapsing into a jump. Impossible entries
+  // at a physical boundary are discarded without blocking later input.
+  useEffect(() => {
+    if (busy || launchingTurn.current || pendingTarget.current !== null) return;
+    while (tapQueue.current.length > 0) {
+      const offset = tapQueue.current[0]!;
+      const to = Math.min(Math.max(currentSpread + offset, 0), TOTAL - 1);
+      if (to === currentSpread) {
+        tapQueue.current.shift();
+        continue;
+      }
+      if (launchTurn(to)) tapQueue.current.shift();
+      return;
+    }
+  }, [busy, currentSpread, launchTurn, tapRevision]);
+
   // A held arrow advances once at each resting boundary. Deliberate absolute
-  // navigation wins first, and the synchronous launch latch prevents the
-  // route-settlement effect below from publishing an intermediate spread.
+  // navigation and finite button taps win first, and the synchronous launch
+  // latch prevents the route effect from publishing an intermediate spread.
   useEffect(() => {
     const direction = heldArrowKeys.current.active;
     if (
       busy ||
       direction === null ||
       pendingTarget.current !== null ||
+      tapQueue.current.length > 0 ||
       launchingTurn.current
     ) {
       return;
     }
     goAdjacent(direction);
-  }, [busy, goAdjacent, heldDirection]);
+  }, [busy, goAdjacent, heldDirection, tapRevision]);
 
   useEffect(() => {
-    if (!busy && !launchingTurn.current && pendingTarget.current === null) {
+    if (
+      !busy &&
+      !launchingTurn.current &&
+      pendingTarget.current === null &&
+      tapQueue.current.length === 0
+    ) {
       reportedSpread.current = state.current;
       onSpreadSettled?.(state.current);
     }
@@ -876,10 +872,9 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       <nav className="bstage__nav" aria-label="Pages">
         <button
           className="bstage__arrow mono-label"
-          onPointerDown={(e) => armAdjacentPointer(e, -1)}
-          onPointerCancel={cancelAdjacentPointer}
-          onClick={(e) => activateAdjacent(e, -1)}
-          disabled={!texturesReady || busy || currentSpread === 0}
+          onClick={() => enqueueAdjacent(-1)}
+          disabled={!texturesReady}
+          aria-disabled={!busy && currentSpread === 0}
           aria-label="Previous spread"
         >
           ←
@@ -894,10 +889,9 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         </button>
         <button
           className="bstage__arrow mono-label"
-          onPointerDown={(e) => armAdjacentPointer(e, 1)}
-          onPointerCancel={cancelAdjacentPointer}
-          onClick={(e) => activateAdjacent(e, 1)}
-          disabled={!texturesReady || busy || currentSpread === TOTAL - 1}
+          onClick={() => enqueueAdjacent(1)}
+          disabled={!texturesReady}
+          aria-disabled={!busy && currentSpread === TOTAL - 1}
           aria-label="Next spread"
         >
           →

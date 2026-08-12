@@ -96,6 +96,19 @@ function completeRiffle() {
   act(() => done());
 }
 
+function pointerTap(button: HTMLElement, pointerId: number) {
+  expect(button.hasAttribute("disabled")).toBe(false);
+  const pointer = {
+    button: 0,
+    pointerId,
+    pointerType: "mouse",
+    isPrimary: true,
+  };
+  fireEvent.pointerDown(button, pointer);
+  fireEvent.pointerUp(button, pointer);
+  fireEvent.click(button, { button: 0, detail: 1 });
+}
+
 afterEach(() => {
   cleanup();
   scene.motion = null;
@@ -129,7 +142,9 @@ describe("BookStage page-turn input", () => {
     fireEvent.keyDown(window, { key: "ArrowRight", repeat: false });
     expect(stage.getAttribute("aria-busy")).toBe("true");
 
-    fireEvent.keyDown(window, { key: "ArrowRight", repeat: true });
+    for (let repeat = 0; repeat < 8; repeat += 1) {
+      fireEvent.keyDown(window, { key: "ArrowRight", repeat: true });
+    }
     completeTurn();
     expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
       "04-05",
@@ -137,7 +152,9 @@ describe("BookStage page-turn input", () => {
     expect(stage.getAttribute("aria-busy")).toBe("true");
     expect(onSpreadSettled).not.toHaveBeenCalled();
 
-    fireEvent.keyDown(window, { key: "ArrowRight", repeat: true });
+    for (let repeat = 0; repeat < 8; repeat += 1) {
+      fireEvent.keyDown(window, { key: "ArrowRight", repeat: true });
+    }
     completeTurn();
     expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
       "06-07",
@@ -164,57 +181,114 @@ describe("BookStage page-turn input", () => {
     expect(onSpreadSettled).toHaveBeenCalledTimes(2);
   });
 
-  it("drops a pointer press that begins while a page is turning", () => {
+  it("queues one forward turn for each deliberate rapid tap", () => {
     stubMatchMedia();
-    const { stage } = renderStage(1);
+    const { onSpreadSettled, stage } = renderStage(1);
     const next = screen.getByRole("button", { name: "Next spread" });
+    const contents = screen.getByRole("button", { name: "Contents" });
+    onSpreadSettled.mockClear();
 
-    fireEvent.pointerDown(next, {
-      button: 0,
-      pointerId: 6,
-      pointerType: "mouse",
-    });
-    fireEvent.pointerUp(next, {
-      button: 0,
-      pointerId: 6,
-      pointerType: "mouse",
-    });
-    fireEvent.click(next, { button: 0, detail: 1 });
-    expect(next.hasAttribute("disabled")).toBe(true);
+    pointerTap(next, 1);
+    pointerTap(next, 2);
+    pointerTap(next, 3);
+    pointerTap(next, 4);
 
-    fireEvent.pointerDown(next, {
-      button: 0,
-      pointerId: 7,
-      pointerType: "mouse",
-    });
     completeTurn();
-    fireEvent.pointerUp(next, {
-      button: 0,
-      pointerId: 7,
-      pointerType: "mouse",
-    });
-    fireEvent.click(next, { button: 0, detail: 1 });
+    expect(contents.textContent).toBe("04-05");
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+    expect(onSpreadSettled).not.toHaveBeenCalled();
 
+    completeTurn();
+    expect(contents.textContent).toBe("06-07");
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+
+    completeTurn();
+    expect(contents.textContent).toBe("08-09");
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+
+    completeTurn();
+    expect(contents.textContent).toBe("10-11");
     expect(stage.getAttribute("aria-busy")).toBe("false");
-    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
-      "04-05",
-    );
+    expect(onSpreadSettled).toHaveBeenCalledTimes(1);
+    expect(onSpreadSettled).toHaveBeenLastCalledWith(5);
+    expect(scene.motion?.onSettled).toBeNull();
   });
 
-  it("drops a late pointer click when a disabled button suppressed pointerdown", () => {
+  it("counts a tap spanning a settlement exactly once", () => {
     stubMatchMedia();
     const { stage } = renderStage(1);
     const next = screen.getByRole("button", { name: "Next spread" });
+    const secondPointer = {
+      button: 0,
+      pointerId: 2,
+      pointerType: "mouse",
+      isPrimary: true,
+    };
 
-    fireEvent.keyDown(window, { key: "ArrowRight", repeat: false });
-    fireEvent.keyUp(window, { key: "ArrowRight" });
+    pointerTap(next, 1);
+    fireEvent.pointerDown(next, secondPointer);
     completeTurn();
+    fireEvent.pointerUp(next, secondPointer);
     fireEvent.click(next, { button: 0, detail: 1 });
 
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+    completeTurn();
     expect(stage.getAttribute("aria-busy")).toBe("false");
     expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
-      "04-05",
+      "06-07",
     );
+    expect(scene.motion?.onSettled).toBeNull();
+  });
+
+  it("preserves the direction of rapid queued taps", () => {
+    stubMatchMedia();
+    const { stage } = renderStage(4);
+    const next = screen.getByRole("button", { name: "Next spread" });
+    const previous = screen.getByRole("button", { name: "Previous spread" });
+
+    pointerTap(next, 1);
+    pointerTap(previous, 2);
+
+    completeTurn();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "10-11",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+
+    completeTurn();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "08-09",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+  });
+
+  it("discards excess taps at a physical boundary", () => {
+    stubMatchMedia();
+    const { onSpreadSettled, stage } = renderStage(9);
+    const next = screen.getByRole("button", { name: "Next spread" });
+    const previous = screen.getByRole("button", { name: "Previous spread" });
+    onSpreadSettled.mockClear();
+
+    pointerTap(next, 1);
+    pointerTap(next, 2);
+    pointerTap(next, 3);
+    completeTurn();
+
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "END",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(next.hasAttribute("disabled")).toBe(false);
+    expect(next.getAttribute("aria-disabled")).toBe("true");
+    expect(onSpreadSettled).toHaveBeenCalledTimes(1);
+    expect(onSpreadSettled).toHaveBeenLastCalledWith(10);
+
+    pointerTap(previous, 4);
+    completeTurn();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "18-19",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("false");
   });
 
   it("stops held navigation when the window loses focus", () => {
@@ -316,5 +390,63 @@ describe("BookStage page-turn input", () => {
     expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
       "12-13",
     );
+  });
+
+  it("runs an absolute jump before preserving buffered taps", () => {
+    stubMatchMedia();
+    const { onSpreadSettled, rerender, stage } = renderStage(1);
+    const next = screen.getByRole("button", { name: "Next spread" });
+    onSpreadSettled.mockClear();
+
+    pointerTap(next, 1);
+    pointerTap(next, 2);
+    rerender(
+      <BookStage targetSpread={6} onSpreadSettled={onSpreadSettled} />,
+    );
+    completeTurn();
+
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+    completeRiffle();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "12-13",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+
+    completeTurn();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "14-15",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(onSpreadSettled).toHaveBeenCalledTimes(1);
+    expect(onSpreadSettled).toHaveBeenLastCalledWith(7);
+  });
+
+  it("finishes finite taps before resuming a held arrow", () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1);
+    const next = screen.getByRole("button", { name: "Next spread" });
+
+    pointerTap(next, 1);
+    pointerTap(next, 2);
+    fireEvent.keyDown(window, { key: "ArrowRight", repeat: false });
+
+    completeTurn();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "04-05",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+
+    completeTurn();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "06-07",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+
+    fireEvent.keyUp(window, { key: "ArrowRight" });
+    completeTurn();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "08-09",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("false");
   });
 });
