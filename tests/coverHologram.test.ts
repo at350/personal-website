@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import {
@@ -13,6 +15,18 @@ import {
 } from "@/book3d/coverHologramMaterial";
 
 describe("cover hologram", () => {
+  it("uses a page-sized, plane-only mask instead of drawing a second A", () => {
+    const pattern = readFileSync(
+      join(process.cwd(), "public", "images", "editorial", "cover-hologram-pattern.svg"),
+      "utf8",
+    );
+
+    expect(pattern).toContain('viewBox="0 0 640 853"');
+    expect(pattern).toContain('id="front-plane"');
+    expect(pattern).toContain('id="right-leg"');
+    expect(pattern).not.toMatch(/registration|printer|<circle|stroke=/i);
+  });
+
   it("is scoped to the physical front-cover texture", () => {
     expect(COVER_HOLOGRAM_PAGE_KEY).toBe("0:recto");
     expect(["0:verso", "1:recto", "10:recto", "0:recto-extra"]).not.toContain(
@@ -87,6 +101,8 @@ describe("cover hologram", () => {
     expect(material.depthWrite).toBe(false);
     expect(material.toneMapped).toBe(false);
     expect(material.polygonOffset).toBe(true);
+    expect(material.fragmentShader).not.toContain("backgroundFoil");
+    expect(material.fragmentShader).toMatch(/pattern \* \(patternedFoil \+ whiteReflection\)/);
 
     updateCoverHologramMaterial(material, {
       pointerX: Number.NaN,

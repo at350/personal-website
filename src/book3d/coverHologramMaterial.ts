@@ -76,8 +76,8 @@ export const COVER_HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
     // than a detached colored seam beside the opaque cover.
     float edgeFade = smoothstep(0.055, 0.20, facing);
 
-    // The pattern stays in page UVs. Only the light field moves, so the
-    // authored A contours remain glued to every vertex while the leaf bends.
+    // The mask stays in page UVs. Only the light field moves, so the foil
+    // remains registered to the photographed paper planes while the leaf bends.
     float diagonal = vHoloUv.x * 0.58 + vHoloUv.y * 0.42;
     float normalTravel = dot(viewNormal.xy, vec2(0.09, -0.07));
     float center = 0.48
@@ -96,14 +96,15 @@ export const COVER_HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
       + normalTravel * 0.7;
     vec3 spectrum = holoSpectrum(fract(phase));
 
-    float angularResponse = 0.65 + grazing * 0.75;
-    float patternedFoil = pattern * (0.075 + band * 0.34) * angularResponse;
-    float backgroundFoil = 0.01 + band * 0.018;
-    float whiteReflection = band * band * (0.018 + grazing * 0.025);
+    float angularResponse = 0.72 + grazing * 0.55;
+    float patternedFoil = (0.09 + band * 0.26) * angularResponse;
+    float whiteReflection = band * band * (0.014 + grazing * 0.02);
+    // Every term is pattern-bound. The book already supplies its own page
+    // sheen, so a second full-page glare would wash out the static cover.
     float alpha = clamp(
-      (patternedFoil + backgroundFoil + whiteReflection) * uStrength * edgeFade,
+      pattern * (patternedFoil + whiteReflection) * uStrength * edgeFade,
       0.0,
-      0.44
+      0.24
     );
     float reflectionMix = clamp(whiteReflection * 10.0, 0.0, 0.5);
     vec3 color = mix(spectrum, vec3(1.0), reflectionMix);
