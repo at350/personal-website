@@ -86,7 +86,7 @@ export function Cover({ face, mode }: SpreadFaceProps) {
       </nav>
 
       <footer className="cover2__foot">
-        <span className="mono-label cover2__place">EVANSTON, ILLINOIS</span>
+        <span className="mono-label cover2__place">CUPERTINO, CALIF.</span>
         <div className="cover2__barcode">
           <Barcode text="ALANTAI.01" height={26} />
         </div>

@@ -141,7 +141,7 @@ function DepartmentsPage() {
       </nav>
 
       <div className="contents2__imprint">
-        <p className="contents2__place">Published from {siteMeta.location}.</p>
+        <p className="contents2__place">Published from {siteMeta.location}</p>
         <p className="contents2__intro">{siteMeta.intro}</p>
       </div>
     </div>
