@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 import { useFrame, useThree } from "@react-three/fiber";
 import { LEAF_ROWS, LEAF_SEGMENTS, leafSurface } from "./bend";
 import { PaperSheet } from "./paperPhysics";
@@ -114,16 +115,16 @@ function usePageMaterial(
     }
     const m = new THREE.MeshPhysicalMaterial({
       color: 0xffffff,
-      roughness: 0.55,
+      roughness: 0.46,
       metalness: 0,
       bumpMap: paperBump,
       bumpScale: 0.08,
-      sheen: 0.16,
+      sheen: 0.32,
       sheenColor: new THREE.Color(0xffffff),
-      sheenRoughness: 0.56,
-      clearcoat: 0.38,
-      clearcoatRoughness: 0.24,
-      specularIntensity: 0.52,
+      sheenRoughness: 0.42,
+      clearcoat: 0.55,
+      clearcoatRoughness: 0.16,
+      specularIntensity: 0.75,
       ior: 1.45,
     });
     m.userData.paperActivity = 0;
@@ -152,13 +153,13 @@ function usePageMaterial(
             2.0
           );
           vec3 paperGleam =
-            totalSpecular * (0.9 * paperActivity) +
-            vec3(paperFresnel * 0.065 * paperActivity);
+            totalSpecular * (1.7 * paperActivity) +
+            vec3(paperFresnel * 0.12 * paperActivity);
           vec3 outgoingLight = diffuseColor.rgb * paperShade + paperGleam;
         `,
       );
     };
-    m.customProgramCacheKey = () => "editorial-paper-lighting-v2";
+    m.customProgramCacheKey = () => "editorial-paper-lighting-v3";
     return m;
   }, [paperBump, unlit]);
   const applied = useRef<string | null>(null);
@@ -211,7 +212,6 @@ function Stack({
   ph: number;
 }) {
   const mesh = useRef<THREE.Mesh>(null);
-  const shadow = useRef<THREE.Mesh>(null);
   const rim = useRef<THREE.LineSegments>(null);
   const topMat = usePageMaterial(topKey, false, true);
   const edges = useMemo(edgeTexture, []);
@@ -239,11 +239,6 @@ function Stack({
       outline.scale.copy(m.scale);
       outline.visible = count > 0;
     }
-    const receiver = shadow.current;
-    if (receiver) {
-      receiver.position.x = m.position.x;
-      receiver.visible = count > 0;
-    }
   });
 
   return (
@@ -258,10 +253,6 @@ function Stack({
           toneMapped={false}
         />
       </lineSegments>
-      <mesh ref={shadow} position={[0, 0, 0.16]} receiveShadow>
-        <planeGeometry args={[pw, ph]} />
-        <shadowMaterial transparent opacity={0.15} depthWrite={false} />
-      </mesh>
     </>
   );
 }
@@ -299,7 +290,17 @@ function GutterShadow({ pw, ph }: { pw: number; ph: number }) {
   );
 }
 
+/* Rect-area lights render as black without their LTC lookup tables. Install
+   them once, before any material that samples the gloss light compiles. */
+let rectAreaLightReady = false;
+function ensureRectAreaLightUniforms() {
+  if (rectAreaLightReady) return;
+  RectAreaLightUniformsLib.init();
+  rectAreaLightReady = true;
+}
+
 function GlossLight({ pw, ph }: { pw: number; ph: number }) {
+  ensureRectAreaLightUniforms();
   const light = useRef<THREE.RectAreaLight>(null);
   useEffect(() => {
     light.current?.lookAt(0, 0, 0);
@@ -308,7 +309,7 @@ function GlossLight({ pw, ph }: { pw: number; ph: number }) {
     <rectAreaLight
       ref={light}
       color={0xffffff}
-      intensity={3.2}
+      intensity={4.2}
       width={pw * 0.9}
       height={ph * 0.55}
       position={[pw * 0.72, ph * 0.42, ph * 0.9]}
@@ -554,16 +555,23 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
         shadow-radius={4}
         shadow-bias={-0.00008}
         shadow-normalBias={0.2}
-        shadow-camera-left={-pw * 1.7}
-        shadow-camera-right={pw * 1.7}
-        shadow-camera-top={ph * 1.1}
-        shadow-camera-bottom={-ph * 1.1}
+        shadow-camera-left={-pw * 2}
+        shadow-camera-right={pw * 2}
+        shadow-camera-top={ph * 1.4}
+        shadow-camera-bottom={-ph * 1.4}
         shadow-camera-near={ph * 0.2}
         shadow-camera-far={ph * 4}
       />
       <group ref={group}>
         <Stack side="left" count={leftCount} topKey={leftTop} pw={pw} ph={ph} />
         <Stack side="right" count={rightCount} topKey={rightTop} pw={pw} ph={ph} />
+        {/* One always-on receiver spanning the whole spread. Per-stack
+            receivers used to blink out whenever a side's count hit zero
+            mid-turn, taking the flying leaf's shadow with them. */}
+        <mesh position={[0, 0, 0.16]} receiveShadow renderOrder={1}>
+          <planeGeometry args={[pw * 2, ph]} />
+          <shadowMaterial transparent opacity={0.15} depthWrite={false} />
+        </mesh>
         {leftCount > 0 && rightCount > 0 ? <GutterShadow pw={pw} ph={ph} /> : null}
         <Leaf motion={motion} pw={pw} ph={ph} />
         {/* The desk: pure shadow on the white void. */}
