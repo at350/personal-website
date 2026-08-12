@@ -15,17 +15,27 @@ import {
   CaptureFarm,
   pageRasterLayout,
   getTextureProgress,
+  isSpreadTextureFresh,
   prefetchAround,
   refreshSpreadTextures,
   type TextureProgress,
 } from "./pageTextures";
 import { useLibraryFilter } from "@/components/MediaWall";
+import {
+  usePersistentInteraction,
+  type PersistentInteractionSpread,
+} from "@/magazine/persistent-interactions";
 import { Folio } from "@/components/furniture/Folio";
 import { RunningHead } from "@/components/furniture/RunningHead";
 import { GridOverlay } from "@/components/furniture/GridOverlay";
 import "@/styles/book-stage.css";
 
 const TOTAL = SPREADS.length;
+
+const PERSISTENT_SPREAD_INDEX: Record<PersistentInteractionSpread, number> = {
+  features: SPREADS.findIndex((def) => def.id === "features"),
+  resume: SPREADS.findIndex((def) => def.id === "resume"),
+};
 
 /** Margin (px) beyond the paper where hover still flattens the book and a
     pull still starts a turn. */
@@ -66,7 +76,17 @@ function usePageSize() {
   return size;
 }
 
-function OverlayFace({ spread, face, showGrid }: { spread: number; face: "verso" | "recto"; showGrid: boolean }) {
+/** Exported so the parity suite can compare the live face with the capture
+ * farm face without maintaining a third, test-only rendering path. */
+export function OverlayFace({
+  spread,
+  face,
+  showGrid,
+}: {
+  spread: number;
+  face: "verso" | "recto";
+  showGrid: boolean;
+}) {
   const def = SPREADS[spread];
   const binding = ISSUE[spread];
   if (!def || !binding) return <div className="ov-face ov-face--void" />;
@@ -105,6 +125,8 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   const [texturesReady, setTexturesReady] = useState(
     () => textureProgress.total > 0 && textureProgress.loaded === textureProgress.total,
   );
+  const [textureRefreshPending, setTextureRefreshPending] = useState(false);
+  const textureRefreshesPending = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -157,7 +179,28 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     [],
   );
 
-  const busy = state.sheet !== null || state.dragging || state.riffle !== null;
+  const busy =
+    state.sheet !== null ||
+    state.dragging ||
+    state.riffle !== null ||
+    textureRefreshPending;
+  const currentSpread = state.current;
+  const launchingTurn = useRef(false);
+  useEffect(() => {
+    if (state.sheet !== null || state.riffle !== null) launchingTurn.current = false;
+  }, [state.riffle, state.sheet]);
+  const launchTurn = useCallback(
+    (to: number) => {
+      if (!isSpreadTextureFresh(currentSpread)) return false;
+      launchingTurn.current = true;
+      motion.turnPose = motion.pose;
+      motion.poseTarget = motion.turnPose;
+      motion.turnShift = motion.shift;
+      dispatch({ type: "TURN", to });
+      return true;
+    },
+    [currentSpread, motion],
+  );
   const onTextureProgress = useCallback((progress: TextureProgress) => {
     setTextureProgress(progress);
   }, []);
@@ -237,16 +280,53 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   // The library chips change the wall's DOM at rest; the captured textures a
   // future flip will fly must follow, or the turn shows the stale filter.
   const libraryFilter = useLibraryFilter();
+  const featuresInteraction = usePersistentInteraction("features");
+  const resumeInteraction = usePersistentInteraction("resume");
   const librarySpread = useMemo(
     () => SPREADS.findIndex((def) => def.id === "library"),
     [],
   );
+  const trackTextureRefresh = useCallback((refresh: Promise<boolean>) => {
+    textureRefreshesPending.current += 1;
+    queueMicrotask(() => setTextureRefreshPending(true));
+    void refresh.finally(() => {
+      textureRefreshesPending.current = Math.max(
+        0,
+        textureRefreshesPending.current - 1,
+      );
+      setTextureRefreshPending(textureRefreshesPending.current > 0);
+    });
+  }, []);
   const seenFilter = useRef(libraryFilter);
   useEffect(() => {
     if (seenFilter.current === libraryFilter) return;
     seenFilter.current = libraryFilter;
-    if (librarySpread >= 0) refreshSpreadTextures(librarySpread);
-  }, [libraryFilter, librarySpread]);
+    if (librarySpread < 0) return;
+    trackTextureRefresh(refreshSpreadTextures(librarySpread));
+  }, [libraryFilter, librarySpread, trackTextureRefresh]);
+
+  const interactionRevisions = useMemo(
+    () => ({
+      features: featuresInteraction.revision,
+      resume: resumeInteraction.revision,
+    }),
+    [featuresInteraction.revision, resumeInteraction.revision],
+  );
+  const seenInteractionRevisions = useRef(interactionRevisions);
+  useEffect(() => {
+    for (const spread of ["features", "resume"] as const) {
+      if (seenInteractionRevisions.current[spread] === interactionRevisions[spread]) {
+        continue;
+      }
+      seenInteractionRevisions.current = {
+        ...seenInteractionRevisions.current,
+        [spread]: interactionRevisions[spread],
+      };
+      const spreadIndex = PERSISTENT_SPREAD_INDEX[spread];
+      if (spreadIndex < 0) continue;
+      trackTextureRefresh(refreshSpreadTextures(spreadIndex));
+    }
+  }, [interactionRevisions, trackTextureRefresh]);
 
   // External navigation. Requests that land mid-turn are queued, not dropped —
   // rapid keyboard/TOC input must never feel ignored.
@@ -257,28 +337,29 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     prevTarget.current = targetSpread;
     if (targetSpread === state.current) return;
     if (busy) pendingTarget.current = targetSpread;
-    else {
-      motion.turnPose = motion.pose;
-      motion.poseTarget = motion.turnPose;
-      motion.turnShift = motion.shift;
-      dispatch({ type: "TURN", to: targetSpread });
-    }
-  }, [busy, motion, state, targetSpread]);
+    else if (!launchTurn(targetSpread)) pendingTarget.current = targetSpread;
+  }, [
+    busy,
+    launchTurn,
+    state,
+    targetSpread,
+  ]);
 
   useEffect(() => {
     if (busy || pendingTarget.current === null) return;
     const to = pendingTarget.current;
-    pendingTarget.current = null;
-    if (to !== state.current) {
-      motion.turnPose = motion.pose;
-      motion.poseTarget = motion.turnPose;
-      motion.turnShift = motion.shift;
-      dispatch({ type: "TURN", to });
-    }
-  }, [busy, motion, state]);
+    if (to === state.current) pendingTarget.current = null;
+    else if (launchTurn(to)) pendingTarget.current = null;
+  }, [
+    busy,
+    launchTurn,
+    state,
+  ]);
 
   useEffect(() => {
-    if (!busy) onSpreadSettled?.(state.current);
+    if (!busy && !launchingTurn.current && pendingTarget.current === null) {
+      onSpreadSettled?.(state.current);
+    }
   }, [busy, onSpreadSettled, state]);
 
   // One drag engine for edge zones (instant) and the page surface (threshold).
@@ -356,9 +437,12 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   const onEdgeDown = useCallback(
     (edge: "fore" | "back") => (e: React.PointerEvent) => {
       e.preventDefault();
-      beginDrag(edge, e.clientX, e.clientY, e.pointerId);
+      if (busy) return;
+      const { clientX, clientY, pointerId } = e;
+      if (!isSpreadTextureFresh(currentSpread)) return;
+      beginDrag(edge, clientX, clientY, pointerId);
     },
-    [beginDrag],
+    [beginDrag, busy, currentSpread],
   );
 
   // Grab anywhere on or near the book — posed mesh and live DOM alike: a
@@ -372,7 +456,13 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       if (busy) return;
       if (e.button !== 0) return;
       if (motion.leaf !== null || motion.dragging) return;
-      if ((e.target as HTMLElement | null)?.closest(".bstage__nav")) return;
+      if (
+        (e.target as HTMLElement | null)?.closest(
+          ".bstage__nav, button, a, input, select, textarea, .letter__plate",
+        )
+      ) {
+        return;
+      }
       const frame = pointerFrame();
       if (
         !withinBookRegion({
@@ -408,6 +498,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
             },
             { capture: true, once: true },
           );
+          if (!isSpreadTextureFresh(state.current)) return;
           beginDrag(edge, downX, downY, pointerId);
         }
       };
@@ -420,7 +511,14 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       window.addEventListener("pointerup", cleanup);
       window.addEventListener("pointercancel", cleanup);
     },
-    [beginDrag, busy, motion, pointerFrame, state, texturesReady],
+    [
+      beginDrag,
+      busy,
+      motion,
+      pointerFrame,
+      state,
+      texturesReady,
+    ],
   );
 
   // Pose choreography: the book rests as a display object and flattens for
@@ -478,14 +576,9 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       if (!texturesReady) return;
       const clamped = Math.min(Math.max(to, 0), TOTAL - 1);
       if (busy) pendingTarget.current = clamped;
-      else {
-        motion.turnPose = motion.pose;
-        motion.poseTarget = motion.turnPose;
-        motion.turnShift = motion.shift;
-        dispatch({ type: "TURN", to: clamped });
-      }
+      else if (!launchTurn(clamped)) pendingTarget.current = clamped;
     },
-    [busy, motion, texturesReady],
+    [busy, launchTurn, texturesReady],
   );
 
   const onRiffleComplete = useCallback(() => {

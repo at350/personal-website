@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router";
 import { dispatches } from "@/lib/content";
+import { DropCapText } from "@/components/furniture/DropCapText";
 import { EndMark } from "@/components/furniture/EndMark";
 import { NotFound } from "./NotFound";
 import "@/styles/routes.css";
@@ -18,8 +19,8 @@ export function WritingPage() {
         <p className="reading__dek">{dispatch.dek}</p>
         <hr className="rule" />
         {dispatch.body.map((paragraph, i) => (
-          <p key={i} className={i === 0 ? "drop-cap" : undefined}>
-            {paragraph}
+          <p key={i}>
+            {i === 0 ? <DropCapText text={paragraph} /> : paragraph}
             {i === dispatch.body.length - 1 ? <EndMark /> : null}
           </p>
         ))}

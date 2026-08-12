@@ -43,29 +43,43 @@ export function Cover({ face, mode }: SpreadFaceProps) {
   };
 
   useEffect(() => {
-    if (!motionOK() || !rootRef.current) return;
-    // Never animate inside the texture farm: a capture taken mid-entrance
-    // rasterizes a cover with no name on it.
-    if (rootRef.current.closest("[data-capture-farm]")) return;
+    // A moving book face is a still texture, so its live DOM twin must also be
+    // settled. Keep the entrance for the linear reader, where there is no
+    // raster handoff to match.
+    if (mode === "book" || !motionOK() || !rootRef.current) return;
     const lines = rootRef.current.querySelectorAll(".cover2__word");
     const split = new SplitText(lines, { type: "chars" });
+    let splitReverted = false;
+    const revertSplit = () => {
+      if (splitReverted) return;
+      splitReverted = true;
+      split.revert();
+    };
     const tween = gsap.from(split.chars, {
       yPercent: 108,
       duration: 0.9,
       ease: "power4.out",
       stagger: 0.045,
       delay: 0.15,
+      clearProps: "transform",
+      onComplete: revertSplit,
     });
     const rule = rootRef.current.querySelector(".cover2__rule");
     const ruleTween = rule
-      ? gsap.from(rule, { scaleX: 0, duration: 1.1, ease: "power4.inOut", delay: 0.5 })
+      ? gsap.from(rule, {
+          scaleX: 0,
+          duration: 1.1,
+          ease: "power4.inOut",
+          delay: 0.5,
+          clearProps: "transform",
+        })
       : null;
     return () => {
       tween.kill();
       ruleTween?.kill();
-      split.revert();
+      revertSplit();
     };
-  }, []);
+  }, [mode]);
 
   if (face === "verso" && mode === "book") return null;
 

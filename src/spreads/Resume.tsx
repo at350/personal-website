@@ -105,6 +105,8 @@ function LedgerGroup({
                 label={entry.marginalia.label}
                 ariaLabel={entry.marginalia.ariaLabel}
                 index={resume.entries.findIndex((e) => e.id === entry.id) + 1}
+                stateKey={entry.id}
+                stateSpread="resume"
               >
                 {entry.marginalia.text}
               </Marginalia>
