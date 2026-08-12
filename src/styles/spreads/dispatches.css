@@ -11,11 +11,6 @@
   padding: 8cqh 8cqw 10cqh;
 }
 
-.dispatches__mark {
-  color: var(--ink-3);
-  font-size: max(11px, 1.6cqw);
-}
-
 /* ————— Verso: the entries ————— */
 
 .dispatches__entries {

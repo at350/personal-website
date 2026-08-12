@@ -46,8 +46,6 @@ const COLOPHON_ENTRIES: ReadonlyArray<{ term: string; desc: ReactNode }> = [
 function LettersPage() {
   return (
     <div className="letters" data-face="verso">
-      <p className="letters__mark mono-label">Letters</p>
-
       <h2 className="letters__heading">{contact.heading}</h2>
       <p className="letters__note">{contact.note}</p>
 

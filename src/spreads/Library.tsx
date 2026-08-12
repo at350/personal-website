@@ -20,7 +20,6 @@ export function Library({ face }: SpreadFaceProps) {
       {face === "verso" ? (
         <>
           <header className="library__head">
-            <p className="library__eyebrow mono-label">THE LIBRARY</p>
             <div className="library__chips" role="group" aria-label="Filter the library">
               {LIBRARY_FILTERS.map((entry) => (
                 <button

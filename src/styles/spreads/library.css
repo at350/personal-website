@@ -12,7 +12,7 @@
   overflow: hidden;
 }
 
-/* ————— Verso header: eyebrow + working chips ————— */
+/* ————— Verso header: the working chips ————— */
 
 .library__head {
   display: flex;
@@ -22,12 +22,6 @@
   gap: 2cqw;
   padding-bottom: 1.2cqh;
   border-bottom: 1px solid var(--hairline);
-}
-
-.library__eyebrow {
-  color: var(--ink-2);
-  font-size: max(11px, 1.6cqw);
-  letter-spacing: 0.2em;
 }
 
 .library__chips {

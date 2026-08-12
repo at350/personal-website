@@ -8,8 +8,6 @@ import "@/styles/spreads/dispatches.css";
 function DispatchIndex() {
   return (
     <div className="dispatches" data-face="verso">
-      <p className="dispatches__mark mono-label">Dispatches</p>
-
       <div className="dispatches__entries">
         {dispatches.map((d, index) => (
           <article className="dispatches__entry" key={d.id}>
