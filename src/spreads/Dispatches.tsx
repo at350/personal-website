@@ -35,7 +35,7 @@ function DispatchIndex() {
 function DispatchCredo() {
   return (
     <div className="dispatches" data-face="recto">
-      <p className="dispatches__credo">Some notes belong on paper you own.</p>
+      <p className="dispatches__credo">Read slowly enough to disagree.</p>
       <span className="dispatches__asterisk" aria-hidden>
         &#10035;
       </span>

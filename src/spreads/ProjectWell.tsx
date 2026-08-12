@@ -21,7 +21,6 @@ const PLATE_ALT: Record<string, string> = {
 /** Pages 10–11 — the well: Architec verso, GreenChain recto, mirrored. */
 export function ProjectWell({ face, mode }: SpreadFaceProps) {
   const project = face === "verso" ? projects[0] : projects[1];
-  const rest = projects.slice(2);
   const no = face === "verso" ? "01" : "02";
 
   return (
@@ -40,13 +39,7 @@ export function ProjectWell({ face, mode }: SpreadFaceProps) {
         </div>
       </header>
 
-      <p className="proj-feature__summary">{project.summary}</p>
-
-      <p className="proj-feature__stack mono-label">
-        {project.stack.join(" · ")}
-      </p>
-
-
+      <p className="proj-feature__summary">{project.detail}</p>
       {project.recognition && (
         <p className="proj-feature__recognition">
           <span className="proj-star" aria-hidden></span>{" "}
@@ -66,22 +59,7 @@ export function ProjectWell({ face, mode }: SpreadFaceProps) {
       )}
 
       {face === "recto" && (
-        <>
-          <Plate project={project} />
-
-          <footer className="proj-rest">
-            <ul className="proj-rest__list">
-              {rest.map((p, i) => (
-                <li key={p.id} className="proj-rest__entry mono-label">
-                  <span className="proj-rest__no" aria-hidden>
-                    {String(i + 3).padStart(2, "0")}
-                  </span>
-                  {p.name} · {p.discipline}
-                </li>
-              ))}
-            </ul>
-          </footer>
-        </>
+        <Plate project={project} />
       )}
     </article>
   );

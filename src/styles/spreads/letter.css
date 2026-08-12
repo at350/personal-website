@@ -1,8 +1,8 @@
 /* A LETTER — pp. 04–05. V2.
    Verso: one 34ch column set flush against the right margin; the heading is
-   the grid-break, crossing back into the wide empty margin where only two
-   red ✳ notes hang. Recto: the portrait plate rides the spine and carries
-   the tilt + glare. Geometry in cqw so book and reader pages agree. */
+   the grid-break, crossing back into the wide empty margin. Recto: the portrait
+   plate rides the spine and carries the tilt + glare. Geometry in cqw so book
+   and reader pages agree. */
 
 .letter {
   position: absolute;
@@ -66,23 +66,6 @@
   line-height: 1.2;
   color: var(--ink);
   margin-top: 4.5cqw;
-}
-
-/* Two ✳ asides at staggered heights — this page's only red. */
-.letter__aside {
-  position: absolute;
-  font-size: clamp(13px, 2.7cqw, 20px);
-  line-height: 1;
-}
-
-.letter__aside--one {
-  top: 48cqw;
-  left: 11cqw;
-}
-
-.letter__aside--two {
-  top: 84cqw;
-  left: 22cqw;
 }
 
 /* Small book faces (height-capped): pull the px floors down so the letter

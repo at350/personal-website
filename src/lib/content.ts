@@ -13,7 +13,7 @@ export const siteMeta = {
   description:
     "Alan Tai is a Northwestern student building software, research, and early-stage products.",
   intro:
-    "I've been building software since middle school. Now I'm studying Industrial Engineering and Artificial Intelligence at Northwestern, and I still just want to make things that work.",
+    "Use the index as a map, not an assignment. Start anywhere; the issue still reads front to back.",
   location: "Cupertino, Calif.",
   issue: {
     number: "01",
@@ -27,28 +27,28 @@ export const about = {
   eyebrow: "Notes from the editor",
   heading: "I like systems with people still visible inside them.",
   lede:
-    "Hi, I'm Alan. I study Industrial Engineering and Artificial Intelligence at Northwestern. Before I spent weekends at hackathons, I spent production nights chasing photo credits and coaxing InDesign back to life.",
+    "Hi, I'm Alan. I learned to make things in a student newsroom, long before I thought of software as the medium.",
   paragraphs: [
-    "Journalism taught me to look for the person inside a system. Debate taught me to expect a good argument to fight back. I bring both habits to software, research, and early-stage teams.",
-    "I like work that crosses boundaries: a voice product, a legal-reasoning benchmark, a soil tool, a sales workflow, a newsroom. Away from the screen, I design geocaches, collect oddly specific roadside landmarks, and remain delighted that the world has both a largest operational and a largest non-operational fire hydrant.",
+    "Reporting taught me to ask one more question before writing. Debate taught me to find the weakest assumption before someone else did. Those habits still shape how I approach software, research, and early-stage teams.",
+    "I am happiest when a question crosses a boundary and I have to learn the neighboring vocabulary fast. The through line is less a medium than a standard: understand what is actually happening, then make the next step clearer.",
   ],
   pullQuote: "I just want to make things that work.",
   notes: [
     {
-      label: "Before code",
-      text: "i was a journalist first. it still shows in how i interview users and decide what belongs in a story.",
+      label: "Start nearby",
+      text: "i start with the people closest to the problem, then turn what repeats into something testable.",
     },
     {
-      label: "Tiny infrastructure",
-      text: "i design geocaches. my best camouflage is a fake electric box, which is a lot of civic theater for a tiny container.",
+      label: "Cross the seam",
+      text: "i move between research, product, and implementation instead of treating the handoffs as somebody else's job.",
     },
     {
-      label: "Unnecessary pilgrimage",
-      text: "i have seen both the world's largest operational fire hydrant and the largest non-operational one. yes, both.",
+      label: "Show the reasoning",
+      text: "i want the result legible enough for another person to question it.",
     },
     {
-      label: "Languages",
-      text: "english first, conversational mandarin second.",
+      label: "Use the thing",
+      text: "i use the workflow in the real world before calling it finished.",
     },
   ],
   photos: [
@@ -160,7 +160,7 @@ export const resume = {
       role: "Founding Intern",
       dates: "Apr 2026 to Present",
       summary:
-        "Building voice-agent infrastructure for personal memory preservation.",
+        "Developing voice-agent infrastructure for personal memory preservation.",
       highlights: [
         "Works across backend systems, observability, and product reliability for a voice experience.",
       ],
@@ -177,14 +177,14 @@ export const resume = {
       role: "GTM Engineering Intern",
       dates: "May 2026 to Present",
       summary:
-        "Building outbound, analytics, and content systems for a revenue-intelligence startup.",
+        "Running outbound, analytics, and content systems for a revenue-intelligence startup.",
       highlights: [
         "Connects research, workflow design, and direct customer conversations instead of treating them as separate jobs.",
       ],
       marginalia: {
         label: "From the call sheet",
         ariaLabel: "Read a personal note about WingRep",
-        text: "built the outbound systems, then made the calls myself.",
+        text: "the job title says engineering; the calendar says calls, copy, dashboards, and whatever broke.",
       },
     },
     {
@@ -194,7 +194,7 @@ export const resume = {
       role: "Co-Founder",
       dates: "Apr 2026 to Present",
       summary:
-        "Building an evaluation layer for teams that put AI in front of customers.",
+        "Leading product discovery for an evaluation layer for teams that put AI in front of customers.",
       highlights: [
         "Runs product discovery and translates recurring reliability questions into testable evaluation workflows.",
       ],
@@ -286,7 +286,7 @@ export const resume = {
       marginalia: {
         label: "Evaluation footnote",
         ariaLabel: "Read a personal note about the Thomson Reuters CS+Law Innovation Lab",
-        text: "every eval pipeline needs a button that says 'a human should look at this.'",
+        text: "clustering became useful only after the rubric made disagreement inspectable.",
       },
     },
     {
@@ -330,14 +330,14 @@ export const resume = {
       role: "President",
       dates: "Aug 2024 to Jun 2025",
       summary:
-        "Led the team and competed in Public Forum debate, including the 2025 NSDA national title.",
+        "Led team operations and coached competitive preparation in Public Forum debate.",
       highlights: [
         "Coached cases, organized team operations, and kept competitive preparation rigorous and teachable.",
       ],
       marginalia: {
         label: "Crossfire lesson",
         ariaLabel: "Read a personal note about Monta Vista Debate",
-        text: "seven years of having every claim i made argued against. useful.",
+        text: "good prep had to be rigorous enough to win and clear enough to teach.",
       },
     },
     {
@@ -386,13 +386,13 @@ export const resume = {
       title: "Public Forum National Champion",
       issuer: "National Speech & Debate Association",
       year: "2025",
-      note: "The final round of seven years spent learning how to build and test an argument.",
+      note: "One line here; years of cases and practice behind it.",
     },
     {
       title: "Five-time hackathon winner",
       issuer: "Collegiate hackathons",
       year: "Ongoing",
-      note: "Built across energy, supply chains, public health, accessibility, and other very short weekends.",
+      note: "Rough ideas carried all the way to live judging.",
     },
   ],
 } satisfies ResumeContent;
@@ -400,8 +400,6 @@ export const resume = {
 export const contact = {
   eyebrow: "Colophon",
   heading: "Send a note, a link, or a strange problem.",
-  note:
-    "Email is the surest route. The other shelves hold code, projects, short posts, and the journalism archive that started all of this.",
   links: [
     {
       kind: "email",
@@ -456,8 +454,8 @@ export const dispatches = [
     title: "Why this site opens like a book",
     dek: "A small note about the structure of the thing you are reading.",
     body: [
-      "Most portfolios behave like filing cabinets. I wanted this one to feel closer to an issue you can wander through: a cover, a contents page, features, and notes in the margins.",
-      "The page turns are theater, but the structure is practical. Each spread has one job, the words remain real HTML, and the quiet-motion version keeps the same story. This is a starter note written for the site, not an older post pulled from an archive.",
+      "Most portfolios ask you to choose between a grid and a resume. I wanted a sequence instead: an opening, a change of pace, a feature well, and a finish. The book gives the work an order without turning that order into a fence.",
+      "The page turn is theater with a practical boundary underneath it. Every resting spread is live HTML; the animation borrows a captured page only while the paper moves. Reduced-motion and smaller-screen readers get the same issue as a vertical stack.",
     ],
   },
   {
@@ -465,10 +463,10 @@ export const dispatches = [
     status: "Site sample",
     label: "Editorial note for Issue 01",
     title: "In defense of the side note",
-    dek: "A resume gives you the sequence. The margins give you some texture.",
+    dek: "A small argument for keeping the useful detail close to the fact it complicates.",
     body: [
-      "Resumes are good at sequence and terrible at texture. They can tell you where I worked, but not that newsroom production nights involved crashing InDesign and emergency photo-credit hunts.",
-      "The marginalia here holds those details. Each note belongs to a verified entry and opens by click or keyboard as well as hover. This is another site sample while the longer-form blog takes shape.",
+      "The neatest version of a career is rarely the most accurate one. A title and date can establish the record; a nearby note can show the constraint, surprise, or habit that changed how the work was done.",
+      "That is why the resume in this issue keeps its asides attached to individual roles. They are optional context, not missing evidence: the chronology stays readable on its own, while each annotation rewards a closer look.",
     ],
   },
 ] satisfies readonly Dispatch[];

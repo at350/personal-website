@@ -19,37 +19,34 @@ const FEATURES: readonly Feature[] = [
   {
     no: "04",
     route: "/about",
-    title: "a letter",
-    dek: "systems with people still visible",
+    title: "the editor's letter",
+    dek: "where the working habits began",
     image: "/images/editorial/index-letter.webp",
   },
   {
     no: "06",
     route: "/profile",
     title: "the profile",
-    dek: "work habits and off-hours notes",
+    dek: "four rules, then off hours",
     image: "/images/editorial/index-profile.webp",
   },
   {
     no: "08",
     route: "/projects",
-    title: "five prototypes",
-    dek: "energy, supply chains, health",
+    title: "the project index",
+    dek: "an index of working experiments",
     image: "/images/editorial/index-projects.webp",
   },
   {
     no: "12",
     route: "/resume",
     title: "the annotated resume",
-    dek: "the work, plus what did not fit",
+    dek: "roles, research, recognition",
     image: "/images/editorial/index-resume.webp",
   },
 ];
 
 const DEPARTMENTS = [
-  { no: "06", route: "/profile", title: "news" },
-  { no: "08", route: "/projects", title: "features" },
-  { no: "12", route: "/resume", title: "sports" },
   { no: "14", route: "/library", title: "arts & ent" },
   { no: "16", route: "/writing", title: "opinion" },
   { no: "18", route: "/contact", title: "letters" },

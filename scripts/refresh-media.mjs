@@ -90,6 +90,19 @@ function stripHtml(html) {
 const truncate = (text, max) =>
   text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 
+function splitPostCopy(text) {
+  if (text.length <= 60) return { title: text };
+  const window = text.slice(0, 59);
+  const wordBreak = window.lastIndexOf(" ");
+  const cut = wordBreak >= 30 ? wordBreak : window.length;
+  const title = `${text.slice(0, cut).trimEnd()}…`;
+  const remainder = text.slice(cut).trimStart();
+  return {
+    title,
+    excerpt: remainder ? truncate(remainder, 500) : undefined,
+  };
+}
+
 function rssItems(xml) {
   const parser = new XMLParser({ ignoreAttributes: false });
   const doc = asRecord(parser.parse(xml));
@@ -191,13 +204,13 @@ function fromXApi(json) {
       const id = textOf(record?.id);
       const text = textOf(record?.text)?.trim();
       if (!record || !id || !text) return [];
+      const copy = splitPostCopy(text);
       return [
         {
           id: `x:${id}`,
           source: "x",
           kind: "post",
-          title: truncate(text, 60),
-          excerpt: truncate(text, 500),
+          ...copy,
           url: `https://x.com/alan_tai1/status/${id}`,
           author: "@alan_tai1",
           publishedAt: isoDate(record.created_at),
