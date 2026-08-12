@@ -89,26 +89,63 @@ describe("magazine engine", () => {
     expect(run(settling, { type: "DRAG_START", edge: "fore" })).toBe(settling);
   });
 
-  it("TURN riffles through intermediate sheets", () => {
-    let s = run(initialEngineState(1), { type: "TURN", to: 4 });
-    expect(s).toMatchObject({ sheet: 1, settleTarget: 1, queue: [2, 3, 4] });
+  it("keeps adjacent TURNs as a single physical sheet", () => {
+    let s = run(initialEngineState(1), { type: "TURN", to: 2 });
+    expect(s).toMatchObject({ sheet: 1, settleTarget: 1, riffle: null });
     s = run(s, { type: "TICK_COMPLETE" });
-    expect(s).toMatchObject({ current: 2, sheet: 2, settleTarget: 1 });
-    s = run(s, { type: "TICK_COMPLETE" });
-    s = run(s, { type: "TICK_COMPLETE" });
-    expect(s).toMatchObject({ current: 4, sheet: null, queue: [] });
+    expect(s).toMatchObject({ current: 2, sheet: null, riffle: null });
   });
 
-  it("TURN backwards riffles too", () => {
-    let s = run(initialEngineState(4), { type: "TURN", to: 2 });
-    expect(s).toMatchObject({ sheet: 3, settleTarget: 0 });
-    s = run(s, { type: "TICK_COMPLETE" }, { type: "TICK_COMPLETE" });
-    expect(s).toMatchObject({ current: 2, sheet: null });
+  it("keeps an adjacent backward TURN as the mirrored physical sheet", () => {
+    let s = run(initialEngineState(2), { type: "TURN", to: 1 });
+    expect(s).toMatchObject({
+      current: 2,
+      sheet: 1,
+      direction: -1,
+      progress: 1,
+      settleTarget: 0,
+      riffle: null,
+    });
+    s = run(s, { type: "TICK_COMPLETE" });
+    expect(s).toMatchObject({ current: 1, sheet: null, riffle: null });
   });
 
-  it("long jumps teleport instead of riffling", () => {
-    const s = run(initialEngineState(0), { type: "TURN", to: 9 });
-    expect(s).toMatchObject({ current: 9, sheet: null, teleported: true });
+  it("groups a non-adjacent forward TURN into one riffle transaction", () => {
+    let s = run(initialEngineState(1), { type: "TURN", to: 6 });
+    expect(s).toMatchObject({
+      current: 1,
+      sheet: null,
+      direction: 1,
+      riffle: {
+        from: 1,
+        to: 6,
+        direction: 1,
+        sheets: [1, 2, 3, 4, 5],
+        visibleSheets: [1, 2, 3, 4, 5],
+      },
+    });
+    s = run(s, { type: "RIFFLE_COMPLETE" });
+    expect(s).toEqual(initialEngineState(6));
+  });
+
+  it("groups a non-adjacent backward TURN in physical sheet order", () => {
+    let s = run(initialEngineState(6), { type: "TURN", to: 1 });
+    expect(s.riffle).toMatchObject({
+      from: 6,
+      to: 1,
+      direction: -1,
+      sheets: [5, 4, 3, 2, 1],
+      visibleSheets: [5, 4, 3, 2, 1],
+    });
+    s = run(s, { type: "RIFFLE_COMPLETE" });
+    expect(s).toEqual(initialEngineState(1));
+  });
+
+  it("animates long jumps with a capped representative packet", () => {
+    const s = run(initialEngineState(0), { type: "TURN", to: 10 });
+    expect(s).toMatchObject({ current: 0, sheet: null });
+    expect(s.riffle?.sheets).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(s.riffle?.visibleSheets).toEqual([0, 2, 5, 7, 9]);
   });
 
   it("TURN is ignored mid-drag and clamped in range", () => {
@@ -116,5 +153,11 @@ describe("magazine engine", () => {
     expect(run(dragging, { type: "TURN", to: 3 })).toBe(dragging);
     const clamped = run(initialEngineState(9), { type: "TURN", to: 99 }, { type: "TICK_COMPLETE" });
     expect(clamped.current).toBe(10);
+  });
+
+  it("ignores drag and TURN input while a riffle is active", () => {
+    const riffle = run(initialEngineState(1), { type: "TURN", to: 6 });
+    expect(run(riffle, { type: "DRAG_START", edge: "fore" })).toBe(riffle);
+    expect(run(riffle, { type: "TURN", to: 8 })).toBe(riffle);
   });
 });

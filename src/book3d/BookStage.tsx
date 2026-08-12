@@ -147,12 +147,13 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       handoff: touchOnly ? 1 : 0,
       onPose: null,
       onSettled: null,
+      riffleProgress: 0,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
-  const busy = state.sheet !== null || state.dragging;
+  const busy = state.sheet !== null || state.dragging || state.riffle !== null;
   const onTextureProgress = useCallback((progress: TextureProgress) => {
     setTextureProgress(progress);
   }, []);
@@ -194,9 +195,10 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.sheetEnergy = 0;
       motion.settleHold = 0;
       motion.swapReady = false;
+      motion.riffleProgress = 0;
     }
     motion.poseTarget =
-      state.sheet !== null || state.dragging
+      state.sheet !== null || state.dragging || state.riffle !== null
         ? motion.turnPose
         : touchOnly
           ? 1
@@ -283,6 +285,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       startY: number,
       pointerId: number,
     ) => {
+      if (busy) return;
       if (motion.dragging) return;
       if (motion.leaf !== null && motion.target !== null) return;
       dispatch({ type: "DRAG_START", edge });
@@ -343,7 +346,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       window.addEventListener("pointerup", up);
       window.addEventListener("pointercancel", up);
     },
-    [motion, ph, pw],
+    [busy, motion, ph, pw],
   );
 
   const onEdgeDown = useCallback(
@@ -362,6 +365,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   const onSurfaceDown = useCallback(
     (e: React.PointerEvent) => {
       if (!texturesReady) return;
+      if (busy) return;
       if (e.button !== 0) return;
       if (motion.leaf !== null || motion.dragging) return;
       if ((e.target as HTMLElement | null)?.closest(".bstage__nav")) return;
@@ -412,17 +416,19 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       window.addEventListener("pointerup", cleanup);
       window.addEventListener("pointercancel", cleanup);
     },
-    [beginDrag, motion, pointerFrame, state, texturesReady],
+    [beginDrag, busy, motion, pointerFrame, state, texturesReady],
   );
 
   // Pose choreography: the book rests as a display object and flattens for
   // reading when the pointer reaches it. One damped channel, no state pops.
   const hoverRef = useRef(false);
   const desiredPose = useCallback(() => {
-    if (motion.leaf !== null || motion.dragging) return motion.turnPose;
+    if (motion.leaf !== null || motion.dragging || state.riffle !== null) {
+      return motion.turnPose;
+    }
     if (touchOnly) return 1;
     return hoverRef.current ? 1 : 0;
-  }, [motion, touchOnly]);
+  }, [motion, state.riffle, touchOnly]);
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -477,6 +483,10 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     [busy, motion, texturesReady],
   );
 
+  const onRiffleComplete = useCallback(() => {
+    dispatch({ type: "RIFFLE_COMPLETE" });
+  }, []);
+
   // Keyboard.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -513,7 +523,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       ref={stageRef}
       onPointerDown={onSurfaceDown}
       onPointerMove={onPointerMove}
-      aria-busy={!texturesReady}
+      aria-busy={!texturesReady || busy}
     >
       {texturesReady ? (
         <Canvas
@@ -526,7 +536,13 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
           dpr={[1, 2]}
         >
           <Suspense fallback={null}>
-            <BookScene motion={motion} pw={pw} ph={ph} />
+            <BookScene
+              motion={motion}
+              riffle={state.riffle}
+              pw={pw}
+              ph={ph}
+              onRiffleComplete={onRiffleComplete}
+            />
           </Suspense>
         </Canvas>
       ) : null}
