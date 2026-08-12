@@ -9,8 +9,13 @@ import { LEAF_ROWS, LEAF_SEGMENTS, leafSurface } from "./bend";
 import { PaperSheet } from "./paperPhysics";
 import { handoffOpacity } from "./handoff";
 import { bookPoseAngles } from "./bookPose";
-import { injectPaperActivity, paperGleamActivity } from "./paperMaterial";
 import {
+  fadeSettlingActivity,
+  injectPaperActivity,
+  paperGleamActivity,
+} from "./paperMaterial";
+import {
+  SETTLE_HOLD_MAX,
   SETTLE_PROGRESS_TOLERANCE,
   SETTLE_VELOCITY_TOLERANCE,
   settleComplete,
@@ -50,8 +55,8 @@ export interface BookMotion {
   /** Seconds the settle gate has held a nominally landed turn. */
   settleHold: number;
   /** The settle gate has fired; the leaf is down and awaiting unmount. The
-      material must read as exactly the resting texture from here on, even if
-      the gate fired via the hold cap with residual sheet energy. */
+      material must use only the shared resting sheen from here on, even if the
+      gate fired via the hold cap with residual sheet energy. */
   swapReady: boolean;
   /** Horizontal book shift in px (centers the closed cover). */
   shift: number;
@@ -60,6 +65,7 @@ export interface BookMotion {
   /** Pointer position -1..1 for parallax. */
   pointerX: number;
   pointerY: number;
+  pointerActive: boolean;
   /**
    * Presentation pose target: 0 = three-quarter display object (spine, top
    * edge and cover all visible — the Stripe Press stance), 1 = flat reading
@@ -122,17 +128,9 @@ function usePaperBumpTexture() {
 function usePageMaterial(
   key: string | null,
   mirror = false,
-  unlit = false,
   paperBump?: THREE.Texture,
 ) {
   const mat = useMemo(() => {
-    if (unlit) {
-      // Static pages are exactly the DOM's pixels: no lighting math at all.
-      return new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        toneMapped: false,
-      });
-    }
     const m = new THREE.MeshPhysicalMaterial({
       color: 0xffffff,
       roughness: 0.46,
@@ -148,10 +146,9 @@ function usePageMaterial(
       ior: 1.45,
     });
     m.userData.paperActivity = 0;
-    // Every lighting response — base specular AND three's sheen/clearcoat
-    // post-mixes — rises only while the page is airborne. At both landing
-    // frames this resolves to the exact captured texture, so the physical
-    // leaf and the unlit stack/DOM cannot shift color on swap.
+    // Every lighting term shares the same low paper response. Motion boosts
+    // that response, but the resting stack and first/last active frames never
+    // lose the baseline sheen.
     m.onBeforeCompile = (shader) => {
       shader.uniforms.paperActivity = {
         value: Number(m.userData.paperActivity ?? 0),
@@ -159,9 +156,9 @@ function usePageMaterial(
       m.userData.paperShader = shader;
       shader.fragmentShader = injectPaperActivity(shader.fragmentShader);
     };
-    m.customProgramCacheKey = () => "editorial-paper-lighting-v4";
+    m.customProgramCacheKey = () => "editorial-paper-lighting-v5";
     return m;
-  }, [paperBump, unlit]);
+  }, [paperBump]);
   // Track the applied SOURCE texture, not the key: a refreshed capture keeps
   // the key but swaps the texture object, and the material must follow.
   const applied = useRef<THREE.Texture | null>(null);
@@ -211,16 +208,18 @@ function Stack({
   topKey,
   pw,
   ph,
+  paperBump,
 }: {
   side: "left" | "right";
   count: number;
   topKey: string | null;
   pw: number;
   ph: number;
+  paperBump: THREE.Texture;
 }) {
   const mesh = useRef<THREE.Mesh>(null);
   const rim = useRef<THREE.LineSegments>(null);
-  const topMat = usePageMaterial(topKey, false, true);
+  const topMat = usePageMaterial(topKey, false, paperBump);
   const edges = useMemo(edgeTexture, []);
   const materials = useMemo(() => {
     const paper = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
@@ -291,14 +290,23 @@ function GlossLight({ pw, ph }: { pw: number; ph: number }) {
   );
 }
 
-function Leaf({ motion, pw, ph }: { motion: BookMotion; pw: number; ph: number }) {
+function Leaf({
+  motion,
+  pw,
+  ph,
+  paperBump,
+}: {
+  motion: BookMotion;
+  pw: number;
+  ph: number;
+  paperBump: THREE.Texture;
+}) {
   const mesh = useRef<THREE.Mesh>(null);
   const backMesh = useRef<THREE.Mesh>(null);
-  const paperBump = usePaperBumpTexture();
   const frontKey = motion.leaf !== null ? pageKey(motion.leaf, "recto") : null;
   const backKey = motion.leaf !== null ? pageKey(motion.leaf + 1, "verso") : null;
-  const frontMat = usePageMaterial(frontKey, false, false, paperBump);
-  const backMat = usePageMaterial(backKey, true, false, paperBump);
+  const frontMat = usePageMaterial(frontKey, false, paperBump);
+  const backMat = usePageMaterial(backKey, true, paperBump);
   useEffect(() => {
     frontMat.side = THREE.FrontSide;
     backMat.side = THREE.BackSide;
@@ -357,10 +365,15 @@ function Leaf({ motion, pw, ph }: { motion: BookMotion; pw: number; ph: number }
     });
     motion.sheetEnergy = sheet.motionEnergy();
     // Once the gate fires the page is down, whatever residual energy the hold
-    // cap accepted — the material must be the plain texture at the swap.
+    // cap accepted — remove only the motion boost and keep the resting sheen.
+    const motionActivity = paperGleamActivity(motion.progress, motion.sheetEnergy);
     const activity = motion.swapReady
       ? 0
-      : paperGleamActivity(motion.progress, motion.sheetEnergy);
+      : fadeSettlingActivity(
+          motionActivity,
+          motion.settleHold,
+          SETTLE_HOLD_MAX,
+        );
     setPaperMaterialActivity(frontMat, activity);
     setPaperMaterialActivity(backMat, activity);
     const pos = g.attributes.position as THREE.BufferAttribute;
@@ -430,6 +443,7 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
   const group = useRef<THREE.Group>(null);
   const light = useRef<THREE.DirectionalLight>(null);
   const clockRef = useRef(0);
+  const paperBump = usePaperBumpTexture();
 
   // Spring integration + settle detection lives with the frames.
   useFrame((_, rawDt) => {
@@ -511,6 +525,7 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
       posed,
       pointerX: motion.pointerX,
       pointerY: motion.pointerY,
+      pointerActive: motion.pointerActive,
       airborne,
       breathe: breatheR,
     });
@@ -559,8 +574,22 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
         shadow-camera-far={ph * 4}
       />
       <group ref={group}>
-        <Stack side="left" count={leftCount} topKey={leftTop} pw={pw} ph={ph} />
-        <Stack side="right" count={rightCount} topKey={rightTop} pw={pw} ph={ph} />
+        <Stack
+          side="left"
+          count={leftCount}
+          topKey={leftTop}
+          pw={pw}
+          ph={ph}
+          paperBump={paperBump}
+        />
+        <Stack
+          side="right"
+          count={rightCount}
+          topKey={rightTop}
+          pw={pw}
+          ph={ph}
+          paperBump={paperBump}
+        />
         {/* One always-on receiver spanning the whole spread. Per-stack
             receivers used to blink out whenever a side's count hit zero
             mid-turn, taking the flying leaf's shadow with them. */}
@@ -568,7 +597,7 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
           <planeGeometry args={[pw * 2, ph]} />
           <shadowMaterial transparent opacity={0.15} depthWrite={false} />
         </mesh>
-        <Leaf motion={motion} pw={pw} ph={ph} />
+        <Leaf motion={motion} pw={pw} ph={ph} paperBump={paperBump} />
         {/* The desk: pure shadow on the white void. */}
         <mesh position={[0, 0, -TOTAL_LEAVES * LEAF_THICKNESS - 2]} receiveShadow>
           <planeGeometry args={[pw * 6, ph * 4]} />
