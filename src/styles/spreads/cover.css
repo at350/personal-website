@@ -66,78 +66,6 @@
   filter: contrast(1.12) brightness(1.045);
 }
 
-/* The foil is registered to two existing planes in the paper photograph. The
-   parent owns the mask so both color and reflection stop at those surfaces. */
-.cover2__hologram {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  overflow: hidden;
-  pointer-events: none;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-}
-
-.cover2__hologram-spectrum,
-.cover2__hologram-glare {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.cover2__hologram-spectrum {
-  background: linear-gradient(
-    var(--holo-angle, 118deg),
-    #ff5f72 0%,
-    #ffad57 15%,
-    #fff06b 29%,
-    #65efaa 44%,
-    #5bd5ff 59%,
-    #8975ff 75%,
-    #f56bd4 90%,
-    #ff5f72 100%
-  );
-  background-size: 178% 178%;
-  background-position:
-    calc(50% + var(--holo-shift-x, 0%))
-    calc(50% + var(--holo-shift-y, 0%));
-  opacity: 0.54;
-  filter: saturate(1.06);
-  transition: background-position 90ms linear;
-}
-
-/* A restrained highlight moves inside the same photographed planes. */
-.cover2__hologram-glare {
-  background:
-    radial-gradient(
-      circle at var(--holo-glare-x, 50%) var(--holo-glare-y, 50%),
-      rgba(255, 255, 255, 0.5) 0%,
-      rgba(255, 255, 255, 0.16) 15%,
-      transparent 38%
-    ),
-    linear-gradient(
-      var(--holo-angle, 118deg),
-      transparent 17%,
-      rgba(255, 255, 255, 0.06) 28%,
-      rgba(255, 255, 255, 0.42) 35%,
-      transparent 45%,
-      rgba(132, 221, 255, 0.14) 61%,
-      transparent 72%
-    );
-  background-size: 100% 100%, 178% 178%;
-  background-position:
-    center,
-    calc(50% + var(--holo-shift-x, 0%))
-      calc(50% + var(--holo-shift-y, 0%));
-  mix-blend-mode: screen;
-  opacity: 0.36;
-  transition: background-position 90ms linear;
-}
-
 /* The mark: the A whose counter prints red. */
 .cover2__a,
 .back2__a {
@@ -229,19 +157,6 @@
 
 .cover2__barcode .barcode__caption {
   display: none;
-}
-
-/* The base texture stays neutral; WebGL supplies the moving foil while a leaf
-   is airborne, preventing a baked, doubled rainbow in the capture farm. */
-[data-capture-farm] .cover2__hologram {
-  display: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cover2__hologram-spectrum,
-  .cover2__hologram-glare {
-    transition: none;
-  }
 }
 
 /* ————— Back cover ————— */

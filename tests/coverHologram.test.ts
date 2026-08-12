@@ -3,13 +3,17 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import {
-  applyCoverHologramPointer,
   COVER_HOLOGRAM_PAGE_KEY,
-  coverHologramCssVariables,
   coverHologramFlipEnvelope,
+  isMovingCoverSheet,
   normalizeCoverHologramPointer,
 } from "@/magazine/coverHologram";
 import {
+  COVER_HOLOGRAM_CHROMA_GAIN,
+  COVER_HOLOGRAM_FRESNEL_GAIN,
+  COVER_HOLOGRAM_GLARE_GAIN,
+  COVER_HOLOGRAM_MAX_ALPHA,
+  COVER_HOLOGRAM_PEAK_WHITE_MIX_MIN,
   createCoverHologramMaterial,
   updateCoverHologramMaterial,
 } from "@/book3d/coverHologramMaterial";
@@ -34,6 +38,20 @@ describe("cover hologram", () => {
     );
   });
 
+  it("is mounted only for the moving front-cover sheet", () => {
+    expect(isMovingCoverSheet(null)).toBe(false);
+    expect(isMovingCoverSheet(0)).toBe(true);
+    expect(isMovingCoverSheet(1)).toBe(false);
+    expect(isMovingCoverSheet(-1)).toBe(false);
+
+    const scene = readFileSync(
+      join(process.cwd(), "src", "book3d", "BookScene.tsx"),
+      "utf8",
+    );
+    expect(scene).not.toContain("RestingCoverHologram");
+    expect(scene).not.toMatch(/motion\.leaf === 0|sheet === 0/);
+  });
+
   it("clamps invalid pointer input to a finite page-local range", () => {
     expect(normalizeCoverHologramPointer(2, -3)).toEqual({ x: 1, y: -1 });
     expect(normalizeCoverHologramPointer(-2, 3)).toEqual({ x: -1, y: 1 });
@@ -47,33 +65,23 @@ describe("cover hologram", () => {
     expect(coverHologramFlipEnvelope(0)).toBe(0);
     expect(coverHologramFlipEnvelope(0.5)).toBeCloseTo(1);
     expect(coverHologramFlipEnvelope(1)).toBe(0);
+    expect(coverHologramFlipEnvelope(0.25)).toBeCloseTo(
+      coverHologramFlipEnvelope(0.75),
+    );
     expect(coverHologramFlipEnvelope(2)).toBe(0);
     expect(coverHologramFlipEnvelope(0.000001)).toBeLessThan(0.000004);
     expect(coverHologramFlipEnvelope(0.999999)).toBeLessThan(0.000004);
   });
 
-  it("produces bounded CSS variables without invalid values", () => {
-    expect(coverHologramCssVariables(1, -1)).toEqual({
-      shiftX: "26.00%",
-      shiftY: "-22.00%",
-      glareX: "84.00%",
-      glareY: "16.00%",
-      angle: "130.00deg",
-    });
-    const invalid = JSON.stringify(
-      coverHologramCssVariables(Number.NaN, Number.NEGATIVE_INFINITY),
+  it("makes white glare stronger than chroma without becoming opaque", () => {
+    expect(COVER_HOLOGRAM_GLARE_GAIN).toBeGreaterThan(
+      COVER_HOLOGRAM_CHROMA_GAIN,
     );
-    expect(invalid).not.toMatch(/NaN|Infinity/);
-  });
-
-  it("applies all live-cover variables through stable DOM style properties", () => {
-    const element = document.createElement("div");
-    applyCoverHologramPointer(element, -1, 1);
-    expect(element.style.getPropertyValue("--holo-shift-x")).toBe("-26.00%");
-    expect(element.style.getPropertyValue("--holo-shift-y")).toBe("22.00%");
-    expect(element.style.getPropertyValue("--holo-glare-x")).toBe("16.00%");
-    expect(element.style.getPropertyValue("--holo-glare-y")).toBe("84.00%");
-    expect(element.style.getPropertyValue("--holo-angle")).toBe("106.00deg");
+    expect(COVER_HOLOGRAM_FRESNEL_GAIN).toBeGreaterThan(
+      COVER_HOLOGRAM_CHROMA_GAIN,
+    );
+    expect(COVER_HOLOGRAM_PEAK_WHITE_MIX_MIN).toBeGreaterThanOrEqual(0.6);
+    expect(COVER_HOLOGRAM_MAX_ALPHA).toBeLessThanOrEqual(0.5);
   });
 
   it("updates WebGL uniforms in place and preserves the material contract", () => {
@@ -102,7 +110,10 @@ describe("cover hologram", () => {
     expect(material.toneMapped).toBe(false);
     expect(material.polygonOffset).toBe(true);
     expect(material.fragmentShader).not.toContain("backgroundFoil");
-    expect(material.fragmentShader).toMatch(/pattern \* \(patternedFoil \+ whiteReflection\)/);
+    expect(material.fragmentShader).toContain("motionVisibility");
+    expect(material.fragmentShader).toMatch(
+      /uStrength \* edgeFade \* motionVisibility/,
+    );
 
     updateCoverHologramMaterial(material, {
       pointerX: Number.NaN,

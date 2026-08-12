@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef } from "react";
 import { Link } from "react-router";
 import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
@@ -6,10 +6,6 @@ import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { withBasePath } from "@/lib/basePath";
 import { Barcode } from "@/components/furniture/Barcode";
 import { motionOK } from "@/lib/motion";
-import {
-  applyCoverHologramPointer,
-  COVER_HOLOGRAM_PATTERN_PATH,
-} from "@/magazine/coverHologram";
 import "@/styles/spreads/cover.css";
 
 gsap.registerPlugin(SplitText);
@@ -24,23 +20,6 @@ const COVER_LINES = [
    counter of the final A printed red — the mark the rest of the site reuses. */
 export function Cover({ face, mode }: SpreadFaceProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-
-  // Book mode inherits the stage's pointer channel so its live layer exactly
-  // matches WebGL at handoff. Reader mode has no stage, so it owns the same
-  // normalized pointer calculation locally.
-  const onHologramMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (mode !== "reader" || event.pointerType !== "mouse" || !motionOK()) return;
-    const root = rootRef.current;
-    if (!root) return;
-    const rect = root.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    const y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
-    applyCoverHologramPointer(root, x, y);
-  };
-
-  const onHologramLeave = () => {
-    if (mode === "reader") applyCoverHologramPointer(rootRef.current, 0, 0);
-  };
 
   useEffect(() => {
     // A moving book face is a still texture, so its live DOM twin must also be
@@ -84,12 +63,7 @@ export function Cover({ face, mode }: SpreadFaceProps) {
   if (face === "verso" && mode === "book") return null;
 
   return (
-    <div
-      className="cover2"
-      ref={rootRef}
-      onPointerMove={onHologramMove}
-      onPointerLeave={onHologramLeave}
-    >
+    <div className="cover2" ref={rootRef}>
       <header className="cover2__issue mono-label">
         <span>A PERSONAL ISSUE</span>
         <span>NO. 01 / 2026</span>
@@ -113,18 +87,6 @@ export function Cover({ face, mode }: SpreadFaceProps) {
           decoding="async"
         />
       </figure>
-
-      <span
-        className="cover2__hologram"
-        aria-hidden
-        style={{
-          WebkitMaskImage: `url("${withBasePath(COVER_HOLOGRAM_PATTERN_PATH)}")`,
-          maskImage: `url("${withBasePath(COVER_HOLOGRAM_PATTERN_PATH)}")`,
-        }}
-      >
-        <span className="cover2__hologram-spectrum" />
-        <span className="cover2__hologram-glare" />
-      </span>
 
       <div className="cover2__rule" aria-hidden />
 
