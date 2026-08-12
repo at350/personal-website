@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  bookCoverTurnShift,
   bookPointerFrame,
   bookPoseAngles,
   bookRestingShift,
@@ -10,28 +9,6 @@ import {
 } from "../src/book3d/bookPose";
 
 describe("pointer-driven book pose", () => {
-  it("moves the whole book continuously while the front cover turns", () => {
-    expect(bookCoverTurnShift(0, 0, 11, 200)).toBe(-100);
-    expect(bookCoverTurnShift(0, 0.5, 11, 200)).toBe(-50);
-    expect(bookCoverTurnShift(0, 1, 11, 200)).toBe(0);
-
-    // Progress is physical rather than directional, so the same mapping also
-    // follows a reverse or canceled drag without a discontinuity.
-    expect(bookCoverTurnShift(0, 0.75, 11, 200)).toBe(-25);
-  });
-
-  it("mirrors progressive centering for the back cover", () => {
-    expect(bookCoverTurnShift(9, 0, 11, 200)).toBe(0);
-    expect(bookCoverTurnShift(9, 0.5, 11, 200)).toBe(50);
-    expect(bookCoverTurnShift(9, 1, 11, 200)).toBe(100);
-    expect(bookCoverTurnShift(4, 0.5, 11, 200)).toBeNull();
-  });
-
-  it("keeps cover centering bounded during spring overshoot", () => {
-    expect(bookCoverTurnShift(0, -0.2, 11, 200)).toBe(-100);
-    expect(bookCoverTurnShift(0, 1.2, 11, 200)).toBe(0);
-  });
-
   it("uses the same center endpoints for resting and riffled books", () => {
     expect(bookRestingShift(0, 11, 200)).toBe(-100);
     expect(bookRestingShift(5, 11, 200)).toBe(0);

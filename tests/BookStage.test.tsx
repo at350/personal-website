@@ -11,6 +11,10 @@ const scene = vi.hoisted(() => ({
   motion: null as null | {
     onSettled: (() => void) | null;
     target: number | null;
+    pointerX: number;
+    pointerY: number;
+    foilPointerX: number;
+    foilPointerY: number;
   },
   onRiffleComplete: null as null | (() => void),
 }));
@@ -100,6 +104,23 @@ afterEach(() => {
 });
 
 describe("BookStage page-turn input", () => {
+  it("keeps the cover foil pointer live while the chassis pose is locked", () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1);
+    const motion = scene.motion!;
+
+    fireEvent.pointerMove(stage, { clientX: 700, clientY: 300 });
+    const chassisAtLaunch = { x: motion.pointerX, y: motion.pointerY };
+
+    fireEvent.keyDown(window, { key: "ArrowRight", repeat: false });
+    fireEvent.pointerMove(stage, { clientX: 200, clientY: 650 });
+
+    expect({ x: motion.pointerX, y: motion.pointerY }).toEqual(chassisAtLaunch);
+    expect({ x: motion.foilPointerX, y: motion.foilPointerY }).not.toEqual(
+      chassisAtLaunch,
+    );
+  });
+
   it("continues a held arrow once per settlement until keyup", () => {
     stubMatchMedia();
     const { onSpreadSettled, stage } = renderStage(1);
