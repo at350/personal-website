@@ -1,6 +1,10 @@
 import { Suspense, lazy, useCallback, useEffect } from "react";
 import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router";
-import { isKnownRoute, routeForSpread, spreadForRoute } from "./magazine/folio";
+import {
+  bookLocationForSpread,
+  isKnownRoute,
+  spreadForBookLocation,
+} from "./magazine/folio";
 
 /* The WebGL book (three.js and friends) loads only when the book is shown —
    reader-mode visitors never pay for it. */
@@ -33,14 +37,19 @@ function IssueView() {
 function BookView() {
   const location = useLocation();
   const navigate = useNavigate();
-  const target = spreadForRoute(location.pathname);
+  const target = spreadForBookLocation(location.pathname, location.state);
 
   const onSettled = useCallback(
     (index: number) => {
-      const route = routeForSpread(index);
-      if (route !== location.pathname) navigate(route, { replace: true });
+      const destination = bookLocationForSpread(index);
+      if (destination.pathname !== location.pathname || target !== index) {
+        navigate(destination.pathname, {
+          replace: true,
+          state: destination.state,
+        });
+      }
     },
-    [location.pathname, navigate],
+    [location.pathname, navigate, target],
   );
 
   return (
