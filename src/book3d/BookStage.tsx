@@ -185,6 +185,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       turnPointerX: 0,
       turnPointerY: 0,
       turnPointerActive: false,
+      foilTilt: 0,
       poseTarget: touchOnly ? 1 : 0,
       pose: touchOnly ? 1 : 0,
       turnPose: touchOnly ? 1 : 0,

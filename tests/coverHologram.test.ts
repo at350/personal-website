@@ -5,7 +5,9 @@ import * as THREE from "three";
 import {
   COVER_HOLOGRAM_PAGE_KEY,
   coverHologramFlipEnvelope,
+  coverHologramTiltEnvelope,
   isMovingCoverSheet,
+  isTiltableCoverStack,
   normalizeCoverHologramPointer,
 } from "@/magazine/coverHologram";
 import {
@@ -38,18 +40,19 @@ describe("cover hologram", () => {
     );
   });
 
-  it("is mounted only for the moving front-cover sheet", () => {
+  it("scopes moving foil to the front-cover sheet", () => {
     expect(isMovingCoverSheet(null)).toBe(false);
     expect(isMovingCoverSheet(0)).toBe(true);
     expect(isMovingCoverSheet(1)).toBe(false);
     expect(isMovingCoverSheet(-1)).toBe(false);
 
-    const scene = readFileSync(
-      join(process.cwd(), "src", "book3d", "BookScene.tsx"),
-      "utf8",
-    );
-    expect(scene).not.toContain("RestingCoverHologram");
-    expect(scene).not.toMatch(/motion\.leaf === 0|sheet === 0/);
+  });
+
+  it("mounts the tilt skin only on the landed front-cover stack", () => {
+    expect(isTiltableCoverStack(0, null, false)).toBe(true);
+    expect(isTiltableCoverStack(0, 0, false)).toBe(false);
+    expect(isTiltableCoverStack(0, null, true)).toBe(false);
+    expect(isTiltableCoverStack(1, null, false)).toBe(false);
   });
 
   it("clamps invalid pointer input to a finite page-local range", () => {
@@ -73,6 +76,17 @@ describe("cover hologram", () => {
     expect(coverHologramFlipEnvelope(0.999999)).toBeLessThan(0.000004);
   });
 
+  it("reveals tilt only after pointer interaction and before the flat handoff", () => {
+    expect(coverHologramTiltEnvelope(false, 0)).toBe(0);
+    expect(coverHologramTiltEnvelope(false, 0.5)).toBe(0);
+    expect(coverHologramTiltEnvelope(true, 0)).toBe(1);
+    expect(coverHologramTiltEnvelope(true, 0.89)).toBeGreaterThan(0);
+    expect(coverHologramTiltEnvelope(true, 0.97)).toBe(0);
+    expect(coverHologramTiltEnvelope(true, 1)).toBe(0);
+    expect(coverHologramTiltEnvelope(true, Number.NaN)).toBe(0);
+    expect(coverHologramTiltEnvelope(true, Number.POSITIVE_INFINITY)).toBe(0);
+  });
+
   it("makes white glare stronger than chroma without becoming opaque", () => {
     expect(COVER_HOLOGRAM_GLARE_GAIN).toBeGreaterThan(
       COVER_HOLOGRAM_CHROMA_GAIN,
@@ -89,11 +103,13 @@ describe("cover hologram", () => {
     const material = createCoverHologramMaterial(texture);
     const pointer = material.uniforms.uPointer.value;
     const uniform = material.uniforms.uPointer;
+    const tiltUniform = material.uniforms.uTilt;
 
     updateCoverHologramMaterial(material, {
       pointerX: 4,
       pointerY: -4,
       progress: 0.5,
+      tilt: 3,
       strength: 8,
     });
 
@@ -102,6 +118,8 @@ describe("cover hologram", () => {
     expect(material.uniforms.uPointer.value).toBe(pointer);
     expect(pointer.toArray()).toEqual([1, -1]);
     expect(material.uniforms.uFlip.value).toBeCloseTo(1);
+    expect(material.uniforms.uTilt).toBe(tiltUniform);
+    expect(material.uniforms.uTilt.value).toBe(1);
     expect(material.uniforms.uStrength.value).toBe(1.25);
     expect(material.side).toBe(THREE.FrontSide);
     expect(material.transparent).toBe(true);
@@ -111,6 +129,9 @@ describe("cover hologram", () => {
     expect(material.polygonOffset).toBe(true);
     expect(material.fragmentShader).not.toContain("backgroundFoil");
     expect(material.fragmentShader).toContain("motionVisibility");
+    expect(material.fragmentShader).toContain(
+      "max(flipVisibility, uTilt)",
+    );
     expect(material.fragmentShader).toMatch(
       /uStrength \* edgeFade \* motionVisibility/,
     );
@@ -119,10 +140,12 @@ describe("cover hologram", () => {
       pointerX: Number.NaN,
       pointerY: Number.POSITIVE_INFINITY,
       progress: 1,
+      tilt: Number.NaN,
       strength: Number.NaN,
     });
     expect(pointer.toArray()).toEqual([0, 0]);
     expect(material.uniforms.uFlip.value).toBe(0);
+    expect(material.uniforms.uTilt.value).toBe(0);
     expect(material.uniforms.uStrength.value).toBe(1);
     material.dispose();
   });
