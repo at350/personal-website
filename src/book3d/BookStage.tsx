@@ -780,6 +780,9 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     <div
       className="bstage"
       ref={stageRef}
+      // Native image dragging wins before the surface gesture reaches its
+      // horizontal threshold. Keep drag ownership with the page-turn engine.
+      onDragStart={(event) => event.preventDefault()}
       onPointerDown={onSurfaceDown}
       onPointerMove={onPointerMove}
       aria-busy={!texturesReady || busy}
