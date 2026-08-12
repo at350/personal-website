@@ -25,7 +25,20 @@ interface CurvatureConstraint {
 const SOLVER_ITERATIONS = 6;
 const STRUCTURAL_STIFFNESS = 0.9998;
 const SHEAR_STIFFNESS = 0.9;
-const CURVATURE_STIFFNESS = 0.84;
+const CURVATURE_STIFFNESS = 0.9;
+/** How much of the vertical pull the row farthest from the grab still gets.
+    Kept high on purpose: a pull field that is nearly uniform down each column
+    shears the sheet instead of compressing vertical links. Steep per-row
+    falloff is what buckled the mesh into the accordion. */
+const PULL_ROW_FLOOR = 0.7;
+const PULL_ROW_FALLOFF = 1.4;
+
+/** Fore-edge emphasis of the vertical pull, by column. */
+const pullColumnWeight = (u: number) => Math.pow(u, 2.8);
+const pullRowWeight = (distanceFromGrab: number) =>
+  PULL_ROW_FLOOR +
+  (1 - PULL_ROW_FLOOR) *
+    Math.exp(-(distanceFromGrab * distanceFromGrab) / PULL_ROW_FALLOFF);
 const DRAG_DAMPING = 0.965;
 const SETTLE_DAMPING = 0.9;
 const BASE_FOLLOW_RATE = 7;
@@ -128,18 +141,18 @@ export class PaperSheet {
     for (let row = 0; row <= this.rows; row += 1) {
       const v = 1 - (row / this.rows) * 2;
       const rowDistance = v - options.grabY;
-      const rowWeight = Math.exp(-(rowDistance * rowDistance) / 0.34);
+      const rowShear = pullRowWeight(rowDistance);
       for (let column = 0; column <= this.segments; column += 1) {
         const index = this.index(row, column);
         const point = this.positions[index]!;
         const old = copyVertex(point);
         const previous = this.previous[index]!;
         const u = column / this.segments;
-        const handleWeight = Math.pow(u, 3.2) * rowWeight;
+        const columnShear = pullColumnWeight(u);
         const guide = target[index]!;
-        const targetY = guide.y + options.handleOffsetY * handleWeight;
+        const targetY = guide.y + options.handleOffsetY * columnShear * rowShear;
         const followRate = options.dragging
-          ? BASE_FOLLOW_RATE + HANDLE_FOLLOW_RATE * handleWeight
+          ? BASE_FOLLOW_RATE + HANDLE_FOLLOW_RATE * columnShear
           : SETTLE_FOLLOW_RATE;
         const follow = 1 - Math.exp(-followRate * dt);
 
@@ -212,14 +225,18 @@ export class PaperSheet {
       const v = 1 - (row / this.rows) * 2;
       const distance = v - options.grabY;
       const rowWeight = Math.exp(-(distance * distance) / 0.48);
+      const rowShear = pullRowWeight(distance);
       for (let column = Math.max(1, this.segments - 3); column <= this.segments; column += 1) {
         const u = column / this.segments;
+        const columnShear = pullColumnWeight(u);
         const weight = Math.pow(u, 4) * rowWeight * 0.1;
         const index = this.index(row, column);
         const point = this.positions[index]!;
         const guide = target[index]!;
         const moveX = (guide.x - point.x) * weight;
-        const moveY = (guide.y + options.handleOffsetY * rowWeight - point.y) * weight;
+        const moveY =
+          (guide.y + options.handleOffsetY * columnShear * rowShear - point.y) *
+          weight;
         const moveZ = (guide.z - point.z) * weight;
         point.x += moveX;
         point.y += moveY;
