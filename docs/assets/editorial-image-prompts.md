@@ -1,6 +1,6 @@
 # Editorial image prompt set
 
-These seven assets were generated as one art-directed family for Issue No. 01.
+These eleven assets were generated as one art-directed family for Issue No. 01.
 They use the site's print palette: bright white paper, near-black ink, and one
 signal red. The final files are WebP exports in `public/images/`.
 
@@ -92,3 +92,46 @@ Physically plausible enough for a WebGL bump map. No folds, tears, stains,
 objects, text, borders, directional spotlight, color cast, or repeating motif.
 
 Output: `public/images/editorial/paper-fiber.webp`
+
+## Index: a letter
+
+Portrait 2:3 editorial still life on a warm-white studio sweep. One folded
+sheet of white uncoated paper passes through a precise near-black architectural
+frame; a taut signal-red thread connects separated paper planes. Soft raking
+daylight, restrained shadows, visible paper fibers, one strong central gesture
+that survives a narrow full-height crop. Suggest correspondence, structure,
+and a person remaining visible inside a system without depicting a person.
+
+Output: `public/images/editorial/index-letter.webp`
+
+## Index: the profile
+
+Portrait 2:3 editorial still life on warm white. Offset white and near-black
+card-stock layers contain rectangular apertures; one small signal-red folded
+plane is visible through their alignment. Build a quiet profile-like negative
+space only through geometry. Vertical rhythm, asymmetrical balance, tactile
+paper edges, delicate layered shadows, and a clear thumbnail-scale silhouette.
+
+Output: `public/images/editorial/index-profile.webp`
+
+## Index: five prototypes
+
+Portrait 2:3 tabletop material study on a seamless warm-white set. Exactly five
+distinct small physical prototypes form a disciplined vertical system: folded
+paper modules, black card channels, pale structural blocks, and translucent
+acrylic planes. A single signal-red route travels through all five. Keep every
+study countable, handmade, and bold enough for a narrow crop; avoid screens and
+literal products.
+
+Output: `public/images/editorial/index-projects.webp`
+
+## Index: the annotated resume
+
+Portrait 2:3 editorial paper still life. Several immaculate white document
+sheets stand in a precise vertical arrangement, carrying only abstract black
+rules and bars. One signal-red annotation tab emerges from the margin and
+physically lifts the top sheet. Raking studio light reveals paper relief,
+registration offsets, edge depth, and a delicate crease shadow. All marks stay
+completely illegible.
+
+Output: `public/images/editorial/index-resume.webp`
