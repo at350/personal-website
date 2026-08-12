@@ -1,5 +1,4 @@
 .experience-dock {
-  --dock-glint-y: 22%;
   position: fixed;
   top: 50%;
   left: max(clamp(14px, 2.1vw, 30px), calc(env(safe-area-inset-left) + 8px));
@@ -11,8 +10,7 @@
 }
 
 /* Dark liquid glass keeps its silhouette legible over both white paper and
-   image-heavy spreads. The moving radial highlight gives the surface a subtle
-   lens response without repainting the React tree on every pointer move. */
+   image-heavy spreads. */
 .experience-dock__surface {
   position: absolute;
   inset: 0;
@@ -34,26 +32,14 @@
   content: "";
   position: absolute;
   inset: -1px;
-  background:
-    radial-gradient(
-      circle at center var(--dock-glint-y),
-      rgba(255, 255, 255, 0.34) 0,
-      rgba(255, 255, 255, 0.12) 12%,
-      transparent 34%
-    ),
-    linear-gradient(
-      100deg,
-      rgba(255, 255, 255, 0.14),
-      transparent 24%,
-      transparent 76%,
-      rgba(255, 255, 255, 0.04)
-    );
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.14),
+    transparent 24%,
+    transparent 76%,
+    rgba(255, 255, 255, 0.04)
+  );
   opacity: 0.72;
-  transition: opacity 260ms var(--ease-settle);
-}
-
-.experience-dock[data-expanded="true"] .experience-dock__surface::before {
-  opacity: 1;
 }
 
 .experience-dock__surface::after {

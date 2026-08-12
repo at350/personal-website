@@ -130,8 +130,6 @@ export function ExperienceDock({
   const expandedAtPointerDownRef = useRef<boolean | null>(null);
   const openTimerRef = useRef<number | null>(null);
   const closeTimerRef = useRef<number | null>(null);
-  const glintFrameRef = useRef<number | null>(null);
-  const pointerYRef = useRef(0);
   const reduceMotion = useReducedMotion();
 
   const selectedIndex = Math.max(
@@ -209,9 +207,6 @@ export function ExperienceDock({
     () => () => {
       cancelScheduledOpen();
       cancelScheduledClose();
-      if (glintFrameRef.current !== null) {
-        window.cancelAnimationFrame(glintFrameRef.current);
-      }
     },
     [cancelScheduledClose, cancelScheduledOpen],
   );
@@ -272,23 +267,6 @@ export function ExperienceDock({
     [scheduleClose],
   );
 
-  const onPointerMove = useCallback((event: PointerEvent<HTMLElement>) => {
-    pointerYRef.current = event.clientY;
-    if (glintFrameRef.current !== null) return;
-
-    glintFrameRef.current = window.requestAnimationFrame(() => {
-      glintFrameRef.current = null;
-      const element = dockRef.current;
-      if (!element) return;
-      const bounds = element.getBoundingClientRect();
-      const y = ((pointerYRef.current - bounds.top) / bounds.height) * 100;
-      element.style.setProperty(
-        "--dock-glint-y",
-        `${Math.min(92, Math.max(8, y))}%`,
-      );
-    });
-  }, []);
-
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>) => {
       keyboardFocusRef.current = true;
@@ -346,7 +324,6 @@ export function ExperienceDock({
       transition={transition}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
-      onPointerMove={onPointerMove}
       onFocusCapture={() => {
         if (restoringFocusRef.current) return;
         if (expandedAtPointerDownRef.current === null) {
