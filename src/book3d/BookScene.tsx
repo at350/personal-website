@@ -70,8 +70,8 @@ export interface BookMotion {
   /** Seconds the settle gate has held a nominally landed turn. */
   settleHold: number;
   /** The settle gate has fired; the leaf is down and awaiting unmount. The
-      material must use only the shared resting sheen from here on, even if the
-      gate fired via the hold cap with residual sheet energy. */
+      material must reproduce the canonical page texture from here on, even if
+      the gate fired via the hold cap with residual sheet energy. */
   swapReady: boolean;
   /** Horizontal book shift in px (centers the closed cover). */
   shift: number;
@@ -163,9 +163,9 @@ function usePageMaterial(
       ior: 1.45,
     });
     m.userData.paperActivity = 0;
-    // Every lighting term shares the same low paper response. Motion boosts
-    // that response, but the resting stack and first/last active frames never
-    // lose the baseline sheen.
+    // The captured texture already contains the persistent page sheen. Gate
+    // every physical term to motion so stacks and turn endpoints reproduce
+    // those same pixels, while a bending leaf gains only a restrained accent.
     m.onBeforeCompile = (shader) => {
       shader.uniforms.paperActivity = {
         value: Number(m.userData.paperActivity ?? 0),
@@ -173,7 +173,7 @@ function usePageMaterial(
       m.userData.paperShader = shader;
       shader.fragmentShader = injectPaperActivity(shader.fragmentShader);
     };
-    m.customProgramCacheKey = () => "editorial-paper-lighting-v5";
+    m.customProgramCacheKey = () => "editorial-paper-lighting-v6";
     return m;
   }, [paperBump]);
   // Track the applied SOURCE texture, not the key: a refreshed capture keeps
@@ -455,7 +455,7 @@ function Leaf({
     });
     motion.sheetEnergy = sheet.motionEnergy();
     // Once the gate fires the page is down, whatever residual energy the hold
-    // cap accepted — remove only the motion boost and keep the resting sheen.
+    // cap accepted — remove the physical accent and show the canonical texture.
     const motionActivity = paperGleamActivity(motion.progress, motion.sheetEnergy);
     const activity = motion.swapReady
       ? 0

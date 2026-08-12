@@ -91,10 +91,13 @@
   cursor: grabbing !important;
 }
 
+.page-face {
+  isolation: isolate;
+}
+
 .ov-face {
   position: relative;
   overflow: hidden;
-  isolation: isolate;
   background: var(--paper);
   container-type: size;
 }
@@ -103,11 +106,11 @@
   background: transparent;
 }
 
-/* The live DOM carries the same quiet optical floor as the WebGL stack and
-   leaf. It never switches on at TURN; physical lighting only adds the moving
-   highlight while the sheet bends. This layer is intentionally absent from
-   the capture farm so it cannot be baked into the page texture twice. */
-.ov-face:not(.ov-face--void)::before {
+/* The quiet sheen belongs to the canonical page surface. OverlayFace renders
+   it live, while CaptureFarm bakes the exact same layer into every WebGL page
+   texture. A turn therefore starts and lands on identical highlight pixels;
+   physical lighting only adds a restrained accent while the sheet bends. */
+.page-face::before {
   content: "";
   position: absolute;
   inset: -8%;
