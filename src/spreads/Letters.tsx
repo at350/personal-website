@@ -37,7 +37,7 @@ const COLOPHON_ENTRIES: ReadonlyArray<{ term: string; desc: ReactNode }> = [
   },
   {
     term: "Issue",
-    desc: <>No. 01, August 2026. Evanston, Illinois.</>,
+    desc: <>No. 01, August 2026. Cupertino, Calif.</>,
   },
 ];
 

@@ -14,7 +14,7 @@ export const siteMeta = {
     "Alan Tai is a Northwestern student building software, research, and early-stage products.",
   intro:
     "I've been building software since middle school. Now I'm studying Industrial Engineering and Artificial Intelligence at Northwestern, and I still just want to make things that work.",
-  location: "Evanston, Illinois",
+  location: "Cupertino, Calif.",
   issue: {
     number: "01",
     title: "Issue No. 01",

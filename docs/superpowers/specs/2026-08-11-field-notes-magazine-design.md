@@ -110,7 +110,7 @@ Pages are numbered for real; cover unnumbered; verso even / recto odd.
 |---|---|---|
 | COVER | — | Nameplate FIELD NOTES; kicker "the personal magazine of Alan Tai";
 type-as-image cover art (kinetic masthead, vermilion seal); 3 cover lines with
-page refs; issue line `NO. 01 · EVANSTON, IL · EST. 2026`; barcode. Idle corner peel invites the turn. |
+page refs; issue line `NO. 01 · CUPERTINO, CALIF. · EST. 2026`; barcode. Idle corner peel invites the turn. |
 | 02–03 | CONTENTS / MASTHEAD | TOC as designed object: features large (title,
 dek, oversized folio), departments in tight secondary column; hover a row → cover-thumb
 reveal. Masthead staff list gag: every role (Editor-in-Chief … Mailroom) = Alan Tai. |
