@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BookStage } from "@/book3d/BookStage";
@@ -7,23 +7,26 @@ vi.mock("@react-three/fiber", () => ({
   Canvas: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
+const scene = vi.hoisted(() => ({
+  motion: null as null | {
+    onSettled: (() => void) | null;
+    target: number | null;
+  },
+  onRiffleComplete: null as null | (() => void),
+}));
+
 vi.mock("@/book3d/BookScene", () => ({
   BookScene: ({
     motion,
     onRiffleComplete,
   }: {
-    motion: { onSettled: (() => void) | null };
+    motion: NonNullable<typeof scene.motion>;
     onRiffleComplete: () => void;
-  }) => (
-    <>
-      <button type="button" onClick={() => motion.onSettled?.()}>
-        Complete turn
-      </button>
-      <button type="button" onClick={onRiffleComplete}>
-        Complete riffle
-      </button>
-    </>
-  ),
+  }) => {
+    scene.motion = motion;
+    scene.onRiffleComplete = onRiffleComplete;
+    return null;
+  },
 }));
 
 vi.mock("@/book3d/pageTextures", () => ({
@@ -72,45 +75,104 @@ function renderStage(targetSpread = 0) {
   return { ...view, onSpreadSettled, stage };
 }
 
+function completeTurn() {
+  const motion = scene.motion;
+  const done = motion?.onSettled;
+  if (!motion || !done) throw new Error("No page turn is ready to settle");
+  act(() => {
+    motion.onSettled = null;
+    motion.target = null;
+    done();
+  });
+}
+
+function completeRiffle() {
+  const done = scene.onRiffleComplete;
+  if (!done) throw new Error("No riffle is ready to settle");
+  act(() => done());
+}
+
 afterEach(() => {
   cleanup();
+  scene.motion = null;
+  scene.onRiffleComplete = null;
   vi.unstubAllGlobals();
 });
 
 describe("BookStage page-turn input", () => {
-  it("treats a held arrow key as one page turn", () => {
+  it("continues a held arrow once per settlement until keyup", () => {
     stubMatchMedia();
-    const { stage } = renderStage();
+    const { onSpreadSettled, stage } = renderStage(1);
+    onSpreadSettled.mockClear();
 
     fireEvent.keyDown(window, { key: "ArrowRight", repeat: false });
     expect(stage.getAttribute("aria-busy")).toBe("true");
 
     fireEvent.keyDown(window, { key: "ArrowRight", repeat: true });
-    fireEvent.click(screen.getByRole("button", { name: "Complete turn" }));
+    completeTurn();
     expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
-      "02-03",
+      "04-05",
     );
-    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+    expect(onSpreadSettled).not.toHaveBeenCalled();
 
     fireEvent.keyDown(window, { key: "ArrowRight", repeat: true });
-    expect(stage.getAttribute("aria-busy")).toBe("false");
+    completeTurn();
     expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
-      "02-03",
+      "06-07",
     );
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+    expect(onSpreadSettled).not.toHaveBeenCalled();
+
+    fireEvent.keyUp(window, { key: "ArrowRight" });
+    completeTurn();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "08-09",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(onSpreadSettled).toHaveBeenCalledTimes(1);
+    expect(onSpreadSettled).toHaveBeenLastCalledWith(4);
+
+    fireEvent.keyDown(window, { key: "ArrowRight", repeat: false });
+    fireEvent.keyUp(window, { key: "ArrowRight" });
+    completeTurn();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "10-11",
+    );
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(onSpreadSettled).toHaveBeenCalledTimes(2);
   });
 
-  it("drops adjacent input while a page is already turning", () => {
+  it("drops a pointer press that begins while a page is turning", () => {
     stubMatchMedia();
     const { stage } = renderStage(1);
-    const previous = screen.getByRole("button", { name: "Previous spread" });
     const next = screen.getByRole("button", { name: "Next spread" });
 
-    fireEvent.click(next);
-    expect(previous.hasAttribute("disabled")).toBe(true);
+    fireEvent.pointerDown(next, {
+      button: 0,
+      pointerId: 6,
+      pointerType: "mouse",
+    });
+    fireEvent.pointerUp(next, {
+      button: 0,
+      pointerId: 6,
+      pointerType: "mouse",
+    });
+    fireEvent.click(next, { button: 0, detail: 1 });
     expect(next.hasAttribute("disabled")).toBe(true);
 
-    fireEvent.keyDown(window, { key: "ArrowLeft", repeat: false });
-    fireEvent.click(screen.getByRole("button", { name: "Complete turn" }));
+    fireEvent.pointerDown(next, {
+      button: 0,
+      pointerId: 7,
+      pointerType: "mouse",
+    });
+    completeTurn();
+    fireEvent.pointerUp(next, {
+      button: 0,
+      pointerId: 7,
+      pointerType: "mouse",
+    });
+    fireEvent.click(next, { button: 0, detail: 1 });
 
     expect(stage.getAttribute("aria-busy")).toBe("false");
     expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
@@ -118,16 +180,116 @@ describe("BookStage page-turn input", () => {
     );
   });
 
+  it("drops a late pointer click when a disabled button suppressed pointerdown", () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1);
+    const next = screen.getByRole("button", { name: "Next spread" });
+
+    fireEvent.keyDown(window, { key: "ArrowRight", repeat: false });
+    fireEvent.keyUp(window, { key: "ArrowRight" });
+    completeTurn();
+    fireEvent.click(next, { button: 0, detail: 1 });
+
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "04-05",
+    );
+  });
+
+  it("stops held navigation when the window loses focus", () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1);
+
+    fireEvent.keyDown(window, { key: "ArrowRight", repeat: false });
+    fireEvent.blur(window);
+    completeTurn();
+
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "04-05",
+    );
+  });
+
+  it("keeps valid pointer and keyboard button activation", () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1);
+    const next = screen.getByRole("button", { name: "Next spread" });
+
+    fireEvent.pointerDown(next, {
+      button: 0,
+      pointerId: 8,
+      pointerType: "mouse",
+    });
+    fireEvent.pointerUp(next, {
+      button: 0,
+      pointerId: 8,
+      pointerType: "mouse",
+    });
+    fireEvent.click(next, { button: 0, detail: 1 });
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+    completeTurn();
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "04-05",
+    );
+
+    next.focus();
+    expect(fireEvent.keyDown(next, { key: "Enter" })).toBe(true);
+    fireEvent.click(next, { detail: 0 });
+    fireEvent.keyUp(next, { key: "Enter" });
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+    completeTurn();
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "06-07",
+    );
+  });
+
+  it("does not queue a route echo back to the in-flight source spread", () => {
+    stubMatchMedia();
+    const { onSpreadSettled, rerender, stage } = renderStage();
+    const next = screen.getByRole("button", { name: "Next spread" });
+
+    fireEvent.click(next, { detail: 0 });
+    completeTurn();
+    expect(onSpreadSettled).toHaveBeenLastCalledWith(1);
+    fireEvent.click(next, { detail: 0 });
+    rerender(<BookStage targetSpread={1} />);
+    completeTurn();
+
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "04-05",
+    );
+  });
+
+  it("queues an intentional return to the in-flight source spread", () => {
+    stubMatchMedia();
+    const { rerender, stage } = renderStage(1);
+
+    rerender(<BookStage targetSpread={2} />);
+    rerender(<BookStage targetSpread={1} />);
+    completeTurn();
+
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+    completeTurn();
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "02-03",
+    );
+  });
+
   it("keeps an external absolute jump queued during a page turn", () => {
     stubMatchMedia();
     const { rerender, stage } = renderStage(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Next spread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next spread" }), {
+      detail: 0,
+    });
     rerender(<BookStage targetSpread={6} />);
-    fireEvent.click(screen.getByRole("button", { name: "Complete turn" }));
+    completeTurn();
 
     expect(stage.getAttribute("aria-busy")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "Complete riffle" }));
+    completeRiffle();
 
     expect(stage.getAttribute("aria-busy")).toBe("false");
     expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(

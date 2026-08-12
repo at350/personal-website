@@ -36,6 +36,19 @@ import { GridOverlay } from "@/components/furniture/GridOverlay";
 import "@/styles/book-stage.css";
 
 const TOTAL = SPREADS.length;
+type ArrowDirection = -1 | 1;
+
+interface HeldArrowKeys {
+  left: boolean;
+  right: boolean;
+  active: ArrowDirection | null;
+}
+
+interface AdjacentPointerArm {
+  offset: ArrowDirection;
+  pointerId: number;
+  spread: number;
+}
 
 const PERSISTENT_SPREAD_INDEX: Record<PersistentInteractionSpread, number> = {
   features: SPREADS.findIndex((def) => def.id === "features"),
@@ -134,6 +147,13 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   const textureRefreshesPending = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const adjacentPointerArm = useRef<AdjacentPointerArm | null>(null);
+  const heldArrowKeys = useRef<HeldArrowKeys>({
+    left: false,
+    right: false,
+    active: null,
+  });
+  const [heldDirection, setHeldDirection] = useState<ArrowDirection | null>(null);
 
   const touchOnly = useMemo(
     () => typeof window !== "undefined" && window.matchMedia("(hover: none)").matches,
@@ -186,8 +206,10 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   }, [state.riffle, state.sheet]);
   const launchTurn = useCallback(
     (to: number) => {
+      if (launchingTurn.current) return false;
       if (!isSpreadTextureFresh(currentSpread)) return false;
       launchingTurn.current = true;
+      adjacentPointerArm.current = null;
       motion.turnPose = motion.pose;
       motion.poseTarget = motion.turnPose;
       motion.turnShift = motion.shift;
@@ -327,11 +349,20 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   // destination; adjacent page-turn input is handled separately and dropped
   // while busy so one gesture can never spill into a second turn.
   const prevTarget = useRef(targetSpread);
+  const reportedSpread = useRef<number | null>(null);
   const pendingTarget = useRef<number | null>(null);
   useEffect(() => {
     if (prevTarget.current === targetSpread) return;
     prevTarget.current = targetSpread;
     const to = Math.min(Math.max(targetSpread, 0), TOTAL - 1);
+    // The parent mirrors a settled spread into the URL. Consume that echo
+    // without treating it as a new absolute request if another turn has
+    // already started in the meantime.
+    if (reportedSpread.current === to) {
+      reportedSpread.current = null;
+      return;
+    }
+    reportedSpread.current = null;
     if (busy) {
       pendingTarget.current = to;
       return;
@@ -347,12 +378,6 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     else if (launchTurn(to)) pendingTarget.current = null;
   }, [busy, currentSpread, launchTurn]);
 
-  useEffect(() => {
-    if (!busy && !launchingTurn.current && pendingTarget.current === null) {
-      onSpreadSettled?.(state.current);
-    }
-  }, [busy, onSpreadSettled, state]);
-
   // One drag engine for edge zones (instant) and the page surface (threshold).
   const beginDrag = useCallback(
     (
@@ -364,6 +389,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       if (busy) return;
       if (motion.dragging) return;
       if (motion.leaf !== null && motion.target !== null) return;
+      adjacentPointerArm.current = null;
       dispatch({ type: "DRAG_START", edge });
       const stage = stageRef.current;
       stage?.classList.add("bstage--dragging");
@@ -579,21 +605,73 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
 
   // Previous/next is a one-page action, never deferred into another turn.
   const goAdjacent = useCallback(
-    (offset: -1 | 1) => {
-      if (!texturesReady || busy) return;
+    (offset: ArrowDirection) => {
+      if (
+        !texturesReady ||
+        busy ||
+        launchingTurn.current ||
+        pendingTarget.current !== null
+      ) {
+        return false;
+      }
       const to = Math.min(Math.max(currentSpread + offset, 0), TOTAL - 1);
-      if (to !== currentSpread) launchTurn(to);
+      return to !== currentSpread && launchTurn(to);
     },
     [busy, currentSpread, launchTurn, texturesReady],
+  );
+
+  const armAdjacentPointer = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>, offset: ArrowDirection) => {
+      adjacentPointerArm.current = null;
+      if (e.button !== 0 || !texturesReady || busy || launchingTurn.current) return;
+      adjacentPointerArm.current = {
+        offset,
+        pointerId: e.pointerId,
+        spread: currentSpread,
+      };
+    },
+    [busy, currentSpread, texturesReady],
+  );
+
+  const cancelAdjacentPointer = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (adjacentPointerArm.current?.pointerId === e.pointerId) {
+        adjacentPointerArm.current = null;
+      }
+    },
+    [],
+  );
+
+  const activateAdjacent = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>, offset: ArrowDirection) => {
+      // Keyboard and assistive clicks have no click count and do not have a
+      // preceding pointerdown to arm. Pointer clicks must originate while the
+      // same spread was idle; this rejects a press begun on a disabled arrow
+      // whose release happens just after the turn settles and re-enables it.
+      if (e.detail === 0) {
+        adjacentPointerArm.current = null;
+        goAdjacent(offset);
+        return;
+      }
+      const arm = adjacentPointerArm.current;
+      adjacentPointerArm.current = null;
+      if (arm?.offset !== offset || arm.spread !== currentSpread) {
+        e.preventDefault();
+        return;
+      }
+      goAdjacent(offset);
+    },
+    [currentSpread, goAdjacent],
   );
 
   const onRiffleComplete = useCallback(() => {
     dispatch({ type: "RIFFLE_COMPLETE" });
   }, []);
 
-  // Keyboard.
+  // Keyboard. Native repeats only tell us that a key is still physically
+  // held; page settlement supplies the cadence so repeats cannot skip pages.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (!texturesReady) return;
       if (e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -605,27 +683,90 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       ) {
         return;
       }
-      const navigationKey =
-        e.key === "ArrowRight" ||
-        e.key === "ArrowLeft" ||
-        e.key === "Home" ||
-        e.key === "End";
-      if (navigationKey && e.repeat) {
+      const arrowDirection: ArrowDirection | null =
+        e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : null;
+      if (arrowDirection !== null) {
+        e.preventDefault();
+        const key = arrowDirection === 1 ? "right" : "left";
+        if (e.repeat || heldArrowKeys.current[key]) return;
+        heldArrowKeys.current[key] = true;
+        heldArrowKeys.current.active = arrowDirection;
+        setHeldDirection(arrowDirection);
+        goAdjacent(arrowDirection);
+        return;
+      }
+      if ((e.key === "Home" || e.key === "End") && e.repeat) {
         e.preventDefault();
         return;
       }
-      if (e.key === "ArrowRight") goAdjacent(1);
-      else if (e.key === "ArrowLeft") goAdjacent(-1);
-      else if (e.key === "Home") goAbsolute(0);
+      if (e.key === "Home") goAbsolute(0);
       else if (e.key === "End") goAbsolute(TOTAL - 1);
       else if (e.key === "g") setShowGrid((v) => !v);
       else if (e.key === "Escape") setTocOpen(false);
       else return;
       e.preventDefault();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      const released: ArrowDirection | null =
+        e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : null;
+      if (released === null) return;
+      const key = released === 1 ? "right" : "left";
+      heldArrowKeys.current[key] = false;
+      if (heldArrowKeys.current.active !== released) return;
+      const fallback =
+        released === 1 && heldArrowKeys.current.left
+          ? -1
+          : released === -1 && heldArrowKeys.current.right
+            ? 1
+            : null;
+      heldArrowKeys.current.active = fallback;
+      setHeldDirection(fallback);
+    };
+
+    const clearHeldArrows = () => {
+      heldArrowKeys.current = { left: false, right: false, active: null };
+      adjacentPointerArm.current = null;
+      setHeldDirection(null);
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) clearHeldArrows();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", clearHeldArrows);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", clearHeldArrows);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [goAbsolute, goAdjacent, texturesReady]);
+
+  // A held arrow advances once at each resting boundary. Deliberate absolute
+  // navigation wins first, and the synchronous launch latch prevents the
+  // route-settlement effect below from publishing an intermediate spread.
+  useEffect(() => {
+    const direction = heldArrowKeys.current.active;
+    if (
+      busy ||
+      direction === null ||
+      pendingTarget.current !== null ||
+      launchingTurn.current
+    ) {
+      return;
+    }
+    goAdjacent(direction);
+  }, [busy, goAdjacent, heldDirection]);
+
+  useEffect(() => {
+    if (!busy && !launchingTurn.current && pendingTarget.current === null) {
+      reportedSpread.current = state.current;
+      onSpreadSettled?.(state.current);
+    }
+  }, [busy, onSpreadSettled, state]);
 
   const pages = spreadPages(state.current);
   const rasterLayout = pageRasterLayout(pw);
@@ -708,7 +849,9 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       <nav className="bstage__nav" aria-label="Pages">
         <button
           className="bstage__arrow mono-label"
-          onClick={() => goAdjacent(-1)}
+          onPointerDown={(e) => armAdjacentPointer(e, -1)}
+          onPointerCancel={cancelAdjacentPointer}
+          onClick={(e) => activateAdjacent(e, -1)}
           disabled={!texturesReady || busy || currentSpread === 0}
           aria-label="Previous spread"
         >
@@ -724,7 +867,9 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         </button>
         <button
           className="bstage__arrow mono-label"
-          onClick={() => goAdjacent(1)}
+          onPointerDown={(e) => armAdjacentPointer(e, 1)}
+          onPointerCancel={cancelAdjacentPointer}
+          onClick={(e) => activateAdjacent(e, 1)}
           disabled={!texturesReady || busy || currentSpread === TOTAL - 1}
           aria-label="Next spread"
         >
