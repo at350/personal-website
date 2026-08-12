@@ -104,7 +104,13 @@
   object-fit: cover;
 }
 
-/* Page 12 has no photograph; it prints the mark instead. */
+/* The resume plate's page stack and red annotation sit left of center. Keep
+   those cues in the narrow fore-edge crop so the image reads at a glance. */
+.contents2__plate[data-feature="12"] img {
+  object-position: 20% center;
+}
+
+/* Fallback for a feature without an editorial plate. */
 .contents2__mark {
   position: absolute;
   inset: 0;

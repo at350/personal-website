@@ -99,6 +99,7 @@ function FeaturesPage() {
           <div
             key={feature.no}
             className="contents2__plate"
+            data-feature={feature.no}
             data-open={active === index || undefined}
           >
             {feature.image ? (
