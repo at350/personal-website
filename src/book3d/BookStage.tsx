@@ -10,7 +10,12 @@ import { SPREADS, pageLabel, spreadPages } from "@/magazine/folio";
 import { applyCoverHologramPointer } from "@/magazine/coverHologram";
 import { initialEngineState, reduce, type EngineEvent } from "@/magazine/engine";
 import { BookScene, type BookMotion } from "./BookScene";
-import { bookPointerFrame, normalizeBookPointer, withinBookRegion } from "./bookPose";
+import {
+  bookPointerFrame,
+  bookRestingShift,
+  normalizeBookPointer,
+  withinBookRegion,
+} from "./bookPose";
 import {
   CaptureFarm,
   pageRasterLayout,
@@ -152,18 +157,8 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       sheetEnergy: 0,
       settleHold: 0,
       swapReady: false,
-      shift:
-        targetSpread === 0
-          ? -pw / 2
-          : targetSpread === TOTAL - 1
-            ? pw / 2
-            : 0,
-      turnShift:
-        targetSpread === 0
-          ? -pw / 2
-          : targetSpread === TOTAL - 1
-            ? pw / 2
-            : 0,
+      shift: bookRestingShift(targetSpread, TOTAL, pw),
+      turnShift: bookRestingShift(targetSpread, TOTAL, pw),
       pointerX: 0,
       pointerY: 0,
       pointerActive: false,
@@ -255,10 +250,10 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   }, [dispatch, motion, pw, state, touchOnly]);
 
   // The overlay only appears once the landed mesh reaches its new resting
-  // center. During the turn, BookScene keeps the original spine under the hand.
+  // center. During a cover turn, BookScene moves that center with the sheet.
   const atCover = state.current === 0;
   const atBack = state.current === TOTAL - 1;
-  const restingShift = atCover ? -pw / 2 : atBack ? pw / 2 : 0;
+  const restingShift = bookRestingShift(state.current, TOTAL, pw);
   const pointerFrame = useCallback(
     () =>
       bookPointerFrame({

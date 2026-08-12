@@ -8,7 +8,12 @@ import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { LEAF_ROWS, LEAF_SEGMENTS, leafSurface } from "./bend";
 import { PaperSheet } from "./paperPhysics";
 import { handoffOpacity } from "./handoff";
-import { bookPoseAngles } from "./bookPose";
+import {
+  bookCoverTurnShift,
+  bookPoseAngles,
+  bookRestingShift,
+  bookRiffleShift,
+} from "./bookPose";
 import {
   fadeSettlingActivity,
   injectPaperActivity,
@@ -799,17 +804,35 @@ export function BookScene({
     const g = group.current;
     if (!g) return;
 
-    // Keep the spine fixed under the hand for the entire pull. Closed covers
-    // and open spreads have different resting centers, so recenter only after
-    // the paper lands; the live overlay waits for this settle below.
-    const restingShift =
-      motion.current === 0
-        ? -pw / 2
-        : motion.current === SPREADS.length - 1
-          ? pw / 2
-          : 0;
+    const restingShift = bookRestingShift(
+      motion.current,
+      SPREADS.length,
+      pw,
+    );
     const turning = motion.leaf !== null || riffle !== null;
-    const shiftTarget = turning ? motion.turnShift : restingShift;
+    const coverTurnShift =
+      motion.leaf === null
+        ? null
+        : bookCoverTurnShift(
+            motion.leaf,
+            motion.progress,
+            SPREADS.length,
+            pw,
+          );
+    const riffleShift = riffle
+      ? bookRiffleShift(
+          riffle.from,
+          riffle.to,
+          motion.riffleProgress,
+          SPREADS.length,
+          pw,
+        )
+      : null;
+    const shiftTarget =
+      coverTurnShift ??
+      riffleShift ??
+      (turning ? motion.turnShift : restingShift);
+    const shiftTracksTurn = coverTurnShift !== null || riffleShift !== null;
 
     // One continuous pose channel: 0 = display stance, 1 = flat reading.
     // Everything derives from it, so no transition can ever pop.
@@ -826,7 +849,12 @@ export function BookScene({
     const breatheY = Math.sin(clockRef.current * 0.55) * 4 * idle;
     const breatheR = Math.sin(clockRef.current * 0.38) * 0.012 * idle;
 
-    g.position.x = THREE.MathUtils.damp(g.position.x, shiftTarget, 8.5, dt);
+    // A cover changes the visible footprint from one page to two (or back
+    // again). Follow that same progress directly so centering is part of the
+    // gesture, including reversals, instead of a second motion after landing.
+    g.position.x = shiftTracksTurn
+      ? shiftTarget
+      : THREE.MathUtils.damp(g.position.x, shiftTarget, 8.5, dt);
     motion.shift = g.position.x;
     g.position.y = THREE.MathUtils.damp(g.position.y, breatheY, 2.4, dt);
 
