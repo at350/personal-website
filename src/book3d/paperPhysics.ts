@@ -59,12 +59,14 @@ const copyVertex = (vertex: LeafVertex): LeafVertex => ({ ...vertex });
 export class PaperSheet {
   private readonly segments: number;
   private readonly rows: number;
+  private readonly width: number;
   private readonly structuralConstraints: Constraint[] = [];
   private readonly shapeConstraints: Constraint[] = [];
   private readonly curvatureConstraints: CurvatureConstraint[] = [];
   private readonly positions: LeafVertex[];
   private readonly previous: LeafVertex[];
   private initialized = false;
+  private energy = 0;
 
   constructor(
     width: number,
@@ -74,6 +76,7 @@ export class PaperSheet {
   ) {
     this.segments = segments;
     this.rows = rows;
+    this.width = width;
     const count = (segments + 1) * (rows + 1);
     this.positions = Array.from({ length: count }, () => ({ x: 0, y: 0, z: 0 }));
     this.previous = Array.from({ length: count }, () => ({ x: 0, y: 0, z: 0 }));
@@ -126,7 +129,14 @@ export class PaperSheet {
       this.positions[index] = copyVertex(source);
       this.previous[index] = copyVertex(source);
     }
+    this.energy = 0;
     this.initialized = true;
+  }
+
+  /** Mean vertex speed, normalized by page width and lightly smoothed:
+      ~0 at true rest, well above SHEET_REST_ENERGY under a live hand. */
+  motionEnergy(): number {
+    return this.energy;
   }
 
   step(target: readonly LeafVertex[], options: PaperStepOptions): LeafVertex[] {
@@ -174,6 +184,7 @@ export class PaperSheet {
         this.solveCurvatureConstraint(constraint, target);
       }
       this.pinSpine(target);
+      this.restOnStack();
     }
     this.keepWithinTurnGuide(target, options.grabY);
     // Finish with coupled in-plane and curvature passes. A structural-only
@@ -185,11 +196,26 @@ export class PaperSheet {
         this.solveCurvatureConstraint(constraint, target);
       }
       this.pinSpine(target);
+      this.restOnStack();
     }
     for (let iteration = 0; iteration < 8; iteration += 1) {
       for (const constraint of this.structuralConstraints) this.solveConstraint(constraint);
       this.pinSpine(target);
+      this.restOnStack();
     }
+
+    let travel = 0;
+    for (let index = 0; index < this.positions.length; index += 1) {
+      const point = this.positions[index]!;
+      const previous = this.previous[index]!;
+      travel += Math.hypot(
+        point.x - previous.x,
+        point.y - previous.y,
+        point.z - previous.z,
+      );
+    }
+    const meanSpeed = travel / this.positions.length / dt;
+    this.energy += (meanSpeed / this.width - this.energy) * Math.min(1, dt * 14);
 
     return this.positions;
   }
@@ -214,6 +240,25 @@ export class PaperSheet {
       previous.x = guide.x;
       previous.y = guide.y;
       previous.z = guide.z;
+    }
+  }
+
+  /** The stacks are solid: z = 0 is a floor, not a suggestion. Contact is
+      inelastic — penetrating velocity dies, separating velocity survives.
+      Constraint passes co-move `previous` with `positions` (zero-velocity
+      corrections), so when both are dragged below the floor the clamp must
+      shift them together: restoring only the position half would convert the
+      correction into a manufactured upward bounce. */
+  private restOnStack() {
+    for (let index = 0; index < this.positions.length; index += 1) {
+      const point = this.positions[index]!;
+      if (point.z < 0) {
+        const depth = point.z;
+        point.z = 0;
+        const previous = this.previous[index]!;
+        if (previous.z > depth) previous.z = 0;
+        else previous.z -= depth;
+      }
     }
   }
 

@@ -10,7 +10,10 @@ const distance = (
   b: { x: number; y: number; z: number },
 ) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
-describe("thin paper sheet dynamics", () => {
+/* Multi-hundred-frame solver simulations: comfortably fast alone, but they
+   exceed vitest's 5s default when CI runners or parallel suites starve the
+   worker. The assertions are deterministic — only the wall clock varies. */
+describe("thin paper sheet dynamics", { timeout: 30_000 }, () => {
   it("lets the grabbed corner lead while the rest of the sheet follows", () => {
     const sheet = new PaperSheet(100, 140, LEAF_SEGMENTS, LEAF_ROWS);
     const flat = leafSurface(0, 100, 140, 0, 1, 1);
@@ -109,6 +112,113 @@ describe("thin paper sheet dynamics", () => {
       0,
     );
     expect(worstError).toBeLessThan(0.75);
+  });
+
+  it("never punches through the stack while a drag slams the page down", () => {
+    // The hand pulls hard to the landing extreme and keeps jittering: the
+    // arched guide collapses flat in a few frames and Verlet inertia wants to
+    // carry the sheet below z = 0 — into the stack it lands on. The rendered
+    // leaf sits only 0.4px above the stack box, so any real overshoot clips.
+    const width = 450;
+    const height = 600;
+    const sheet = new PaperSheet(width, height, LEAF_SEGMENTS, LEAF_ROWS);
+    sheet.reset(leafSurface(0.55, width, height, 3, 0.9, 1));
+
+    let minZ = 0;
+    for (let frame = 0; frame < 160; frame += 1) {
+      const progress = Math.min(1, 0.55 + frame * 0.05);
+      const current = sheet.step(leafSurface(progress, width, height, 3, 0.9, 1), {
+        dt: 1 / 60,
+        dragging: true,
+        grabY: 0.9,
+        handleOffsetY: 120 * Math.sin(frame / 2.5),
+        velocity: 3,
+      });
+      for (const vertex of current) minZ = Math.min(minZ, vertex.z);
+    }
+
+    expect(minZ).toBeGreaterThanOrEqual(-1e-6);
+  });
+
+  it("never dips below the stack during a released landing", () => {
+    // A fling release: the guide drops from a mid-air arch to dead flat and
+    // the sheet follows with momentum. The transit minimum matters, not just
+    // where it finally rests.
+    const width = 450;
+    const height = 600;
+    const sheet = new PaperSheet(width, height, LEAF_SEGMENTS, LEAF_ROWS);
+    sheet.reset(leafSurface(0.7, width, height, 3.5, 0.8, 1));
+    const landed = leafSurface(1, width, height, 0, 0.8, 1);
+
+    let minZ = 0;
+    for (let frame = 0; frame < 200; frame += 1) {
+      const current = sheet.step(landed, {
+        dt: 1 / 60,
+        dragging: false,
+        grabY: 0.8,
+        handleOffsetY: 0,
+        velocity: 0,
+      });
+      for (const vertex of current) minZ = Math.min(minZ, vertex.z);
+    }
+
+    expect(minZ).toBeGreaterThanOrEqual(-1e-6);
+  });
+
+  it("keeps floor contact inelastic when corrections drag the sheet below it", () => {
+    // Constraint passes co-move `previous` with `positions` (zero-velocity
+    // corrections). If a co-move carries both below the floor, clamping only
+    // the position half manufactures upward velocity — an unmodeled bounce.
+    const width = 450;
+    const height = 600;
+    const sheet = new PaperSheet(width, height, LEAF_SEGMENTS, LEAF_ROWS);
+    const landed = leafSurface(1, width, height, 0, 0.8, 1);
+    const below = landed.map((v) => ({ ...v, z: v.z - 3 }));
+    sheet.reset(below);
+
+    let maxZ = -Infinity;
+    for (let frame = 0; frame < 3; frame += 1) {
+      const current = sheet.step(landed, {
+        dt: 1 / 60,
+        dragging: false,
+        grabY: 0.8,
+        handleOffsetY: 0,
+        velocity: 0,
+      });
+      for (const vertex of current) maxZ = Math.max(maxZ, vertex.z);
+    }
+
+    // A truly inelastic clamp surfaces the sheet without launching it.
+    expect(maxZ).toBeLessThan(1);
+  });
+
+  it("reports motion energy that is live under the hand and dies at rest", () => {
+    const sheet = new PaperSheet(450, 600, LEAF_SEGMENTS, LEAF_ROWS);
+    const flat = leafSurface(0, 450, 600, 0, 0.8, 1);
+    sheet.reset(flat);
+
+    for (let frame = 0; frame < 30; frame += 1) {
+      sheet.step(leafSurface(0.2 + 0.2 * Math.sin(frame / 3), 450, 600, 2, 0.8, 1), {
+        dt: 1 / 60,
+        dragging: true,
+        grabY: 0.8,
+        handleOffsetY: 80 * Math.sin(frame / 3),
+        velocity: 2,
+      });
+    }
+    expect(sheet.motionEnergy()).toBeGreaterThan(0.1);
+
+    const landed = leafSurface(1, 450, 600, 0, 0.8, 1);
+    for (let frame = 0; frame < 240; frame += 1) {
+      sheet.step(landed, {
+        dt: 1 / 60,
+        dragging: false,
+        grabY: 0.8,
+        handleOffsetY: 0,
+        velocity: 0,
+      });
+    }
+    expect(sheet.motionEnergy()).toBeLessThan(0.02);
   });
 
   it("keeps the free edge smooth instead of folding into an accordion", () => {

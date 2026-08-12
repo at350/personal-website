@@ -5,7 +5,9 @@ import jsxA11y from "eslint-plugin-jsx-a11y";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "node_modules", "coverage"] },
+  // .claude holds agent worktrees — nested repo copies whose paths defeat the
+  // root-anchored overrides below and double-lint everything.
+  { ignores: ["dist", "node_modules", "coverage", ".claude"] },
   {
     files: ["**/*.{ts,tsx}"],
     extends: [

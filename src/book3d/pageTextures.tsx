@@ -79,8 +79,33 @@ function emitProgress() {
   progressListeners.forEach((fn) => fn(progress));
 }
 
-function capture(key: string): Promise<boolean> {
-  if (cache.has(key)) return Promise.resolve(true);
+/** The farm lives far off-screen, where `loading="lazy"` sources never start
+    loading — captured pages would keep their skeleton state forever. Promote
+    them to eager and wait (bounded) for the pixels before rasterizing. */
+const IMAGE_SETTLE_TIMEOUT = 4000;
+async function settleImages(root: HTMLElement): Promise<void> {
+  const images = Array.from(root.querySelectorAll("img"));
+  await Promise.all(
+    images.map((image) => {
+      if (image.loading === "lazy") image.loading = "eager";
+      if (image.complete) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        const done = () => {
+          window.clearTimeout(timer);
+          image.removeEventListener("load", done);
+          image.removeEventListener("error", done);
+          resolve();
+        };
+        const timer = window.setTimeout(done, IMAGE_SETTLE_TIMEOUT);
+        image.addEventListener("load", done);
+        image.addEventListener("error", done);
+      });
+    }),
+  );
+}
+
+function capture(key: string, refresh = false): Promise<boolean> {
+  if (!refresh && cache.has(key)) return Promise.resolve(true);
   const existing = inFlight.get(key);
   if (existing) return existing;
 
@@ -91,6 +116,7 @@ function capture(key: string): Promise<boolean> {
     if (!el) return false;
 
     await document.fonts.ready;
+    await settleImages(el);
     const options = {
       pixelRatio: 2,
       width: CAPTURE_W,
@@ -120,6 +146,8 @@ function capture(key: string): Promise<boolean> {
     listeners.forEach((fn) => fn());
     return true;
   })().catch(() => {
+    // A refresh that fails keeps the previous (real) texture on the mesh.
+    if (refresh && cache.has(key)) return true;
     // Last-resort paper still counts as a texture. The entry screen must never
     // trap a reader because one page contains an uncooperative remote asset.
     const canvas = document.createElement("canvas");
@@ -172,6 +200,26 @@ export function preloadAllPageTextures(
   return preloadPromise.finally(() => {
     if (onProgress) progressListeners.delete(onProgress);
   });
+}
+
+/** Re-rasterize both faces of a spread whose DOM content changed while the
+    book is open (e.g. a library filter chip). The stale texture stays on the
+    mesh until the fresh capture lands, so a flip mid-refresh never goes
+    blank; material hooks swap by texture identity when the cache updates. */
+export function refreshSpreadTextures(spread: number) {
+  for (const face of ["verso", "recto"] as const) {
+    const key = pageKey(spread, face);
+    if (!ALL_PAGE_KEYS.includes(key)) continue;
+    const old = cache.get(key) ?? null;
+    const pending = inFlight.get(key);
+    const task = pending
+      ? pending.then(() => capture(key, true))
+      : capture(key, true);
+    void task.then(() => {
+      const next = cache.get(key);
+      if (old && next && next !== old) old.dispose();
+    });
+  }
 }
 
 /** Rasterize the faces around `spread` so the next turn is always ready. */

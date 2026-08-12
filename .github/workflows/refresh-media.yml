@@ -30,7 +30,8 @@ jobs:
 
       - run: npm run refresh-media
         env:
-          LETTERBOXD_USER: ${{ secrets.LETTERBOXD_USER }}
+          # A letterboxd username is public; the secret (if set) overrides it.
+          LETTERBOXD_USER: ${{ secrets.LETTERBOXD_USER || 'alantai' }}
           SUBSTACK_RSS_URL: ${{ secrets.SUBSTACK_RSS_URL }}
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           X_USER_ID: ${{ secrets.X_USER_ID }}
@@ -39,7 +40,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/lib/media/live.json
+          git add src/lib/media/live.json public/media/thumbs
           if git diff --quiet --cached; then
             echo "live.json unchanged; nothing to commit."
           else
