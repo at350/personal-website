@@ -1,4 +1,4 @@
-/** Motion-only foil inputs for the WebGL cover leaf. */
+/** Interactive foil inputs for the WebGL cover surface. */
 
 export const COVER_HOLOGRAM_PAGE_KEY = "0:recto";
 export const COVER_HOLOGRAM_PATTERN_PATH =
@@ -25,8 +25,8 @@ export function normalizeCoverHologramPointer(
 }
 
 /**
- * The foil exists only while the cover is moving. This exact-zero envelope is
- * the continuity contract with the neutral cover at pickup and landing.
+ * The flip contribution exists only while the cover is moving. This exact-zero
+ * envelope is the continuity contract with the neutral cover at pickup and landing.
  */
 export function coverHologramFlipEnvelope(progress: number): number {
   const p = clamp(progress, 0, 1);
@@ -34,7 +34,30 @@ export function coverHologramFlipEnvelope(progress: number): number {
   return Math.sin(Math.PI * p);
 }
 
+/**
+ * Pointer tilt is visible only while the book is still a 3D surface. The
+ * untouched display pose and the flat DOM handoff both remain foil-free.
+ */
+export function coverHologramTiltEnvelope(
+  pointerActive: boolean,
+  pose: number,
+): number {
+  if (!pointerActive || !Number.isFinite(pose)) return 0;
+  const displayAmount = 1 - clamp(pose, 0, 1);
+  const t = clamp((displayAmount - 0.035) / (0.22 - 0.035), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
 /** The cover front is sheet zero in both the ordinary and fast turn paths. */
 export function isMovingCoverSheet(sheet: number | null): boolean {
   return sheet === 0;
+}
+
+/** Avoids drawing a second foil skin while the cover itself is airborne. */
+export function isTiltableCoverStack(
+  spread: number,
+  sheet: number | null,
+  riffleActive: boolean,
+): boolean {
+  return spread === 0 && sheet === null && !riffleActive;
 }

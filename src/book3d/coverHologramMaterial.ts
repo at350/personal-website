@@ -9,6 +9,7 @@ export interface CoverHologramMaterial extends THREE.ShaderMaterial {
     uPattern: THREE.IUniform<THREE.Texture>;
     uPointer: THREE.IUniform<THREE.Vector2>;
     uFlip: THREE.IUniform<number>;
+    uTilt: THREE.IUniform<number>;
     uStrength: THREE.IUniform<number>;
   };
 }
@@ -17,6 +18,7 @@ export interface CoverHologramMaterialState {
   pointerX: number;
   pointerY: number;
   progress: number;
+  tilt?: number;
   strength?: number;
 }
 
@@ -47,6 +49,7 @@ export const COVER_HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
   uniform sampler2D uPattern;
   uniform vec2 uPointer;
   uniform float uFlip;
+  uniform float uTilt;
   uniform float uStrength;
 
   varying vec2 vHoloUv;
@@ -114,9 +117,11 @@ export const COVER_HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
     float fresnelSheen = (0.018 + grazing * ${COVER_HOLOGRAM_FRESNEL_GAIN.toFixed(2)})
       * (0.42 + 0.58 * primaryWide);
     float totalFoil = colorFoil + whiteReflection + fresnelSheen;
-    // uFlip is exactly zero at both landed endpoints and symmetric for reverse
-    // turns, so the motion-only foil cannot flash against the neutral cover.
-    float motionVisibility = smoothstep(0.0, 0.28, uFlip);
+    // Flip and pointer tilt are independent paths into the same coating. The
+    // captured/live DOM cover stays neutral; a 3D tilt or moving leaf reveals
+    // the foil without a pickup/landing discontinuity.
+    float flipVisibility = smoothstep(0.0, 0.28, uFlip);
+    float motionVisibility = max(flipVisibility, uTilt);
     float alpha = clamp(
       coating * totalFoil * uStrength * edgeFade * motionVisibility,
       0.0,
@@ -148,6 +153,7 @@ export function createCoverHologramMaterial(
       uPattern: { value: pattern },
       uPointer: { value: new THREE.Vector2(0, 0) },
       uFlip: { value: 0 },
+      uTilt: { value: 0 },
       uStrength: { value: 1 },
     },
     vertexShader: COVER_HOLOGRAM_VERTEX_SHADER,
@@ -175,6 +181,8 @@ export function updateCoverHologramMaterial(
   );
   material.uniforms.uPointer.value.set(pointer.x, pointer.y);
   material.uniforms.uFlip.value = coverHologramFlipEnvelope(state.progress);
+  const requestedTilt = Number.isFinite(state.tilt) ? (state.tilt ?? 0) : 0;
+  material.uniforms.uTilt.value = Math.min(1, Math.max(0, requestedTilt));
   const requestedStrength = Number.isFinite(state.strength)
     ? (state.strength ?? 1)
     : 1;

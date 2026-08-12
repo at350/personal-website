@@ -37,7 +37,9 @@ import {
 import { withBasePath } from "@/lib/basePath";
 import {
   COVER_HOLOGRAM_PATTERN_PATH,
+  coverHologramTiltEnvelope,
   isMovingCoverSheet,
+  isTiltableCoverStack,
 } from "@/magazine/coverHologram";
 import {
   createCoverHologramMaterial,
@@ -107,6 +109,8 @@ export interface BookMotion {
   turnPointerX: number;
   turnPointerY: number;
   turnPointerActive: boolean;
+  /** Damped visibility of the foil while the resting cover is pointer-tilted. */
+  foilTilt: number;
   /**
    * Presentation pose target: 0 = three-quarter display object (spine, top
    * edge and cover all visible — the Stripe Press stance), 1 = flat reading
@@ -245,7 +249,7 @@ function setPaperMaterialActivity(material: THREE.Material, activity: number) {
   }
 }
 
-/** One authored UV mask, attached only to the bending cover leaf. */
+/** One authored UV mask, shared by the tilted stack and bending cover leaf. */
 function useCoverHologramMaterial(motion: BookMotion) {
   const pattern = useLoader(
     THREE.TextureLoader,
@@ -269,9 +273,28 @@ function useCoverHologramMaterial(motion: BookMotion) {
       pointerX: motion.foilPointerX,
       pointerY: motion.foilPointerY,
       progress: isMovingCoverSheet(motion.leaf) ? motion.progress : 0,
+      tilt: motion.foilTilt,
     });
   });
   return material;
+}
+
+/** Transparent at untouched rest; revealed imperatively by regular 3D tilt. */
+function TiltedCoverHologram({
+  motion,
+  pw,
+  ph,
+}: {
+  motion: BookMotion;
+  pw: number;
+  ph: number;
+}) {
+  const material = useCoverHologramMaterial(motion);
+  return (
+    <mesh position={[pw / 2, 0, 0.32]} material={material} renderOrder={3}>
+      <planeGeometry args={[pw, ph]} />
+    </mesh>
+  );
 }
 
 function useFastCoverHologramMaterial() {
@@ -584,6 +607,7 @@ function FastLeaf({
         pointerX: motion.foilPointerX,
         pointerY: motion.foilPointerY,
         progress,
+        tilt: motion.foilTilt,
       });
     }
     const velocity = Math.sin(completion * Math.PI) * 2.6;
@@ -834,6 +858,18 @@ export function BookScene({
     // Everything derives from it, so no transition can ever pop.
     motion.pose = THREE.MathUtils.damp(motion.pose, motion.poseTarget, 5.2, dt);
     const posed = 1 - motion.pose;
+    const foilTiltTarget = coverHologramTiltEnvelope(
+      motion.pointerActive,
+      motion.pose,
+    );
+    motion.foilTilt = THREE.MathUtils.damp(
+      motion.foilTilt,
+      foilTiltTarget,
+      14,
+      dt,
+    );
+    if (foilTiltTarget === 0 && motion.foilTilt < 0.002) motion.foilTilt = 0;
+    if (foilTiltTarget === 1 && motion.foilTilt > 0.998) motion.foilTilt = 1;
 
     const airborne =
       riffle !== null
@@ -977,6 +1013,13 @@ export function BookScene({
           <planeGeometry args={[pw * 2, ph]} />
           <shadowMaterial transparent opacity={0.15} depthWrite={false} />
         </mesh>
+        {isTiltableCoverStack(
+          motion.current,
+          motion.leaf,
+          riffle !== null,
+        ) ? (
+          <TiltedCoverHologram motion={motion} pw={pw} ph={ph} />
+        ) : null}
         <Leaf motion={motion} pw={pw} ph={ph} paperBump={paperBump} />
         <FastRiffle
           transition={riffle}

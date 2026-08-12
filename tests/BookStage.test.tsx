@@ -11,6 +11,7 @@ const scene = vi.hoisted(() => ({
   motion: null as null | {
     onSettled: (() => void) | null;
     target: number | null;
+    pointerActive: boolean;
     pointerX: number;
     pointerY: number;
     foilPointerX: number;
@@ -132,6 +133,18 @@ describe("BookStage page-turn input", () => {
     expect({ x: motion.foilPointerX, y: motion.foilPointerY }).not.toEqual(
       chassisAtLaunch,
     );
+  });
+
+  it("activates interactive tilt only after the first pointer movement", () => {
+    stubMatchMedia();
+    const { stage } = renderStage();
+    const motion = scene.motion!;
+
+    expect(motion.pointerActive).toBe(false);
+    fireEvent.pointerMove(stage, { clientX: 720, clientY: 360 });
+    expect(motion.pointerActive).toBe(true);
+    expect(Number.isFinite(motion.pointerX)).toBe(true);
+    expect(Number.isFinite(motion.pointerY)).toBe(true);
   });
 
   it("continues a held arrow once per settlement until keyup", () => {
