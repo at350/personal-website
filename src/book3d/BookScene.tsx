@@ -128,10 +128,10 @@ export interface BookMotion {
 
 const TOTAL_LEAVES = SPREADS.length - 1;
 const LEAF_THICKNESS = 2.3;
-/** Softer spring for choreographed turns; snappier when a drag is released.
-    Damping sits just under critical — paper flexes at the end of a turn,
-    it does not clunk into place like a stone. */
-const SPRING_K_AUTO = 55;
+/** Automatic turns stay brisk enough for a rapid sequence of page taps;
+    released drags keep a gentler landing that follows the reader's hand.
+    Damping sits just under critical so paper flexes without clunking. */
+const SPRING_K_AUTO = 150;
 const SPRING_K_RELEASE = 115;
 const SPRING_DAMPING = 0.88;
 /** While dragging, the leaf CHASES the hand through its own little spring —
