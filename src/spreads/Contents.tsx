@@ -21,28 +21,28 @@ const FEATURES: readonly Feature[] = [
     route: "/about",
     title: "a letter",
     dek: "systems with people still visible",
-    image: "/images/about/alan-headshot.webp",
+    image: "/images/editorial/index-letter.webp",
   },
   {
     no: "06",
     route: "/profile",
     title: "the profile",
     dek: "work habits and off-hours notes",
-    image: "/images/editorial/cover-fold.webp",
+    image: "/images/editorial/index-profile.webp",
   },
   {
     no: "08",
     route: "/projects",
     title: "five prototypes",
     dek: "energy, supply chains, health",
-    image: "/images/projects/architec.webp",
+    image: "/images/editorial/index-projects.webp",
   },
   {
     no: "12",
     route: "/resume",
     title: "the annotated resume",
     dek: "the work, plus what did not fit",
-    image: "/images/editorial/paper-fiber.webp",
+    image: "/images/editorial/index-resume.webp",
   },
 ];
 
