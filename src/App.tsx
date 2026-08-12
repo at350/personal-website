@@ -17,6 +17,7 @@ import { WritingPage } from "./routes/WritingPage";
 import { NotFound } from "./routes/NotFound";
 import { applyMeta } from "./lib/meta";
 import { routerBasename } from "./lib/basePath";
+import { CursorOrb } from "./components/CursorOrb";
 
 function IssueView() {
   const location = useLocation();
@@ -91,6 +92,7 @@ export default function App() {
         <Route path="*" element={<IssueView />} />
       </Routes>
       <div className="grain" aria-hidden />
+      <CursorOrb />
     </BrowserRouter>
   );
 }
