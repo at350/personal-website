@@ -5,15 +5,24 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 import { useFrame, useLoader, useThree } from "@react-three/fiber";
-import { LEAF_ROWS, LEAF_SEGMENTS, leafSurface } from "./bend";
+import {
+  LEAF_ROWS,
+  LEAF_SEGMENTS,
+  leafSurface,
+  type LeafVertex,
+} from "./bend";
 import { PaperSheet } from "./paperPhysics";
 import { handoffOpacity } from "./handoff";
 import {
-  bookCoverTurnShift,
   bookPoseAngles,
   bookRestingShift,
   bookRiffleShift,
 } from "./bookPose";
+import {
+  bookPaperFootprint,
+  isBoundaryCoverSheet,
+  solveProjectedPaperShift,
+} from "./bookProjection";
 import {
   fadeSettlingActivity,
   injectPaperActivity,
@@ -83,10 +92,21 @@ export interface BookMotion {
   shift: number;
   /** Screen-space spine position recorded at turn start. */
   turnShift: number;
+  /** Live post-physics cover geometry used to center its projected footprint. */
+  coverVertices: readonly LeafVertex[] | null;
   /** Pointer position -1..1 for parallax. */
   pointerX: number;
   pointerY: number;
   pointerActive: boolean;
+  /** Always-live pointer channel for the cover foil. Chassis parallax freezes
+      during a turn, but the light field should keep following the hand. */
+  foilPointerX: number;
+  foilPointerY: number;
+  /** Pointer pose recorded at turn start so dragging paper does not also yaw
+      the entire book beneath the hand. */
+  turnPointerX: number;
+  turnPointerY: number;
+  turnPointerActive: boolean;
   /**
    * Presentation pose target: 0 = three-quarter display object (spine, top
    * edge and cover all visible — the Stripe Press stance), 1 = flat reading
@@ -246,8 +266,8 @@ function useCoverHologramMaterial(motion: BookMotion) {
   useEffect(() => () => material.dispose(), [material]);
   useFrame(() => {
     updateCoverHologramMaterial(material, {
-      pointerX: motion.pointerX,
-      pointerY: motion.pointerY,
+      pointerX: motion.foilPointerX,
+      pointerY: motion.foilPointerY,
       progress: isMovingCoverSheet(motion.leaf) ? motion.progress : 0,
     });
   });
@@ -415,6 +435,7 @@ function Leaf({
   useFrame((_, rawDt) => {
     if (motion.leaf === null) {
       activeLeaf.current = null;
+      motion.coverVertices = null;
       return;
     }
     const g = geometry;
@@ -437,6 +458,8 @@ function Leaf({
       handleOffsetY: motion.grabOffsetY,
       velocity: motion.velocity,
     });
+    const boundaryCover = isBoundaryCoverSheet(motion.leaf, SPREADS.length);
+    motion.coverVertices = boundaryCover ? vertices : null;
     motion.sheetEnergy = sheet.motionEnergy();
     // Once the gate fires the page is down, whatever residual energy the hold
     // cap accepted — remove the physical accent and show the canonical texture.
@@ -457,7 +480,7 @@ function Leaf({
     }
     pos.needsUpdate = true;
     g.computeVertexNormals();
-  });
+  }, -1);
 
   if (motion.leaf === null) return null;
   return (
@@ -558,8 +581,8 @@ function FastLeaf({
     const progress = riffleLeafProgress(clock.current, ordinal, direction);
     if (isMovingCoverSheet(sheet)) {
       updateCoverHologramMaterial(hologramMat, {
-        pointerX: motion.pointerX,
-        pointerY: motion.pointerY,
+        pointerX: motion.foilPointerX,
+        pointerY: motion.foilPointerY,
         progress,
       });
     }
@@ -731,8 +754,10 @@ export function BookScene({
   const light = useRef<THREE.DirectionalLight>(null);
   const clockRef = useRef(0);
   const paperBump = usePaperBumpTexture();
+  const camera = useThree((state) => state.camera);
 
-  // Spring integration + settle detection lives with the frames.
+  // Explicit frame order keeps every channel causal in the same rendered
+  // frame: spring (-2) -> deformed leaf bounds (-1) -> book transform (0).
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 30);
     clockRef.current += dt;
@@ -779,7 +804,10 @@ export function BookScene({
         motion.settleHold = 0;
       }
     }
+  }, -2);
 
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 1 / 30);
     const g = group.current;
     if (!g) return;
 
@@ -789,15 +817,6 @@ export function BookScene({
       pw,
     );
     const turning = motion.leaf !== null || riffle !== null;
-    const coverTurnShift =
-      motion.leaf === null
-        ? null
-        : bookCoverTurnShift(
-            motion.leaf,
-            motion.progress,
-            SPREADS.length,
-            pw,
-          );
     const riffleShift = riffle
       ? bookRiffleShift(
           riffle.from,
@@ -808,10 +827,8 @@ export function BookScene({
         )
       : null;
     const shiftTarget =
-      coverTurnShift ??
       riffleShift ??
       (turning ? motion.turnShift : restingShift);
-    const shiftTracksTurn = coverTurnShift !== null || riffleShift !== null;
 
     // One continuous pose channel: 0 = display stance, 1 = flat reading.
     // Everything derives from it, so no transition can ever pop.
@@ -828,20 +845,15 @@ export function BookScene({
     const breatheY = Math.sin(clockRef.current * 0.55) * 4 * idle;
     const breatheR = Math.sin(clockRef.current * 0.38) * 0.012 * idle;
 
-    // A cover changes the visible footprint from one page to two (or back
-    // again). Follow that same progress directly so centering is part of the
-    // gesture, including reversals, instead of a second motion after landing.
-    g.position.x = shiftTracksTurn
-      ? shiftTarget
-      : THREE.MathUtils.damp(g.position.x, shiftTarget, 8.5, dt);
-    motion.shift = g.position.x;
     g.position.y = THREE.MathUtils.damp(g.position.y, breatheY, 2.4, dt);
 
     const rotation = bookPoseAngles({
       posed,
-      pointerX: motion.pointerX,
-      pointerY: motion.pointerY,
-      pointerActive: motion.pointerActive,
+      pointerX: turning ? motion.turnPointerX : motion.pointerX,
+      pointerY: turning ? motion.turnPointerY : motion.pointerY,
+      pointerActive: turning
+        ? motion.turnPointerActive
+        : motion.pointerActive,
       airborne,
       breathe: breatheR,
     });
@@ -849,11 +861,44 @@ export function BookScene({
     g.rotation.y = THREE.MathUtils.damp(g.rotation.y, rotation.yaw, 6, dt);
     const scale = 1 - (1 - POSE_DROP) * posed;
     g.scale.setScalar(THREE.MathUtils.damp(g.scale.x, scale, 6, dt));
+
+    // A cover changes the visible footprint from one page to two (or back
+    // again). Center the actual projected silhouette so curl and perspective
+    // cannot postpone a chunk of the chassis motion until after visual landing.
+    const paperFootprint = bookPaperFootprint({
+      currentSpread: motion.current,
+      activeCoverSheet: motion.leaf,
+      activeVertices: motion.coverVertices,
+      totalSpreads: SPREADS.length,
+      pageWidth: pw,
+      pageHeight: ph,
+    });
+    const flatReading = motion.pose > 1 - 1e-4;
+    const projectedShift =
+      riffle === null
+        ? solveProjectedPaperShift(
+            g,
+            camera,
+            paperFootprint,
+            g.position.x,
+          )
+        : shiftTarget;
+    const projectedRestingShift =
+      riffle === null && motion.leaf === null ? projectedShift : restingShift;
+    // At rest, retain the exact historical local-space endpoints once the pose
+    // is flat. This keeps the DOM overlay and pointer zones on their canonical
+    // centers while still solving perspective continuously during approach.
+    const resolvedShift =
+      !turning && flatReading
+        ? restingShift
+        : projectedShift;
+    g.position.x = resolvedShift;
+    motion.shift = g.position.x;
     motion.handoff = handoffOpacity({
       turning,
       rotationError: Math.max(Math.abs(g.rotation.x), Math.abs(g.rotation.y)),
       scaleError: Math.abs(1 - g.scale.x),
-      shiftError: Math.abs(g.position.x - restingShift),
+      shiftError: Math.abs(g.position.x - projectedRestingShift),
     });
     motion.onPose?.(motion.pose, motion.handoff);
   });

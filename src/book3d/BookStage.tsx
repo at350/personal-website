@@ -178,9 +178,15 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       swapReady: false,
       shift: bookRestingShift(targetSpread, TOTAL, pw),
       turnShift: bookRestingShift(targetSpread, TOTAL, pw),
+      coverVertices: null,
       pointerX: 0,
       pointerY: 0,
       pointerActive: false,
+      foilPointerX: 0,
+      foilPointerY: 0,
+      turnPointerX: 0,
+      turnPointerY: 0,
+      turnPointerActive: false,
       poseTarget: touchOnly ? 1 : 0,
       pose: touchOnly ? 1 : 0,
       turnPose: touchOnly ? 1 : 0,
@@ -212,6 +218,10 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.turnPose = motion.pose;
       motion.poseTarget = motion.turnPose;
       motion.turnShift = motion.shift;
+      motion.coverVertices = null;
+      motion.turnPointerX = motion.pointerX;
+      motion.turnPointerY = motion.pointerY;
+      motion.turnPointerActive = motion.pointerActive;
       dispatch({ type: "TURN", to });
       return true;
     },
@@ -259,6 +269,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.settleHold = 0;
       motion.swapReady = false;
       motion.riffleProgress = 0;
+      motion.coverVertices = null;
     }
     motion.poseTarget =
       state.sheet !== null || state.dragging || state.riffle !== null
@@ -409,6 +420,10 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.turnPose = motion.pose;
       motion.poseTarget = motion.turnPose;
       motion.turnShift = motion.shift;
+      motion.coverVertices = null;
+      motion.turnPointerX = motion.pointerX;
+      motion.turnPointerY = motion.pointerY;
+      motion.turnPointerActive = motion.pointerActive;
       motion.turnDirection = edge === "fore" ? 1 : -1;
       const paperRect = overlayRef.current?.getBoundingClientRect();
       const paperCenterY = paperRect
@@ -557,17 +572,28 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         ...frame,
       };
       const pointer = normalizeBookPointer(point);
-      motion.pointerX = pointer.x;
-      motion.pointerY = pointer.y;
-      motion.pointerActive = true;
-      hoverRef.current = withinBookRegion({
-        ...point,
-        halfWidth: frame.halfWidth + GRAB_PAD,
-        halfHeight: frame.halfHeight + GRAB_PAD,
-      });
-      motion.poseTarget = desiredPose();
+      motion.foilPointerX = pointer.x;
+      motion.foilPointerY = pointer.y;
+      // Pointer capture keeps delivering moves while a page is held. Do not
+      // feed that drag path back into the chassis pose: it would rotate the
+      // whole magazine on release and create a second apparent recenter. The
+      // foil uses its separate live channel above, so its light still follows
+      // the hand throughout the turn.
+      const poseLocked =
+        motion.leaf !== null || motion.dragging || state.riffle !== null;
+      if (!poseLocked) {
+        motion.pointerX = pointer.x;
+        motion.pointerY = pointer.y;
+        motion.pointerActive = true;
+        hoverRef.current = withinBookRegion({
+          ...point,
+          halfWidth: frame.halfWidth + GRAB_PAD,
+          halfHeight: frame.halfHeight + GRAB_PAD,
+        });
+        motion.poseTarget = desiredPose();
+      }
     },
-    [desiredPose, motion, pointerFrame],
+    [desiredPose, motion, pointerFrame, state.riffle],
   );
 
   // The scene reports exact transform alignment every frame. The DOM only

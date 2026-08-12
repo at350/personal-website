@@ -48,30 +48,6 @@ export function bookRestingShift(
   return 0;
 }
 
-/**
- * Couple the book center to a boundary cover's physical flip progress.
- *
- * Sheet progress has the same meaning in either direction (0 = on the right,
- * 1 = on the left), so this also follows reverse drags and canceled turns
- * without starting a second animation. Interior sheets return null because a
- * full spread is already centered on both sides of their turn.
- */
-export function bookCoverTurnShift(
-  sheet: number,
-  progress: number,
-  totalSpreads: number,
-  pageWidth: number,
-): number | null {
-  const clampedProgress = clamp01(progress);
-  if (sheet === 0) {
-    return -pageWidth / 2 + (pageWidth / 2) * clampedProgress;
-  }
-  if (sheet === totalSpreads - 2) {
-    return (pageWidth / 2) * clampedProgress;
-  }
-  return null;
-}
-
 /** Long jumps share the same centering choreography as a hand-driven cover.
  * Smoothstep softens the otherwise-linear riffle clock at both endpoints. */
 export function bookRiffleShift(
