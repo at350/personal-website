@@ -328,33 +328,29 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     }
   }, [interactionRevisions, trackTextureRefresh]);
 
-  // External navigation. Requests that land mid-turn are queued, not dropped —
-  // rapid keyboard/TOC input must never feel ignored.
+  // Absolute navigation may arrive while paper is moving. Keep only its latest
+  // destination; adjacent page-turn input is handled separately and dropped
+  // while busy so one gesture can never spill into a second turn.
   const prevTarget = useRef(targetSpread);
   const pendingTarget = useRef<number | null>(null);
   useEffect(() => {
     if (prevTarget.current === targetSpread) return;
     prevTarget.current = targetSpread;
-    if (targetSpread === state.current) return;
-    if (busy) pendingTarget.current = targetSpread;
-    else if (!launchTurn(targetSpread)) pendingTarget.current = targetSpread;
-  }, [
-    busy,
-    launchTurn,
-    state,
-    targetSpread,
-  ]);
+    const to = Math.min(Math.max(targetSpread, 0), TOTAL - 1);
+    if (busy) {
+      pendingTarget.current = to;
+      return;
+    }
+    pendingTarget.current = null;
+    if (to !== currentSpread && !launchTurn(to)) pendingTarget.current = to;
+  }, [busy, currentSpread, launchTurn, targetSpread]);
 
   useEffect(() => {
     if (busy || pendingTarget.current === null) return;
     const to = pendingTarget.current;
-    if (to === state.current) pendingTarget.current = null;
+    if (to === currentSpread) pendingTarget.current = null;
     else if (launchTurn(to)) pendingTarget.current = null;
-  }, [
-    busy,
-    launchTurn,
-    state,
-  ]);
+  }, [busy, currentSpread, launchTurn]);
 
   useEffect(() => {
     if (!busy && !launchingTurn.current && pendingTarget.current === null) {
@@ -570,15 +566,30 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     };
   }, [motion]);
 
-  // Queued turn helper: never drop an intent because paper was moving.
-  const go = useCallback(
+  // Deliberate absolute jumps (TOC, Home/End) keep their latest destination.
+  const goAbsolute = useCallback(
     (to: number) => {
       if (!texturesReady) return;
       const clamped = Math.min(Math.max(to, 0), TOTAL - 1);
       if (busy) pendingTarget.current = clamped;
-      else if (!launchTurn(clamped)) pendingTarget.current = clamped;
+      else {
+        pendingTarget.current = null;
+        if (clamped !== currentSpread && !launchTurn(clamped)) {
+          pendingTarget.current = clamped;
+        }
+      }
     },
-    [busy, launchTurn, texturesReady],
+    [busy, currentSpread, launchTurn, texturesReady],
+  );
+
+  // Previous/next is a one-page action, never deferred into another turn.
+  const goAdjacent = useCallback(
+    (offset: -1 | 1) => {
+      if (!texturesReady || busy) return;
+      const to = Math.min(Math.max(currentSpread + offset, 0), TOTAL - 1);
+      if (to !== currentSpread) launchTurn(to);
+    },
+    [busy, currentSpread, launchTurn, texturesReady],
   );
 
   const onRiffleComplete = useCallback(() => {
@@ -591,7 +602,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       if (!texturesReady) return;
       if (e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const t = e.target as HTMLElement | null;
+      const t = e.target instanceof Element ? e.target : null;
       if (
         t?.closest(
           "button, a, input, textarea, select, [contenteditable='true'], [role='toolbar']",
@@ -599,10 +610,19 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       ) {
         return;
       }
-      if (e.key === "ArrowRight") go(state.current + 1);
-      else if (e.key === "ArrowLeft") go(state.current - 1);
-      else if (e.key === "Home") go(0);
-      else if (e.key === "End") go(TOTAL - 1);
+      const navigationKey =
+        e.key === "ArrowRight" ||
+        e.key === "ArrowLeft" ||
+        e.key === "Home" ||
+        e.key === "End";
+      if (navigationKey && e.repeat) {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "ArrowRight") goAdjacent(1);
+      else if (e.key === "ArrowLeft") goAdjacent(-1);
+      else if (e.key === "Home") goAbsolute(0);
+      else if (e.key === "End") goAbsolute(TOTAL - 1);
       else if (e.key === "g") setShowGrid((v) => !v);
       else if (e.key === "Escape") setTocOpen(false);
       else return;
@@ -610,7 +630,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, state, texturesReady]);
+  }, [goAbsolute, goAdjacent, texturesReady]);
 
   const pages = spreadPages(state.current);
   const rasterLayout = pageRasterLayout(pw);
@@ -693,8 +713,8 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       <nav className="bstage__nav" aria-label="Pages">
         <button
           className="bstage__arrow mono-label"
-          onClick={() => go(state.current - 1)}
-          disabled={state.current === 0}
+          onClick={() => goAdjacent(-1)}
+          disabled={!texturesReady || busy || currentSpread === 0}
           aria-label="Previous spread"
         >
           ←
@@ -709,8 +729,8 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         </button>
         <button
           className="bstage__arrow mono-label"
-          onClick={() => go(state.current + 1)}
-          disabled={state.current === TOTAL - 1}
+          onClick={() => goAdjacent(1)}
+          disabled={!texturesReady || busy || currentSpread === TOTAL - 1}
           aria-label="Next spread"
         >
           →
@@ -726,7 +746,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
                   className={`bstage__toc-row ${i === state.current ? "bstage__toc-row--here" : ""}`}
                   onClick={() => {
                     setTocOpen(false);
-                    go(i);
+                    goAbsolute(i);
                   }}
                 >
                   <span className="mono-label bstage__toc-no">
