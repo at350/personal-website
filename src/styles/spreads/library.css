@@ -1,6 +1,6 @@
 /* THE LIBRARY — pp. 14–15. White paper, catalog plates, one red.
-   Verso's grid-break: the active filter as a Tanker section mark, cut by the
-   trim. Recto's: the second column drops below the first. */
+   Verso's active filter is a Tanker section mark aligned to the running head.
+   Recto's grid-break: the second column drops below the first. */
 
 .library {
   position: absolute;
@@ -50,7 +50,7 @@
 
 .library__display {
   margin-top: 1cqh;
-  margin-left: -7cqw; /* runs off the trim */
+  margin-left: calc(var(--page-pad) - 7cqw); /* match the p.8 running-head inset */
   font-family: var(--font-condensed);
   font-size: 19cqw;
   line-height: 0.84;

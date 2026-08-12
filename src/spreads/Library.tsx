@@ -34,7 +34,7 @@ export function Library({ face }: SpreadFaceProps) {
               ))}
             </div>
           </header>
-          {/* The section mark: the active filter set huge, cut by the trim. */}
+          {/* The section mark: the active filter set huge beneath the controls. */}
           <p className="library__display" aria-hidden key={filter}>
             {active?.label}
             <span className="library__display-dot">.</span>
