@@ -30,6 +30,16 @@ export function normalizeBookPointer(input: PointerInput) {
   };
 }
 
+/** True when a viewport point sits on the book (or its grab margin). The same
+    rect that flattens the pose on hover also accepts a page pull, so anywhere
+    the book responds to the pointer is also a place it can be grabbed. */
+export function withinBookRegion(input: PointerInput): boolean {
+  return (
+    Math.abs(input.x - input.centerX) < input.halfWidth &&
+    Math.abs(input.y - input.centerY) < input.halfHeight
+  );
+}
+
 /**
  * The flat reading state stays an exact endpoint so the DOM handoff lands on
  * zero rotation. Everywhere short of flat — including the full display
