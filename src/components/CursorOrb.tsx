@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import "@/styles/cursor-orb.css";
 
-const DOT_SIZE = 6;
 const RING_SIZE = 26;
 const FOLLOW_PER_FRAME = 0.16;
 const INTERACTIVE_SCALE = 1.6;
@@ -14,14 +13,12 @@ const INTERACTIVE =
  */
 export function CursorOrb() {
   const rootRef = useRef<HTMLDivElement>(null);
-  const dotRef = useRef<HTMLSpanElement>(null);
   const ringRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const root = rootRef.current;
-    const dot = dotRef.current;
     const ring = ringRef.current;
-    if (!root || !dot || !ring) return;
+    if (!root || !ring) return;
 
     const precisionPointer = window.matchMedia(
       "(hover: hover) and (pointer: fine)",
@@ -126,7 +123,6 @@ export function CursorOrb() {
       pointerX = event.clientX;
       pointerY = event.clientY;
       updateInteractiveTarget(event.target);
-      dot.style.transform = `translate3d(${(pointerX - DOT_SIZE / 2).toFixed(2)}px, ${(pointerY - DOT_SIZE / 2).toFixed(2)}px, 0)`;
 
       if (!visible) {
         // Re-enter at the pointer instead of flying in from a stale coordinate.
@@ -178,7 +174,6 @@ export function CursorOrb() {
       stop();
       root.classList.remove("is-visible");
       ring.classList.remove("is-interactive");
-      dot.style.transform = "";
       ring.style.transform = "";
     };
   }, []);
@@ -186,7 +181,6 @@ export function CursorOrb() {
   return (
     <div ref={rootRef} className="cursor-orb" aria-hidden="true">
       <span ref={ringRef} className="cursor-orb__ring" />
-      <span ref={dotRef} className="cursor-orb__dot" />
     </div>
   );
 }

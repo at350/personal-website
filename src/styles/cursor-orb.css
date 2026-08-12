@@ -8,7 +8,6 @@
   overflow: visible;
 }
 
-.cursor-orb__dot,
 .cursor-orb__ring {
   position: absolute;
   top: 0;
@@ -17,12 +16,6 @@
   opacity: 0;
   will-change: transform;
   transition: opacity var(--dur-swap) ease;
-}
-
-.cursor-orb__dot {
-  width: 6px;
-  height: 6px;
-  background: var(--ink);
 }
 
 .cursor-orb__ring {
@@ -36,7 +29,6 @@
     border-color 180ms ease;
 }
 
-.cursor-orb.is-visible .cursor-orb__dot,
 .cursor-orb.is-visible .cursor-orb__ring {
   opacity: 1;
 }
