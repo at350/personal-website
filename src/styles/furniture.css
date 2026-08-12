@@ -19,6 +19,12 @@
   color: var(--ink);
 }
 
+/* Spread roots declare their tone so overprinted furniture stays legible in
+   the live book, reader view, and captured page-turn textures alike. */
+[data-page-tone="dark"] ~ .folio .folio__page {
+  color: var(--paper);
+}
+
 .running-head {
   position: absolute;
   top: calc(var(--page-pad) * 0.45);

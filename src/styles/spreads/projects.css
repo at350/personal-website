@@ -120,6 +120,8 @@
 
 .proj-index[data-mode="book"] .proj-index__list {
   min-height: 0;
+  margin-left: -3.2cqw;
+  padding-left: 3.2cqw;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;

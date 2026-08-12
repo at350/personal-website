@@ -14,7 +14,7 @@ export function Profile({ face }: SpreadFaceProps) {
   if (face === "recto") {
     // The poster page: ink ground, the off-hours nouns as white woodtype.
     return (
-      <div className="profile" data-face="recto">
+      <div className="profile" data-face="recto" data-page-tone="dark">
         <p className="profile__poster-eyebrow mono-label">Away from the screen</p>
         <ul className="profile__poster" aria-label="Off hours">
           {POSTER_WORDS.map((word, i) => (
