@@ -1,7 +1,6 @@
 /* V2 THE PROFILE — pages 06–07. White paper, black ink, one red.
-   Verso: Fett statement flush left, numbered ledger stepped right, loose
-   prints scattered on the lower third (the draggable signature).
-   Recto: full-bleed hutong photo, mono caption plate. */
+   Verso: display statement with a numbered ledger stepped right.
+   Recto: an ink-ground off-hours poster with shared issue furniture. */
 
 .profile {
   position: absolute;
@@ -136,33 +135,6 @@
   }
 }
 
-/* ————— Recto (p.07): the photo is the page ————— */
-
-.profile__bleed {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.profile__plate {
-  position: absolute;
-  left: 6cqw;
-  bottom: 6cqw;
-  display: inline-flex;
-  align-items: baseline;
-  gap: max(8px, 1.6cqw);
-  padding: max(6px, 1.1cqw) max(10px, 1.8cqw);
-  background: var(--paper);
-  color: var(--ink);
-  font-size: max(11px, 1.6cqw);
-}
-
-.profile__plate-no {
-  color: var(--red);
-}
-
 /* ————— The off-hours poster (recto v3): white woodtype on ink ————— */
 
 .profile[data-face="recto"] {
@@ -215,12 +187,4 @@
 
 .profile__poster-row:nth-child(4) {
   margin-left: 4.5cqw;
-}
-
-.profile__plate--poster {
-  position: static;
-  background: transparent;
-  color: var(--paper);
-  opacity: 0.55;
-  padding: 0;
 }

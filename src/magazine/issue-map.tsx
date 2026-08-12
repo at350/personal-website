@@ -16,7 +16,7 @@ const BINDINGS: Record<string, Omit<SpreadBinding, "id">> = {
   cover: { Component: Cover, fullBleed: { verso: true, recto: true } },
   contents: { Component: Contents },
   letter: { Component: EditorsLetter },
-  profile: { Component: Profile, fullBleed: { recto: true } },
+  profile: { Component: Profile },
   features: { Component: ProjectsOpener },
   well: { Component: ProjectWell },
   resume: { Component: Resume },
