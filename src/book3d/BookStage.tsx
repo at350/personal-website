@@ -51,7 +51,10 @@ function usePageSize() {
   const compute = () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const pw = Math.min(0.46 * w, 0.66 * h);
+    // Keep an 80px rail clear on each side when width is the limiting axis.
+    // The left rail belongs to the experience dock; the right remains a
+    // balanced page-turn gutter so the book never looks pushed off-center.
+    const pw = Math.min(0.46 * w, 0.66 * h, (w - 160) / 2);
     return { pw, ph: (pw * 4) / 3 };
   };
   const [size, setSize] = useState(compute);
@@ -493,9 +496,16 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!texturesReady) return;
+      if (e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
-      if (t && /^(input|textarea|select)$/i.test(t.tagName)) return;
+      if (
+        t?.closest(
+          "button, a, input, textarea, select, [contenteditable='true'], [role='toolbar']",
+        )
+      ) {
+        return;
+      }
       if (e.key === "ArrowRight") go(state.current + 1);
       else if (e.key === "ArrowLeft") go(state.current - 1);
       else if (e.key === "Home") go(0);
