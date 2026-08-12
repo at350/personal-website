@@ -41,6 +41,13 @@ npm run lint
   flip to the folio they print.
 - **Spreads** — `src/spreads/*`, one component per spread, all content from
   `src/lib/content.ts` (verified — no invented facts).
+- **Project files** — add a project once in the `projects` collection in
+  `src/lib/content.ts`; the count, expandable archive, and technology marks all
+  update from that entry. Include its full
+  `detail`, stack, optional image/links, and set `featureOrder` only when it
+  should occupy one of the two editorial feature pages. Brand marks resolve in
+  `src/lib/technology-icons.ts`; uncatalogued tools and methods receive a
+  monochrome typographic mark automatically.
 - **Media library** — `src/lib/media/`: a verified seed merged with
   `live.json`, refreshed by `npm run refresh-media` (see below).
 - **Editorial art** — generated concept still lifes live in

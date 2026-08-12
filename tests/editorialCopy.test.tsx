@@ -46,8 +46,16 @@ describe("editorial copy allocation", () => {
 
   it("uses summaries in the project index and details in the following well", () => {
     const index = textOf(<ProjectsOpener face="recto" {...readerProps} />);
-    const architec = textOf(<ProjectWell face="verso" {...readerProps} />);
-    const greenchain = textOf(<ProjectWell face="recto" {...readerProps} />);
+    const architec = textOf(
+      <MemoryRouter>
+        <ProjectWell face="verso" {...readerProps} />
+      </MemoryRouter>,
+    );
+    const greenchain = textOf(
+      <MemoryRouter>
+        <ProjectWell face="recto" {...readerProps} />
+      </MemoryRouter>,
+    );
 
     expect(index).toContain(projects[0].summary);
     expect(index).toContain(projects[1].summary);

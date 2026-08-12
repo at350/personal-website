@@ -10,7 +10,7 @@ const ROUTE_META: Record<string, { title: string; description: string }> = {
   "/contents": { title: `Contents · ${BASE_TITLE}`, description: "What's in Issue No. 01." },
   "/about": { title: `Letter · ${BASE_TITLE}`, description: "A short letter from Alan." },
   "/profile": { title: `Profile · ${BASE_TITLE}`, description: "Work habits and off-hours notes." },
-  "/projects": { title: `Projects · ${BASE_TITLE}`, description: "Five working prototypes across energy, supply chains, and public health." },
+  "/projects": { title: `Projects · ${BASE_TITLE}`, description: "A growing archive of working prototypes, tools, and product systems." },
   "/resume": { title: `Resume · ${BASE_TITLE}`, description: "The annotated resume." },
   "/library": { title: `Library · ${BASE_TITLE}`, description: "Films, articles, posts." },
   "/writing": { title: `Dispatches · ${BASE_TITLE}`, description: "Occasional writing." },
