@@ -1,0 +1,59 @@
+/* A decorative echo around the native cursor. Kept above the paper grain so
+   its edge stays crisp, but it never participates in hit testing. */
+.cursor-orb {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.cursor-orb__dot,
+.cursor-orb__ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  opacity: 0;
+  will-change: transform;
+  transition: opacity var(--dur-swap) ease;
+}
+
+.cursor-orb__dot {
+  width: 6px;
+  height: 6px;
+  background: var(--ink);
+}
+
+.cursor-orb__ring {
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid color-mix(in srgb, var(--red) 64%, transparent);
+  background: transparent;
+  transition:
+    opacity var(--dur-swap) ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+
+.cursor-orb.is-visible .cursor-orb__dot,
+.cursor-orb.is-visible .cursor-orb__ring {
+  opacity: 1;
+}
+
+.cursor-orb__ring.is-interactive {
+  border-color: color-mix(in srgb, var(--red) 82%, transparent);
+  background: color-mix(in srgb, var(--red) 11%, transparent);
+}
+
+@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .cursor-orb {
+    display: none;
+  }
+}
+
+@media print {
+  .cursor-orb {
+    display: none;
+  }
+}
