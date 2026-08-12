@@ -102,22 +102,29 @@
   background: transparent;
 }
 
-/* Gutter ambient occlusion — the one derived shadow the DOM layer keeps. */
-.ov-face--verso::after,
-.ov-face--recto::after {
+/* The gutter belongs to the printed page, not to a particular renderer.
+   CaptureFarm rasterizes this exact class into the WebGL stack and turning
+   leaf, while OverlayFace uses it live at rest. That keeps the crease
+   continuous through the otherwise-atomic DOM/WebGL handoff. */
+.page-face::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 3;
+}
+
+/* The live DOM retains a faint trim line. The captured WebGL pages already
+   have physical edge geometry, so this outline intentionally stays ov-only. */
+.ov-face::after {
   box-shadow: inset 0 0 0 1px rgba(14, 14, 12, 0.055);
 }
 
-.ov-face--verso::after {
+.page-face--verso::after {
   background: linear-gradient(to left, rgba(14, 14, 12, 0.085), transparent 9%);
 }
 
-.ov-face--recto::after {
+.page-face--recto::after {
   background: linear-gradient(to right, rgba(14, 14, 12, 0.085), transparent 9%);
 }
 

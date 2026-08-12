@@ -74,7 +74,7 @@ function OverlayFace({ spread, face, showGrid }: { spread: number; face: "verso"
   const fullBleed = binding.fullBleed?.[face] ?? false;
   const { Component } = binding;
   return (
-    <div className={`ov-face ov-face--${face}`}>
+    <div className={`page-face page-face--${face} ov-face ov-face--${face}`}>
       <Component face={face} mode="book" />
       {!fullBleed && def.runningHead ? <RunningHead text={def.runningHead} side={face} /> : null}
       {!fullBleed && page !== null ? <Folio page={page} side={face} /> : null}

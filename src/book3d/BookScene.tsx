@@ -1,7 +1,7 @@
 /* The physical book: page stacks with real thickness, a bending leaf,
    one key light, honest shadows. World units are CSS pixels. */
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -165,7 +165,7 @@ function usePageMaterial(
   // Track the applied SOURCE texture, not the key: a refreshed capture keeps
   // the key but swaps the texture object, and the material must follow.
   const applied = useRef<THREE.Texture | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const apply = () => {
       const texture = key ? getPageTexture(key) : null;
       if (texture && applied.current !== texture) {
@@ -186,6 +186,9 @@ function usePageMaterial(
         applied.current = null;
       }
     };
+    // A turn hides the live DOM in the same commit that selects this leaf.
+    // Attach its cached page (including the baked-in gutter) before paint so
+    // there is never a blank first WebGL frame at drag/flip start.
     apply();
     return onTexturesChanged(apply);
   }, [key, mat, mirror]);
@@ -258,39 +261,6 @@ function Stack({
         />
       </lineSegments>
     </>
-  );
-}
-
-function gutterTexture() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 128;
-  canvas.height = 4;
-  const context = canvas.getContext("2d")!;
-  const gradient = context.createLinearGradient(0, 0, canvas.width, 0);
-  gradient.addColorStop(0, "rgba(14,14,12,0)");
-  gradient.addColorStop(0.32, "rgba(14,14,12,0.025)");
-  gradient.addColorStop(0.5, "rgba(14,14,12,0.105)");
-  gradient.addColorStop(0.68, "rgba(14,14,12,0.025)");
-  gradient.addColorStop(1, "rgba(14,14,12,0)");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-function GutterShadow({ pw, ph }: { pw: number; ph: number }) {
-  const texture = useMemo(gutterTexture, []);
-  return (
-    <mesh position={[0, 0, 0.21]} renderOrder={2}>
-      <planeGeometry args={[pw * 0.2, ph]} />
-      <meshBasicMaterial
-        map={texture}
-        transparent
-        depthWrite={false}
-        toneMapped={false}
-      />
-    </mesh>
   );
 }
 
@@ -598,7 +568,6 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
           <planeGeometry args={[pw * 2, ph]} />
           <shadowMaterial transparent opacity={0.15} depthWrite={false} />
         </mesh>
-        {leftCount > 0 && rightCount > 0 ? <GutterShadow pw={pw} ph={ph} /> : null}
         <Leaf motion={motion} pw={pw} ph={ph} />
         {/* The desk: pure shadow on the white void. */}
         <mesh position={[0, 0, -TOTAL_LEAVES * LEAF_THICKNESS - 2]} receiveShadow>

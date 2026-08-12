@@ -257,6 +257,7 @@ function FarmFace({ spread, face }: { spread: number; face: "verso" | "recto" })
   }
   return (
     <div
+      className={`page-face page-face--${face}`}
       data-capture-key={pageKey(spread, face)}
       style={{
         width: CAPTURE_W,
