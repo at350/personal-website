@@ -17,8 +17,9 @@
   border-top-color: var(--shu);
 }
 
-/* Drop cap: 3-line Zodiak, optically aligned. */
-.drop-cap::first-letter {
+/* Drop cap: 3-line Zodiak, optically aligned. A real element is required so
+   the moving page's DOM rasterizer preserves the same initial and text wrap. */
+.drop-cap__letter {
   font-family: var(--font-display);
   font-weight: 800;
   float: left;

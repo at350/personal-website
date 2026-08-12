@@ -1,5 +1,9 @@
 import { useId, useRef, useState } from "react";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
+import {
+  togglePersistentInteractionOpenKey,
+  usePersistentInteraction,
+} from "@/magazine/persistent-interactions";
 import { ProjectTechnologyList } from "@/components/ProjectTechnologyList";
 import { projects } from "@/lib/content";
 import { withBasePath } from "@/lib/basePath";
@@ -46,7 +50,7 @@ function Count() {
 /* p.9 — the index. Rows expand in place; one open at a time.
    Pointer hover previews; activation pins for mouse, touch, and keyboard. */
 function Index({ mode }: { mode: "book" | "reader" }) {
-  const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const { openKey: pinnedId } = usePersistentInteraction("features");
   const [hoverId, setHoverId] = useState<string | null>(null);
   const baseId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -87,7 +91,7 @@ function Index({ mode }: { mode: "book" | "reader" }) {
                   aria-expanded={open}
                   aria-controls={panelId}
                   onClick={() =>
-                    setPinnedId((v) => (v === project.id ? null : project.id))
+                    togglePersistentInteractionOpenKey("features", project.id)
                   }
                   onPointerEnter={() => setHoverId(project.id)}
                 >

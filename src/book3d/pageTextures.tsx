@@ -26,6 +26,10 @@ export function pageRasterLayout(visiblePageWidth: number) {
 
 const cache = new Map<string, THREE.CanvasTexture>();
 const inFlight = new Map<string, Promise<boolean>>();
+const spreadRefreshes = new Map<number, Promise<boolean>>();
+const requestedSpreadRevisions = new Map<number, number>();
+const capturedSpreadRevisions = new Map<number, number>();
+let textureEpoch = 0;
 const listeners = new Set<() => void>();
 const progressListeners = new Set<(progress: TextureProgress) => void>();
 let preloadPromise: Promise<TextureProgress> | null = null;
@@ -109,6 +113,7 @@ function capture(key: string, refresh = false): Promise<boolean> {
   const existing = inFlight.get(key);
   if (existing) return existing;
 
+  const epoch = textureEpoch;
   const task = (async () => {
     const el = document.querySelector<HTMLElement>(
       `[data-capture-key="${CSS.escape(key)}"]`,
@@ -142,12 +147,20 @@ function capture(key: string, refresh = false): Promise<boolean> {
     texture.anisotropy = 8;
     texture.generateMipmaps = true;
     texture.minFilter = THREE.LinearMipmapLinearFilter;
+    if (epoch !== textureEpoch) {
+      texture.dispose();
+      return false;
+    }
     cache.set(key, texture);
     listeners.forEach((fn) => fn());
     return true;
   })().catch(() => {
+    if (import.meta.env.DEV && !import.meta.env.TEST) {
+      console.warn(`Page texture capture failed: ${key}`);
+    }
+    if (epoch !== textureEpoch) return false;
     // A refresh that fails keeps the previous (real) texture on the mesh.
-    if (refresh && cache.has(key)) return true;
+    if (refresh) return false;
     // Last-resort paper still counts as a texture. The entry screen must never
     // trap a reader because one page contains an uncooperative remote asset.
     const canvas = document.createElement("canvas");
@@ -203,23 +216,60 @@ export function preloadAllPageTextures(
 }
 
 /** Re-rasterize both faces of a spread whose DOM content changed while the
-    book is open (e.g. a library filter chip). The stale texture stays on the
-    mesh until the fresh capture lands, so a flip mid-refresh never goes
-    blank; material hooks swap by texture identity when the cache updates. */
-export function refreshSpreadTextures(spread: number) {
-  for (const face of ["verso", "recto"] as const) {
-    const key = pageKey(spread, face);
-    if (!ALL_PAGE_KEYS.includes(key)) continue;
-    const old = cache.get(key) ?? null;
-    const pending = inFlight.get(key);
-    const task = pending
-      ? pending.then(() => capture(key, true))
-      : capture(key, true);
-    void task.then(() => {
-      const next = cache.get(key);
-      if (old && next && next !== old) old.dispose();
+    book is open (e.g. a library filter chip). Callers can await the returned
+    promise before launching paper so the moving face never uses stale DOM. */
+export function refreshSpreadTextures(spread: number): Promise<boolean> {
+  const nextRevision = (requestedSpreadRevisions.get(spread) ?? 0) + 1;
+  requestedSpreadRevisions.set(spread, nextRevision);
+  const existing = spreadRefreshes.get(spread);
+  if (existing) return existing;
+
+  const refresh = (async () => {
+    while (true) {
+      const revision = requestedSpreadRevisions.get(spread) ?? 0;
+      const tasks: Promise<boolean>[] = [];
+      for (const face of ["verso", "recto"] as const) {
+        const key = pageKey(spread, face);
+        if (!ALL_PAGE_KEYS.includes(key)) continue;
+        const old = cache.get(key) ?? null;
+        const pending = inFlight.get(key);
+        const task = pending
+          ? pending.then(() => capture(key, true))
+          : capture(key, true);
+        tasks.push(
+          task.then((captured) => {
+            const next = cache.get(key);
+            if (old && next && next !== old) old.dispose();
+            return captured;
+          }),
+        );
+      }
+
+      const fresh = (await Promise.all(tasks)).every(Boolean);
+      if (!fresh) return false;
+      capturedSpreadRevisions.set(spread, revision);
+      if ((requestedSpreadRevisions.get(spread) ?? 0) === revision) return true;
+    }
+  })()
+    .finally(() => {
+      if (spreadRefreshes.get(spread) === refresh) spreadRefreshes.delete(spread);
     });
-  }
+  spreadRefreshes.set(spread, refresh);
+  return refresh;
+}
+
+/** A page turn can await this without starting a duplicate capture. */
+export function waitForSpreadTextures(spread: number): Promise<boolean> {
+  const refresh = spreadRefreshes.get(spread);
+  if (refresh) return refresh;
+  return Promise.resolve(isSpreadTextureFresh(spread));
+}
+
+export function isSpreadTextureFresh(spread: number): boolean {
+  return (
+    (capturedSpreadRevisions.get(spread) ?? 0) ===
+    (requestedSpreadRevisions.get(spread) ?? 0)
+  );
 }
 
 /** Rasterize the faces around `spread` so the next turn is always ready. */
@@ -237,15 +287,27 @@ export function prefetchAround(spread: number) {
 
 /** Invalidate everything (fonts loaded late, content changed). */
 export function dropAllTextures() {
+  textureEpoch += 1;
   cache.forEach((t) => t.dispose());
   cache.clear();
   preloadPromise = null;
   completedCaptures = 0;
+  spreadRefreshes.clear();
+  requestedSpreadRevisions.clear();
+  capturedSpreadRevisions.clear();
   listeners.forEach((fn) => fn());
   emitProgress();
 }
 
-function FarmFace({ spread, face }: { spread: number; face: "verso" | "recto" }) {
+/** Exported for the DOM parity regression suite. Production rendering still
+ * reaches this component only through CaptureFarm. */
+export function FarmFace({
+  spread,
+  face,
+}: {
+  spread: number;
+  face: "verso" | "recto";
+}) {
   const def = SPREADS[spread]!;
   const binding = ISSUE[spread]!;
   const pages = spreadPages(spread);

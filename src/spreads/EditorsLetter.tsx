@@ -2,6 +2,7 @@ import { useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { about } from "@/lib/content";
+import { DropCapText } from "@/components/furniture/DropCapText";
 import { EndMark } from "@/components/furniture/EndMark";
 import { motionOK } from "@/lib/motion";
 import { withBasePath } from "@/lib/basePath";
@@ -39,7 +40,9 @@ export function EditorsLetter({ face }: SpreadFaceProps) {
         <section className="letter__column" aria-label="A letter">
           <p className="letter__eyebrow">a letter</p>
           <h2 className="letter__heading">{about.heading}</h2>
-          <p className="letter__body drop-cap">{about.lede}</p>
+          <p className="letter__body">
+            <DropCapText text={about.lede} />
+          </p>
           {about.paragraphs.map((paragraph) => (
             <p key={paragraph.slice(0, 24)} className="letter__body">
               {paragraph}

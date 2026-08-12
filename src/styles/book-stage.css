@@ -290,15 +290,22 @@
   cursor: default;
 }
 
-/* The farm must capture FINISHED pages. Off-screen, lazy images never load,
-   so load-state dressing (skeleton pulses, fade-ins) would be baked into the
-   turn textures as gray plates the moment paper starts moving — and a capture
-   racing an entry rise would bake a half-risen tile. Every entry animation
-   ends at the element's base state, so killing them resolves the settled page. */
+/* Book faces must be FINISHED pages. A moving face is a still texture, so the
+   live DOM twin cannot run an independent entrance animation at either end of
+   the handoff. Reader-mode pages are outside `.page-face` and keep their
+   editorial entrances. */
+.page-face *,
+.page-face *::before,
+.page-face *::after {
+  animation: none !important;
+}
+
+/* The farm additionally suppresses transitions while cloning. Off-screen,
+   lazy images never load on their own, so its load-state dressing is forced to
+   the same settled image state captured by the texture. */
 [data-capture-farm] *,
 [data-capture-farm] *::before,
 [data-capture-farm] *::after {
-  animation: none !important;
   transition: none !important;
 }
 
