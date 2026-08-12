@@ -4,6 +4,10 @@
   height: 100dvh;
   background: var(--void);
   overflow: clip;
+  /* A horizontal pull anywhere near the book is ours (page turn); vertical
+     pans and pinch zoom stay with the browser. Without this, touch drags on
+     the page surface get claimed by the browser and cancelled mid-pull. */
+  touch-action: pan-y pinch-zoom;
 }
 
 .bstage__canvas {
@@ -117,12 +121,14 @@
   background: linear-gradient(to right, rgba(14, 14, 12, 0.085), transparent 9%);
 }
 
-/* Fore-edge drag zones. */
+/* Fore-edge drag zones: instant grab, so they must stay narrow enough not to
+   sit over page content people want to click — 40px over the paper, and out
+   across the full grab margin beside it. */
 .bstage__edge {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 64px;
+  width: 88px;
   height: min(78vh, 900px);
   z-index: 10;
   cursor: grab;
