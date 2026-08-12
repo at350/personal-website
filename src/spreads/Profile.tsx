@@ -24,10 +24,6 @@ export function Profile({ face }: SpreadFaceProps) {
             </li>
           ))}
         </ul>
-        <p className="profile__plate profile__plate--poster mono-label">
-          <span className="profile__plate-no">07</span>
-          <span>selected curiosities, no ranking implied</span>
-        </p>
       </div>
     );
   }
