@@ -354,19 +354,31 @@ function Stack({
     m.scale.z = THREE.MathUtils.damp(m.scale.z, targetScale, 12, dt);
     m.position.z = -m.scale.z / 2;
     m.position.x = side === "left" ? -pw / 2 : pw / 2;
-    m.visible = count > 0;
     const outline = rim.current;
     if (outline) {
       outline.position.copy(m.position);
       outline.scale.copy(m.scale);
-      outline.visible = count > 0;
     }
   });
 
   return (
     <>
-      <mesh ref={mesh} castShadow geometry={geo} material={materials} />
-      <lineSegments ref={rim} geometry={rimGeo} renderOrder={3}>
+      {/* Visibility belongs to the React commit that changes the stack count.
+          Waiting for useFrame leaves one paint where a settled boundary leaf
+          is gone but its newly exposed stack is still hidden. */}
+      <mesh
+        ref={mesh}
+        visible={count > 0}
+        castShadow
+        geometry={geo}
+        material={materials}
+      />
+      <lineSegments
+        ref={rim}
+        visible={count > 0}
+        geometry={rimGeo}
+        renderOrder={3}
+      >
         <lineBasicMaterial
           color="#d2d1cc"
           transparent
