@@ -47,8 +47,11 @@ const FEATURES: readonly Feature[] = [
 ];
 
 const DEPARTMENTS = [
-  { no: "14", route: "/library", title: "library" },
-  { no: "16", route: "/writing", title: "writing" },
+  { no: "06", route: "/profile", title: "news" },
+  { no: "08", route: "/projects", title: "features" },
+  { no: "12", route: "/resume", title: "sports" },
+  { no: "14", route: "/library", title: "arts & ent" },
+  { no: "16", route: "/writing", title: "opinion" },
   { no: "18", route: "/contact", title: "letters" },
 ] as const;
 
@@ -115,13 +118,13 @@ function FeaturesPage() {
   );
 }
 
-/* Recto — departments as a hung mono ledger, then the imprint. Nothing else. */
+/* Recto — the sections as a hung mono ledger, then the imprint. Nothing else. */
 function DepartmentsPage() {
   const navigate = useNavigate();
 
   return (
     <div className="contents2" data-face="recto">
-      <nav className="contents2__ledger" aria-label="Departments">
+      <nav className="contents2__ledger" aria-label="Sections">
         {DEPARTMENTS.map((dept) => (
           <button
             key={dept.no}
