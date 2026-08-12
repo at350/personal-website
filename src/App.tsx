@@ -18,6 +18,7 @@ import { NotFound } from "./routes/NotFound";
 import { applyMeta } from "./lib/meta";
 import { routerBasename } from "./lib/basePath";
 import { CursorOrb } from "./components/CursorOrb";
+import { ExperienceDock } from "./components/ExperienceDock";
 
 function IssueView() {
   const location = useLocation();
@@ -54,9 +55,12 @@ function BookView() {
   );
 
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#fff" }} />}>
-      <BookStage targetSpread={target} onSpreadSettled={onSettled} />
-    </Suspense>
+    <>
+      <Suspense fallback={<div style={{ minHeight: "100vh", background: "#fff" }} />}>
+        <BookStage targetSpread={target} onSpreadSettled={onSettled} />
+      </Suspense>
+      <ExperienceDock />
+    </>
   );
 }
 
