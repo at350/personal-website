@@ -2,14 +2,11 @@ import { useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { about } from "@/lib/content";
-import { Marginalia } from "@/components/furniture/Marginalia";
 import { EndMark } from "@/components/furniture/EndMark";
 import { motionOK } from "@/lib/motion";
 import { withBasePath } from "@/lib/basePath";
 import "@/styles/spreads/letter.css";
 
-/* The two ✳ asides in the verso's wide margin. */
-const marginNotes = [about.notes[1], about.notes[2]];
 const portrait = about.photos[0];
 
 /** Pages 04–05 — a letter (verso) and the portrait plate (recto). */
@@ -54,20 +51,6 @@ export function EditorsLetter({ face }: SpreadFaceProps) {
           </p>
         </section>
 
-        {marginNotes.map((note, i) => (
-          <span
-            key={note.label}
-            className={`letter__aside letter__aside--${i === 0 ? "one" : "two"}`}
-          >
-            <Marginalia
-              label={note.label}
-              ariaLabel={`Read a margin note: ${note.label}`}
-              index={i + 1}
-            >
-              {note.text}
-            </Marginalia>
-          </span>
-        ))}
       </div>
     );
   }

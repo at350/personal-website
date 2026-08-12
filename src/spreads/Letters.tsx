@@ -47,7 +47,6 @@ function LettersPage() {
   return (
     <div className="letters" data-face="verso">
       <h2 className="letters__heading">{contact.heading}</h2>
-      <p className="letters__note">{contact.note}</p>
 
       <nav className="letters__ledger" aria-label="Ways to reach Alan Tai">
         <ul>

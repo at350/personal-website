@@ -2,12 +2,12 @@ import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { about } from "@/lib/content";
 import "@/styles/spreads/profile.css";
 
-const STATEMENT = ["Systems with", "people still", "visible", "inside them"] as const;
+const STATEMENT = ["Ask first", "build second"] as const;
 
 /* Off-hours nouns, all verified in the about copy. */
 const POSTER_WORDS = ["GEOCACHES", "FIRE HYDRANTS", "ROADSIDE LANDMARKS", "MANDARIN"] as const;
 
-/** THE PROFILE (pages 06–07). Verso: the statement and the four notes as a
+/** THE PROFILE (pages 06–07). Verso: the working rule and four notes as a
  *  numbered ledger — the emptiness below is deliberate. Recto: the off-hours
  *  poster, white woodtype on ink. */
 export function Profile({ face }: SpreadFaceProps) {
@@ -15,7 +15,7 @@ export function Profile({ face }: SpreadFaceProps) {
     // The poster page: ink ground, the off-hours nouns as white woodtype.
     return (
       <div className="profile" data-face="recto">
-        <p className="profile__poster-eyebrow mono-label">Off hours</p>
+        <p className="profile__poster-eyebrow mono-label">Away from the screen</p>
         <ul className="profile__poster" aria-label="Off hours">
           {POSTER_WORDS.map((word, i) => (
             <li className="profile__poster-row" key={word}>
@@ -26,7 +26,7 @@ export function Profile({ face }: SpreadFaceProps) {
         </ul>
         <p className="profile__plate profile__plate--poster mono-label">
           <span className="profile__plate-no">07</span>
-          <span>things kept up between deadlines</span>
+          <span>selected curiosities, no ranking implied</span>
         </p>
       </div>
     );

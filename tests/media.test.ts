@@ -120,7 +120,7 @@ describe("fromSubstackRss", () => {
 });
 
 describe("fromXApi", () => {
-  const longText = "a".repeat(600);
+  const longText = Array.from({ length: 120 }, (_, index) => `word${index}`).join(" ");
   const payload = {
     data: [
       {
@@ -145,12 +145,14 @@ describe("fromXApi", () => {
       publishedAt: "2026-08-11T07:17:42.000Z",
     });
     expect(items[1]?.title).toBe("short post");
+    expect(items[1]?.excerpt).toBeUndefined();
   });
 
-  it("truncates title to 60 chars and excerpt to 500", () => {
+  it("splits a long post into non-overlapping title and excerpt copy", () => {
     const [item] = fromXApi(payload);
     expect(item?.title.length).toBeLessThanOrEqual(60);
     expect(item?.excerpt?.length).toBeLessThanOrEqual(500);
+    expect(item?.excerpt?.startsWith(item.title.replace(/…$/, ""))).toBe(false);
   });
 
   it("returns [] on garbage or missing data", () => {

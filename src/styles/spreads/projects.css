@@ -201,49 +201,10 @@
   max-width: 56cqw;
 }
 
-.proj-index__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.8cqh 1.2cqw;
-}
-
-.proj-index__chip {
-  border: 1px solid var(--hairline);
-  padding: 0.28em 0.65em;
-  color: var(--ink-2);
-  font-size: max(11px, 1.4cqw);
-}
-
-.proj-index__recognition {
-  font-family: var(--font-body);
-  font-style: italic;
-  font-size: clamp(11px, 2cqw, 15px);
-  line-height: 1.5;
-  color: var(--ink-2);
-  max-width: 54cqw;
-}
-
 /* The section's accent. */
 .proj-star {
   color: var(--red);
   font-style: normal;
-}
-
-.proj-index__link {
-  color: var(--ink);
-  font-size: max(11px, 1.5cqw);
-  text-decoration: none;
-  border-bottom: 1px solid var(--ink);
-  padding-bottom: 2px;
-  transition:
-    color 200ms var(--ease-settle),
-    border-color 200ms var(--ease-settle);
-}
-
-.proj-index__link:hover,
-.proj-index__link:focus-visible {
-  color: var(--red);
-  border-color: var(--red);
 }
 
 /* ————— pp.10–11 · the well ————— */
@@ -336,12 +297,6 @@
   max-width: 62cqw;
 }
 
-.proj-feature__stack {
-  margin-top: 1.8cqh;
-  color: var(--ink-2);
-  font-size: max(11px, 1.5cqw);
-}
-
 .proj-feature__recognition {
   margin-top: 1.6cqh;
   font-family: var(--font-body);
@@ -371,41 +326,10 @@
   border-color: var(--red);
 }
 
-/* p.11 bottom strip — a hairline, then the other three, numbered. */
-.proj-rest {
-  margin-top: 3cqh;
-  border-top: 1px solid var(--hairline);
-  padding-top: 1.8cqh;
-}
-
-.proj-rest__list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9cqh;
-}
-
-.proj-rest__entry {
-  display: flex;
-  align-items: baseline;
-  gap: 2cqw;
-  color: var(--ink-2);
-  font-size: max(11px, 1.5cqw);
-}
-
-.proj-rest__no {
-  font-family: var(--font-condensed);
-  letter-spacing: -0.004em;
-  font-size: max(11px, 2.2cqw);
-  line-height: 1;
-  color: var(--ink-3);
-  font-feature-settings: "lnum" 1;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .proj-index__no,
   .proj-index__reveal,
   .proj-index__body,
-  .proj-index__link,
   .proj-feature__link {
     transition: none;
   }

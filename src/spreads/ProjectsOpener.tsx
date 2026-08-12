@@ -96,35 +96,6 @@ function Index({ mode }: { mode: "book" | "reader" }) {
               >
                 <div className="proj-index__body">
                   <p className="proj-index__summary">{project.summary}</p>
-
-                  <ul
-                    className="proj-index__chips"
-                    aria-label={`${project.name} stack`}
-                  >
-                    {project.stack.map((item) => (
-                      <li key={item} className="proj-index__chip mono-label">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {project.recognition && (
-                    <p className="proj-index__recognition">
-                      <span className="proj-star" aria-hidden></span>{" "}
-                      {project.recognition}
-                    </p>
-                  )}
-
-                  {project.link && (
-                    <a
-                      className="proj-index__link mono-label"
-                      href={project.link.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {project.link.label} ↗
-                    </a>
-                  )}
                 </div>
               </div>
             </li>

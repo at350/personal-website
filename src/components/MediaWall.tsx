@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Link } from "react-router";
 import type { MediaImage, MediaItem, MediaKind, MediaSource } from "@/lib/media/types";
 import { withBasePath } from "@/lib/basePath";
+import { distinctExcerpt } from "@/lib/copy";
 import "@/styles/spreads/library.css";
 
 /* ————— Shared filter store —————
@@ -126,7 +127,7 @@ function StarRating({ value }: { value: number }) {
 }
 
 /** Skeleton block until the image arrives, then a 200ms fade. */
-function PlateThumb({ image }: { image: MediaImage }) {
+function PlateThumb({ image, alt }: { image: MediaImage; alt: string }) {
   const [loaded, setLoaded] = useState(false);
   const ratio =
     image.width !== undefined && image.height !== undefined
@@ -146,7 +147,7 @@ function PlateThumb({ image }: { image: MediaImage }) {
         }}
         className="media-plate__thumb"
         src={withBasePath(image.src)}
-        alt={image.alt}
+        alt={alt}
         width={image.width}
         height={image.height}
         loading="lazy"
@@ -160,6 +161,8 @@ function PlateThumb({ image }: { image: MediaImage }) {
 
 function MediaPlate({ item, index }: { item: MediaItem; index: string }) {
   const className = `media-plate media-plate--${item.kind}`;
+  const excerpt =
+    item.kind === "photo" ? undefined : distinctExcerpt(item.title, item.excerpt);
 
   const body = (
     <>
@@ -167,12 +170,18 @@ function MediaPlate({ item, index }: { item: MediaItem; index: string }) {
         <span className="media-plate__index">{index}</span>
         <span className="media-plate__kind">{item.kind}</span>
       </p>
-      {item.image ? <PlateThumb image={item.image} /> : null}
+      {item.image ? (
+        <PlateThumb
+          image={item.image}
+          // The adjacent title already names linked covers and thumbnails.
+          alt={item.kind === "photo" ? item.image.alt : ""}
+        />
+      ) : null}
       <h3 className="media-plate__title">{item.title}</h3>
       {item.rating !== undefined ? <StarRating value={item.rating} /> : null}
       <p className="media-plate__source mono-label">{sourceLine(item)}</p>
-      {item.excerpt !== undefined && item.kind !== "photo" ? (
-        <p className="media-plate__excerpt">{item.excerpt}</p>
+      {excerpt !== undefined ? (
+        <p className="media-plate__excerpt">{excerpt}</p>
       ) : null}
     </>
   );

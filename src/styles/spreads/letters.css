@@ -29,18 +29,6 @@
   max-width: 16ch;
 }
 
-/* The one deliberate grid-break: the note leaves the column for the right edge. */
-.letters__note {
-  margin-top: 3cqh;
-  margin-left: auto;
-  max-width: 36ch;
-  font-family: var(--font-body);
-  font-style: italic;
-  font-size: clamp(11px, 2.1cqw, 15px);
-  line-height: 1.55;
-  color: var(--ink-2);
-}
-
 /* The ledger sits on the floor; the middle of the page stays empty. */
 .letters__ledger {
   margin-top: auto;

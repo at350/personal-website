@@ -102,7 +102,6 @@ export const ContactLinkSchema = z.object({
 export const ContactSchema = z.object({
   eyebrow: z.string(),
   heading: z.string(),
-  note: z.string(),
   links: z.array(ContactLinkSchema).min(4),
 });
 export type ContactContent = z.infer<typeof ContactSchema>;
