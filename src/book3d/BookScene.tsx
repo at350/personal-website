@@ -23,6 +23,14 @@ import {
 import { withBasePath } from "@/lib/basePath";
 import { getPageTexture, onTexturesChanged, pageKey } from "./pageTextures";
 import { SPREADS } from "@/magazine/folio";
+import {
+  RIFFLE_VISIBLE_MAX,
+  riffleDuration,
+  riffleLeafCompletion,
+  riffleLeafProgress,
+  riffleStackCounts,
+  type RiffleTransition,
+} from "@/magazine/riffle";
 
 export const CAM_FOV = 22;
 
@@ -81,6 +89,8 @@ export interface BookMotion {
   /** Scene to stage: report pose and subpixel handoff readiness. */
   onPose: ((pose: number, handoff: number) => void) | null;
   onSettled: (() => void) | null;
+  /** Shared 0..1 clock for the concurrent fast-riffle packet. */
+  riffleProgress: number;
 }
 
 const TOTAL_LEAVES = SPREADS.length - 1;
@@ -403,6 +413,184 @@ function Leaf({
   );
 }
 
+const FAST_LEAF_SEGMENTS = 16;
+const FAST_LEAF_ROWS = 8;
+const FAST_LEAF_DEPTH_GAP = 0.2;
+const FAST_RIFFLE_SLOTS = Array.from(
+  { length: RIFFLE_VISIBLE_MAX },
+  (_, ordinal) => ordinal,
+);
+
+interface FastLeafProps {
+  sheet: number | null;
+  ordinal: number;
+  count: number;
+  direction: 1 | -1;
+  clock: { current: number };
+  paperBump: THREE.Texture;
+  pw: number;
+  ph: number;
+}
+
+/** A lightweight page used only in the short, concurrent fast-forward burst. */
+function FastLeaf({
+  sheet,
+  ordinal,
+  count,
+  direction,
+  clock,
+  paperBump,
+  pw,
+  ph,
+}: FastLeafProps) {
+  const frontKey = sheet === null ? null : pageKey(sheet, "recto");
+  const backKey = sheet === null ? null : pageKey(sheet + 1, "verso");
+  const frontMat = usePageMaterial(frontKey, false, paperBump);
+  const backMat = usePageMaterial(backKey, true, paperBump);
+
+  useEffect(() => {
+    frontMat.side = THREE.FrontSide;
+    backMat.side = THREE.BackSide;
+  }, [backMat, frontMat]);
+
+  const geometry = useMemo(
+    () => new THREE.PlaneGeometry(pw, ph, FAST_LEAF_SEGMENTS, FAST_LEAF_ROWS),
+    [ph, pw],
+  );
+  const outlineGeometry = useMemo(() => {
+    const outline = new THREE.BufferGeometry();
+    outline.setAttribute("position", geometry.getAttribute("position"));
+    const indices: number[] = [];
+    const columns = FAST_LEAF_SEGMENTS + 1;
+    for (let column = 0; column <= FAST_LEAF_SEGMENTS; column += 1) {
+      indices.push(column);
+    }
+    for (let row = 1; row <= FAST_LEAF_ROWS; row += 1) {
+      indices.push(row * columns + FAST_LEAF_SEGMENTS);
+    }
+    for (let column = FAST_LEAF_SEGMENTS - 1; column >= 0; column -= 1) {
+      indices.push(FAST_LEAF_ROWS * columns + column);
+    }
+    for (let row = FAST_LEAF_ROWS - 1; row > 0; row -= 1) {
+      indices.push(row * columns);
+    }
+    outline.setIndex(indices);
+    return outline;
+  }, [geometry]);
+
+  useFrame(() => {
+    if (sheet === null) return;
+    const completion = riffleLeafCompletion(clock.current, ordinal);
+    const progress = riffleLeafProgress(clock.current, ordinal, direction);
+    const velocity = Math.sin(completion * Math.PI) * 2.6;
+    const grabY = count <= 1 ? 0 : 0.14 - (ordinal / (count - 1)) * 0.28;
+    const vertices = leafSurface(
+      progress,
+      pw,
+      ph,
+      velocity,
+      grabY,
+      direction,
+      FAST_LEAF_SEGMENTS,
+      FAST_LEAF_ROWS,
+    );
+
+    // The first sheet is topmost at launch and the last is topmost at landing.
+    // Interpolating that packet order keeps concurrent pages from z-fighting.
+    const startDepth = count - ordinal;
+    const endDepth = ordinal + 1;
+    const depth = THREE.MathUtils.lerp(startDepth, endDepth, completion);
+    const zOffset = 0.4 + depth * FAST_LEAF_DEPTH_GAP;
+    const positions = geometry.attributes.position as THREE.BufferAttribute;
+    for (let index = 0; index < vertices.length; index += 1) {
+      const vertex = vertices[index]!;
+      positions.setXYZ(index, vertex.x, vertex.y, vertex.z + zOffset);
+    }
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals();
+
+    const activity = paperGleamActivity(progress, 0);
+    setPaperMaterialActivity(frontMat, activity);
+    setPaperMaterialActivity(backMat, activity);
+  });
+
+  return (
+    <group visible={sheet !== null}>
+      <mesh geometry={geometry} material={frontMat} castShadow receiveShadow />
+      <mesh geometry={geometry} material={backMat} castShadow receiveShadow />
+      <lineLoop geometry={outlineGeometry} renderOrder={4 + ordinal}>
+        <lineBasicMaterial
+          color="#c9c8c3"
+          transparent
+          opacity={0.68}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </lineLoop>
+    </group>
+  );
+}
+
+interface FastRiffleProps {
+  transition: RiffleTransition | null;
+  motion: BookMotion;
+  paperBump: THREE.Texture;
+  pw: number;
+  ph: number;
+  onComplete: () => void;
+}
+
+/**
+ * A fixed five-slot pool avoids allocating page materials and mirrored texture
+ * clones on every jump. One clock launches the visible packet in quick overlap.
+ */
+function FastRiffle({
+  transition,
+  motion,
+  paperBump,
+  pw,
+  ph,
+  onComplete,
+}: FastRiffleProps) {
+  const clock = useRef(0);
+  const completed = useRef(false);
+
+  useEffect(() => {
+    clock.current = 0;
+    completed.current = false;
+    motion.riffleProgress = 0;
+  }, [motion, transition]);
+
+  useFrame((_, rawDt) => {
+    if (transition === null || completed.current) return;
+    const duration = riffleDuration(transition.visibleSheets.length);
+    clock.current = Math.min(duration, clock.current + Math.min(rawDt, 0.1));
+    motion.riffleProgress = duration === 0 ? 1 : clock.current / duration;
+    if (clock.current >= duration) {
+      completed.current = true;
+      onComplete();
+    }
+  });
+
+  return (
+    <>
+      {FAST_RIFFLE_SLOTS.map((ordinal) => (
+        <FastLeaf
+          key={ordinal}
+          sheet={transition?.visibleSheets[ordinal] ?? null}
+          ordinal={ordinal}
+          count={transition?.visibleSheets.length ?? 0}
+          direction={transition?.direction ?? 1}
+          clock={clock}
+          paperBump={paperBump}
+          pw={pw}
+          ph={ph}
+        />
+      ))}
+    </>
+  );
+}
+
 /* Hidden documents get no rAF: browsers pause the loop in background tabs
    (and headless panes). Step the world manually so physics still settle and
    the canvas always has a current frame. */
@@ -439,7 +627,21 @@ function Rig({ ph }: { ph: number }) {
 
 const POSE_DROP = 0.994; // posed book sits a breath smaller — object, not page
 
-export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; ph: number }) {
+interface BookSceneProps {
+  motion: BookMotion;
+  riffle: RiffleTransition | null;
+  pw: number;
+  ph: number;
+  onRiffleComplete: () => void;
+}
+
+export function BookScene({
+  motion,
+  riffle,
+  pw,
+  ph,
+  onRiffleComplete,
+}: BookSceneProps) {
   const group = useRef<THREE.Group>(null);
   const light = useRef<THREE.DirectionalLight>(null);
   const clockRef = useRef(0);
@@ -505,14 +707,20 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
         : motion.current === SPREADS.length - 1
           ? pw / 2
           : 0;
-    const shiftTarget = motion.leaf === null ? restingShift : motion.turnShift;
+    const turning = motion.leaf !== null || riffle !== null;
+    const shiftTarget = turning ? motion.turnShift : restingShift;
 
     // One continuous pose channel: 0 = display stance, 1 = flat reading.
     // Everything derives from it, so no transition can ever pop.
     motion.pose = THREE.MathUtils.damp(motion.pose, motion.poseTarget, 5.2, dt);
     const posed = 1 - motion.pose;
 
-    const airborne = motion.leaf !== null ? Math.sin(motion.progress * Math.PI) : 0;
+    const airborne =
+      riffle !== null
+        ? Math.sin(motion.riffleProgress * Math.PI)
+        : motion.leaf !== null
+          ? Math.sin(motion.progress * Math.PI)
+          : 0;
     const idle = posed * 0.5 + airborne * 0.2;
     const breatheY = Math.sin(clockRef.current * 0.55) * 4 * idle;
     const breatheR = Math.sin(clockRef.current * 0.38) * 0.012 * idle;
@@ -534,7 +742,7 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
     const scale = 1 - (1 - POSE_DROP) * posed;
     g.scale.setScalar(THREE.MathUtils.damp(g.scale.x, scale, 6, dt));
     motion.handoff = handoffOpacity({
-      turning: motion.leaf !== null,
+      turning,
       rotationError: Math.max(Math.abs(g.rotation.x), Math.abs(g.rotation.y)),
       scaleError: Math.abs(1 - g.scale.x),
       shiftError: Math.abs(g.position.x - restingShift),
@@ -542,14 +750,33 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
     motion.onPose?.(motion.pose, motion.handoff);
   });
 
-  const leftCount = motion.leaf !== null ? motion.leaf : motion.current;
-  const rightCount = TOTAL_LEAVES - leftCount - (motion.leaf !== null ? 1 : 0);
-  const staticLeft = motion.leaf !== null ? motion.leaf : motion.current;
-  const staticRight = motion.leaf !== null ? motion.leaf + 1 : motion.current;
+  const riffleStacks = riffle ? riffleStackCounts(TOTAL_LEAVES, riffle) : null;
+  const leftCount = riffleStacks
+    ? riffleStacks.left
+    : motion.leaf !== null
+      ? motion.leaf
+      : motion.current;
+  const rightCount = riffleStacks
+    ? riffleStacks.right
+    : TOTAL_LEAVES - leftCount - (motion.leaf !== null ? 1 : 0);
+  const staticLeft = riffle
+    ? Math.min(riffle.from, riffle.to)
+    : motion.leaf !== null
+      ? motion.leaf
+      : motion.current;
+  const staticRight = riffle
+    ? Math.max(riffle.from, riffle.to)
+    : motion.leaf !== null
+      ? motion.leaf + 1
+      : motion.current;
   const leftTop =
-    SPREADS[staticLeft]?.kind === "cover" ? null : pageKey(staticLeft, "verso");
+    leftCount === 0 || SPREADS[staticLeft]?.kind === "cover"
+      ? null
+      : pageKey(staticLeft, "verso");
   const rightTop =
-    SPREADS[staticRight]?.kind === "back" ? null : pageKey(staticRight, "recto");
+    rightCount === 0 || SPREADS[staticRight]?.kind === "back"
+      ? null
+      : pageKey(staticRight, "recto");
 
   return (
     <>
@@ -598,6 +825,14 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
           <shadowMaterial transparent opacity={0.15} depthWrite={false} />
         </mesh>
         <Leaf motion={motion} pw={pw} ph={ph} paperBump={paperBump} />
+        <FastRiffle
+          transition={riffle}
+          motion={motion}
+          paperBump={paperBump}
+          pw={pw}
+          ph={ph}
+          onComplete={onRiffleComplete}
+        />
         {/* The desk: pure shadow on the white void. */}
         <mesh position={[0, 0, -TOTAL_LEAVES * LEAF_THICKNESS - 2]} receiveShadow>
           <planeGeometry args={[pw * 6, ph * 4]} />

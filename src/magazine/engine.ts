@@ -1,9 +1,13 @@
-/* Pure page-flip state machine. No DOM, no timing — the component owns springs
-   and dispatches TICK_COMPLETE when a settle finishes. */
+/* Pure page-flip state machine. No DOM or frame timing — the component owns
+   springs/riffle clocks and dispatches a completion event when paper lands. */
+
+import {
+  createRiffleTransition,
+  type RiffleTransition,
+} from "./riffle";
 
 export const COMMIT_THRESHOLD = 0.35;
 export const VELOCITY_BIAS = 0.4; // px/ms of pointer speed that forces a commit
-export const RIFFLE_MAX = 5; // longest jump animated sheet-by-sheet
 
 export interface EngineState {
   /** Spread currently considered "open". */
@@ -16,10 +20,8 @@ export interface EngineState {
   dragging: boolean;
   /** Where the in-flight sheet should spring to once released / auto-turning. */
   settleTarget: 0 | 1 | null;
-  /** Remaining riffle stops (spread indices) for a multi-sheet TURN. */
-  queue: readonly number[];
-  /** One-shot marker: the last TURN was too far to riffle; crossfade instead. */
-  teleported: boolean;
+  /** One bounded, concurrent packet for a non-adjacent TURN. */
+  riffle: RiffleTransition | null;
 }
 
 export type EngineEvent =
@@ -27,7 +29,8 @@ export type EngineEvent =
   | { type: "DRAG_MOVE"; progress: number }
   | { type: "DRAG_END"; velocity: number }
   | { type: "TURN"; to: number }
-  | { type: "TICK_COMPLETE" };
+  | { type: "TICK_COMPLETE" }
+  | { type: "RIFFLE_COMPLETE" };
 
 export const initialEngineState = (spread = 0): EngineState => ({
   current: spread,
@@ -36,8 +39,7 @@ export const initialEngineState = (spread = 0): EngineState => ({
   direction: 0,
   dragging: false,
   settleTarget: null,
-  queue: [],
-  teleported: false,
+  riffle: null,
 });
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
@@ -45,13 +47,13 @@ const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 export function reduce(state: EngineState, event: EngineEvent, total: number): EngineState {
   switch (event.type) {
     case "DRAG_START": {
-      if (state.sheet !== null) return state; // busy settling or already dragging
+      if (state.sheet !== null || state.riffle !== null) return state;
       if (event.edge === "fore") {
         if (state.current >= total - 1) return state;
-        return { ...state, sheet: state.current, direction: 1, progress: 0, dragging: true, teleported: false };
+        return { ...state, sheet: state.current, direction: 1, progress: 0, dragging: true };
       }
       if (state.current <= 0) return state;
-      return { ...state, sheet: state.current - 1, direction: -1, progress: 1, dragging: true, teleported: false };
+      return { ...state, sheet: state.current - 1, direction: -1, progress: 1, dragging: true };
     }
 
     case "DRAG_MOVE": {
@@ -75,19 +77,21 @@ export function reduce(state: EngineState, event: EngineEvent, total: number): E
     }
 
     case "TURN": {
-      if (state.sheet !== null || state.dragging) return state;
+      if (state.sheet !== null || state.dragging || state.riffle !== null) return state;
       const to = Math.min(Math.max(event.to, 0), total - 1);
       if (to === state.current) return state;
       const distance = Math.abs(to - state.current);
-      if (distance > RIFFLE_MAX) {
-        return { ...initialEngineState(to), teleported: true };
+      if (distance > 1) {
+        const riffle = createRiffleTransition(state.current, to);
+        if (!riffle) return state;
+        return {
+          ...state,
+          direction: riffle.direction,
+          riffle,
+        };
       }
       const direction: 1 | -1 = to > state.current ? 1 : -1;
-      const stops: number[] = [];
-      for (let s = state.current + direction; direction === 1 ? s <= to : s >= to; s += direction) {
-        stops.push(s);
-      }
-      return startAutoTurn({ ...state, teleported: false }, stops, direction);
+      return startAutoTurn(state, direction);
     }
 
     case "TICK_COMPLETE": {
@@ -102,13 +106,12 @@ export function reduce(state: EngineState, event: EngineEvent, total: number): E
         direction: 0,
         settleTarget: null,
       };
-      if (state.queue.length > 0) {
-        const [, ...remaining] = state.queue;
-        if (remaining.length === 0) return { ...rest, queue: [] };
-        const direction: 1 | -1 = remaining[0]! > landed ? 1 : -1;
-        return startAutoTurn({ ...rest, queue: [] }, remaining, direction);
-      }
       return rest;
+    }
+
+    case "RIFFLE_COMPLETE": {
+      if (state.riffle === null) return state;
+      return initialEngineState(state.riffle.to);
     }
 
     default:
@@ -116,7 +119,7 @@ export function reduce(state: EngineState, event: EngineEvent, total: number): E
   }
 }
 
-function startAutoTurn(state: EngineState, stops: readonly number[], direction: 1 | -1): EngineState {
+function startAutoTurn(state: EngineState, direction: 1 | -1): EngineState {
   const sheet = direction === 1 ? state.current : state.current - 1;
   return {
     ...state,
@@ -125,6 +128,6 @@ function startAutoTurn(state: EngineState, stops: readonly number[], direction: 
     dragging: false,
     progress: direction === 1 ? 0 : 1,
     settleTarget: direction === 1 ? 1 : 0,
-    queue: stops,
+    riffle: null,
   };
 }
