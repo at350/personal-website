@@ -277,7 +277,6 @@
 /* The recto carries three dense ledgers. Keep their rhythm explicit instead
    of letting the last recognition row run under the trim at shorter stages. */
 .resume2--recto {
-  padding-top: max(30px, 4.2cqh);
   padding-bottom: max(24px, 3.8cqh);
 }
 
