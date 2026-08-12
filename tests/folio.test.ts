@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   SPREADS,
+  bookLocationForSpread,
   pageLabel,
   routeForSpread,
+  spreadForBookLocation,
   spreadForPage,
   spreadForRoute,
   spreadPages,
@@ -43,6 +45,24 @@ describe("folio arithmetic", () => {
     const well = SPREADS.findIndex((s) => s.id === "well");
     expect(routeForSpread(well)).toBe("/projects");
     expect(routeForSpread(SPREADS.length - 1)).toBe("/contact");
+  });
+
+  it("round-trips a backward flip from resume onto the routeless project well", () => {
+    const resume = SPREADS.findIndex((s) => s.id === "resume");
+    const well = SPREADS.findIndex((s) => s.id === "well");
+    const projects = SPREADS.findIndex((s) => s.id === "features");
+
+    expect(resume - 1).toBe(well);
+
+    const landed = bookLocationForSpread(well);
+    expect(landed).toEqual({
+      pathname: "/projects",
+      state: { bookSpread: well },
+    });
+    expect(spreadForBookLocation(landed.pathname, landed.state)).toBe(well);
+
+    // A direct visit still opens the routed projects spread, not its well.
+    expect(spreadForBookLocation("/projects", null)).toBe(projects);
   });
 
   it("spreadForPage inverts spreadPages", () => {

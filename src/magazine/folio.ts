@@ -24,6 +24,14 @@ export const SPREADS: readonly SpreadDef[] = [
   { id: "back", route: null, label: "Back Cover", runningHead: null, kind: "back" },
 ] as const;
 
+export interface BookLocation {
+  pathname: string;
+  state: { bookSpread: number } | null;
+}
+
+const normalizeRoute = (route: string) =>
+  route !== "/" && route.endsWith("/") ? route.slice(0, -1) : route;
+
 /** Physical page numbers for a spread: [verso, recto]. Cover and back are unnumbered. */
 export function spreadPages(index: number, defs: readonly SpreadDef[] = SPREADS): [number, number] | null {
   const def = defs[index];
@@ -41,7 +49,7 @@ export function pageLabel(index: number, defs: readonly SpreadDef[] = SPREADS): 
 }
 
 export function spreadForRoute(route: string, defs: readonly SpreadDef[] = SPREADS): number {
-  const normalized = route !== "/" && route.endsWith("/") ? route.slice(0, -1) : route;
+  const normalized = normalizeRoute(route);
   const index = defs.findIndex(
     (d) => d.route === normalized || d.aliases?.includes(normalized),
   );
@@ -56,8 +64,51 @@ export function routeForSpread(index: number, defs: readonly SpreadDef[] = SPREA
   return "/";
 }
 
+/**
+ * Routeless spreads share the URL of the nearest routed spread before them.
+ * Preserve their physical index in history state so that syncing the URL does
+ * not send the book back to that earlier spread.
+ */
+export function bookLocationForSpread(
+  index: number,
+  defs: readonly SpreadDef[] = SPREADS,
+): BookLocation {
+  const pathname = routeForSpread(index, defs);
+  const roundTrips = spreadForRoute(pathname, defs) === index;
+  return {
+    pathname,
+    state: roundTrips ? null : { bookSpread: index },
+  };
+}
+
+/** Resolve a URL to a physical spread, honoring trusted routeless-spread state. */
+export function spreadForBookLocation(
+  route: string,
+  state: unknown,
+  defs: readonly SpreadDef[] = SPREADS,
+): number {
+  const normalized = normalizeRoute(route);
+  const candidate =
+    typeof state === "object" && state !== null && "bookSpread" in state
+      ? (state as { bookSpread?: unknown }).bookSpread
+      : null;
+
+  if (
+    typeof candidate === "number" &&
+    Number.isInteger(candidate) &&
+    candidate >= 0 &&
+    candidate < defs.length &&
+    defs[candidate]?.route === null &&
+    routeForSpread(candidate, defs) === normalized
+  ) {
+    return candidate;
+  }
+
+  return spreadForRoute(normalized, defs);
+}
+
 export function isKnownRoute(route: string): boolean {
-  const normalized = route !== "/" && route.endsWith("/") ? route.slice(0, -1) : route;
+  const normalized = normalizeRoute(route);
   return SPREADS.some(
     (d) => d.route === normalized || d.aliases?.includes(normalized),
   );
