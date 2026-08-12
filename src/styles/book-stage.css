@@ -94,12 +94,41 @@
 .ov-face {
   position: relative;
   overflow: hidden;
+  isolation: isolate;
   background: var(--paper);
   container-type: size;
 }
 
 .ov-face--void {
   background: transparent;
+}
+
+/* The live DOM carries the same quiet optical floor as the WebGL stack and
+   leaf. It never switches on at TURN; physical lighting only adds the moving
+   highlight while the sheet bends. This layer is intentionally absent from
+   the capture farm so it cannot be baked into the page texture twice. */
+.ov-face:not(.ov-face--void)::before {
+  content: "";
+  position: absolute;
+  inset: -8%;
+  z-index: 5;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse at 74% 14%,
+      rgba(255, 255, 255, 0.1),
+      transparent 38%
+    ),
+    linear-gradient(
+      118deg,
+      transparent 16%,
+      rgba(255, 255, 255, 0.035) 34%,
+      rgba(255, 255, 255, 0.16) 47%,
+      rgba(255, 255, 255, 0.05) 61%,
+      transparent 82%
+    );
+  mix-blend-mode: screen;
+  opacity: 0.68;
 }
 
 /* The gutter belongs to the printed page, not to a particular renderer.
@@ -111,7 +140,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 3;
+  z-index: 6;
 }
 
 /* The live DOM retains a faint trim line. The captured WebGL pages already

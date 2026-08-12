@@ -9,7 +9,7 @@ import { ISSUE } from "@/magazine/issue-map";
 import { SPREADS, pageLabel, spreadPages } from "@/magazine/folio";
 import { initialEngineState, reduce, type EngineEvent } from "@/magazine/engine";
 import { BookScene, type BookMotion } from "./BookScene";
-import { normalizeBookPointer, withinBookRegion } from "./bookPose";
+import { bookPointerFrame, normalizeBookPointer, withinBookRegion } from "./bookPose";
 import {
   CaptureFarm,
   pageRasterLayout,
@@ -140,6 +140,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
             : 0,
       pointerX: 0,
       pointerY: 0,
+      pointerActive: false,
       poseTarget: touchOnly ? 1 : 0,
       pose: touchOnly ? 1 : 0,
       turnPose: touchOnly ? 1 : 0,
@@ -209,6 +210,18 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   const atCover = state.current === 0;
   const atBack = state.current === TOTAL - 1;
   const restingShift = atCover ? -pw / 2 : atBack ? pw / 2 : 0;
+  const pointerFrame = useCallback(
+    () =>
+      bookPointerFrame({
+        viewportCenterX: window.innerWidth / 2,
+        viewportCenterY: window.innerHeight / 2,
+        shift: motion.shift,
+        pageWidth: pw,
+        pageHeight: ph,
+        visible: atCover ? "right" : atBack ? "left" : "spread",
+      }),
+    [atBack, atCover, motion, ph, pw],
+  );
 
   // Texture prefetch around the action.
   useEffect(() => {
@@ -352,14 +365,14 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       if (e.button !== 0) return;
       if (motion.leaf !== null || motion.dragging) return;
       if ((e.target as HTMLElement | null)?.closest(".bstage__nav")) return;
+      const frame = pointerFrame();
       if (
         !withinBookRegion({
           x: e.clientX,
           y: e.clientY,
-          centerX: window.innerWidth / 2 + motion.shift,
-          centerY: window.innerHeight / 2,
-          halfWidth: pw + GRAB_PAD,
-          halfHeight: ph / 2 + GRAB_PAD,
+          ...frame,
+          halfWidth: frame.halfWidth + GRAB_PAD,
+          halfHeight: frame.halfHeight + GRAB_PAD,
         })
       ) {
         return;
@@ -399,7 +412,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       window.addEventListener("pointerup", cleanup);
       window.addEventListener("pointercancel", cleanup);
     },
-    [beginDrag, motion, ph, pw, state, texturesReady],
+    [beginDrag, motion, pointerFrame, state, texturesReady],
   );
 
   // Pose choreography: the book rests as a display object and flattens for
@@ -413,23 +426,24 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
-      const cx = window.innerWidth / 2 + motion.shift;
-      const cy = window.innerHeight / 2;
-      const region = {
+      const frame = pointerFrame();
+      const point = {
         x: e.clientX,
         y: e.clientY,
-        centerX: cx,
-        centerY: cy,
-        halfWidth: pw + GRAB_PAD,
-        halfHeight: ph / 2 + GRAB_PAD,
+        ...frame,
       };
-      const pointer = normalizeBookPointer(region);
+      const pointer = normalizeBookPointer(point);
       motion.pointerX = pointer.x;
       motion.pointerY = pointer.y;
-      hoverRef.current = withinBookRegion(region);
+      motion.pointerActive = true;
+      hoverRef.current = withinBookRegion({
+        ...point,
+        halfWidth: frame.halfWidth + GRAB_PAD,
+        halfHeight: frame.halfHeight + GRAB_PAD,
+      });
       motion.poseTarget = desiredPose();
     },
-    [desiredPose, motion, ph, pw],
+    [desiredPose, motion, pointerFrame],
   );
 
   // The scene reports exact transform alignment every frame. The DOM only
