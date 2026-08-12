@@ -20,6 +20,13 @@ export interface CoverHologramMaterialState {
   strength?: number;
 }
 
+/** Visual contract: a white foil sweep leads; chroma remains the fringe. */
+export const COVER_HOLOGRAM_CHROMA_GAIN = 0.045;
+export const COVER_HOLOGRAM_GLARE_GAIN = 0.42;
+export const COVER_HOLOGRAM_PEAK_WHITE_MIX_MIN = 0.96;
+export const COVER_HOLOGRAM_MAX_ALPHA = 0.48;
+export const COVER_HOLOGRAM_FRESNEL_GAIN = 0.18;
+
 export const COVER_HOLOGRAM_VERTEX_SHADER = /* glsl */ `
   varying vec2 vHoloUv;
   varying vec3 vHoloNormal;
@@ -67,6 +74,7 @@ export const COVER_HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
       patternPixel.rgb,
       vec3(0.2126, 0.7152, 0.0722)
     );
+    float coating = smoothstep(0.004, 0.16, pattern);
 
     vec3 viewNormal = normalize(vHoloNormal);
     vec3 viewDirection = normalize(vHoloViewPosition);
@@ -85,9 +93,10 @@ export const COVER_HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
       - uPointer.y * 0.14
       + uFlip * 0.10
       + normalTravel;
-    float band = holoBell(diagonal - center, 0.13)
-      + 0.72 * holoBell(diagonal - (center - 0.34), 0.105);
-    band = clamp(band, 0.0, 1.0);
+    float primaryWide = holoBell(diagonal - center, 0.22);
+    float primaryCore = holoBell(diagonal - center, 0.075);
+    float secondary = holoBell(diagonal - (center - 0.34), 0.11);
+    float colorBand = clamp(primaryWide + 0.55 * secondary, 0.0, 1.0);
 
     float phase = diagonal * 1.18
       + uPointer.x * 0.12
@@ -97,17 +106,34 @@ export const COVER_HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
     vec3 spectrum = holoSpectrum(fract(phase));
 
     float angularResponse = 0.72 + grazing * 0.55;
-    float patternedFoil = (0.09 + band * 0.26) * angularResponse;
-    float whiteReflection = band * band * (0.014 + grazing * 0.02);
-    // Every term is pattern-bound. The book already supplies its own page
-    // sheen, so a second full-page glare would wash out the static cover.
+    float colorFoil = (0.012 + colorBand * ${COVER_HOLOGRAM_CHROMA_GAIN.toFixed(3)})
+      * angularResponse;
+    float whiteReflection = primaryWide * (0.18 + grazing * 0.12)
+      + primaryCore * (${COVER_HOLOGRAM_GLARE_GAIN.toFixed(2)} + grazing * 0.20)
+      + secondary * (0.07 + grazing * 0.045);
+    float fresnelSheen = (0.018 + grazing * ${COVER_HOLOGRAM_FRESNEL_GAIN.toFixed(2)})
+      * (0.42 + 0.58 * primaryWide);
+    float totalFoil = colorFoil + whiteReflection + fresnelSheen;
+    // uFlip is exactly zero at both landed endpoints and symmetric for reverse
+    // turns, so the motion-only foil cannot flash against the neutral cover.
+    float motionVisibility = smoothstep(0.0, 0.28, uFlip);
     float alpha = clamp(
-      pattern * (patternedFoil + whiteReflection) * uStrength * edgeFade,
+      coating * totalFoil * uStrength * edgeFade * motionVisibility,
       0.0,
-      0.24
+      ${COVER_HOLOGRAM_MAX_ALPHA.toFixed(2)}
     );
-    float reflectionMix = clamp(whiteReflection * 10.0, 0.0, 0.5);
-    vec3 color = mix(spectrum, vec3(1.0), reflectionMix);
+    // Pure white vanishes against white stock. A broad neutral-silver shoulder
+    // gives the narrow white core enough contrast to read as reflected light;
+    // only a small spectrum fraction remains at the fringe.
+    vec3 silverPearl = mix(vec3(0.48, 0.57, 0.68), spectrum, 0.10);
+    float reflectionMix = clamp(
+      primaryCore * primaryCore * ${COVER_HOLOGRAM_PEAK_WHITE_MIX_MIN.toFixed(2)}
+        + primaryWide * 0.06
+        + secondary * 0.08,
+      0.0,
+      0.96
+    );
+    vec3 color = mix(silverPearl, vec3(1.0), reflectionMix);
 
     gl_FragColor = vec4(color, alpha);
   }

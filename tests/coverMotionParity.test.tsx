@@ -32,6 +32,19 @@ beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
 describe("cover motion parity", () => {
+  it.each(["book", "reader"] as const)(
+    "does not render hologram markup on the static %s cover",
+    (mode) => {
+      const { container } = render(
+        <MemoryRouter>
+          <Cover face="recto" mode={mode} />
+        </MemoryRouter>,
+      );
+
+      expect(container.querySelector(".cover2__hologram")).toBeNull();
+    },
+  );
+
   it("keeps the live book cover in the same settled state as its texture", () => {
     render(
       <MemoryRouter>

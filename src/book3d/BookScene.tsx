@@ -28,6 +28,7 @@ import {
 import { withBasePath } from "@/lib/basePath";
 import {
   COVER_HOLOGRAM_PATTERN_PATH,
+  isMovingCoverSheet,
 } from "@/magazine/coverHologram";
 import {
   createCoverHologramMaterial,
@@ -224,7 +225,7 @@ function setPaperMaterialActivity(material: THREE.Material, activity: number) {
   }
 }
 
-/** One authored UV mask, reused by both the flat cover and its bending leaf. */
+/** One authored UV mask, attached only to the bending cover leaf. */
 function useCoverHologramMaterial(motion: BookMotion) {
   const pattern = useLoader(
     THREE.TextureLoader,
@@ -247,7 +248,7 @@ function useCoverHologramMaterial(motion: BookMotion) {
     updateCoverHologramMaterial(material, {
       pointerX: motion.pointerX,
       pointerY: motion.pointerY,
-      progress: motion.leaf === 0 ? motion.progress : 0,
+      progress: isMovingCoverSheet(motion.leaf) ? motion.progress : 0,
     });
   });
   return material;
@@ -272,28 +273,6 @@ function useFastCoverHologramMaterial() {
   );
   useEffect(() => () => material.dispose(), [material]);
   return material;
-}
-
-/** The posed closed book is an unlit stack, so its foil is a matching skin. */
-function RestingCoverHologram({
-  motion,
-  pw,
-  ph,
-}: {
-  motion: BookMotion;
-  pw: number;
-  ph: number;
-}) {
-  const material = useCoverHologramMaterial(motion);
-  return (
-    <mesh
-      position={[pw / 2, 0, 0.32]}
-      material={material}
-      renderOrder={3}
-    >
-      <planeGeometry args={[pw, ph]} />
-    </mesh>
-  );
 }
 
 function Stack({
@@ -485,7 +464,7 @@ function Leaf({
     <group>
       <mesh ref={mesh} geometry={geometry} material={frontMat} castShadow receiveShadow />
       <mesh ref={backMesh} geometry={geometry} material={backMat} castShadow receiveShadow />
-      {motion.leaf === 0 ? (
+      {isMovingCoverSheet(motion.leaf) ? (
         <mesh
           geometry={geometry}
           material={hologramMat}
@@ -577,7 +556,7 @@ function FastLeaf({
     if (sheet === null) return;
     const completion = riffleLeafCompletion(clock.current, ordinal);
     const progress = riffleLeafProgress(clock.current, ordinal, direction);
-    if (sheet === 0) {
+    if (isMovingCoverSheet(sheet)) {
       updateCoverHologramMaterial(hologramMat, {
         pointerX: motion.pointerX,
         pointerY: motion.pointerY,
@@ -620,7 +599,7 @@ function FastLeaf({
     <group visible={sheet !== null}>
       <mesh geometry={geometry} material={frontMat} castShadow receiveShadow />
       <mesh geometry={geometry} material={backMat} castShadow receiveShadow />
-      {sheet === 0 ? (
+      {isMovingCoverSheet(sheet) ? (
         <mesh geometry={geometry} material={hologramMat} renderOrder={3} />
       ) : null}
       <lineLoop geometry={outlineGeometry} renderOrder={4 + ordinal}>
@@ -953,9 +932,6 @@ export function BookScene({
           <planeGeometry args={[pw * 2, ph]} />
           <shadowMaterial transparent opacity={0.15} depthWrite={false} />
         </mesh>
-        {motion.leaf === null && motion.current === 0 && riffle === null ? (
-          <RestingCoverHologram motion={motion} pw={pw} ph={ph} />
-        ) : null}
         <Leaf motion={motion} pw={pw} ph={ph} paperBump={paperBump} />
         <FastRiffle
           transition={riffle}
