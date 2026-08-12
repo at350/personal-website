@@ -9,7 +9,7 @@ import { ISSUE } from "@/magazine/issue-map";
 import { SPREADS, pageLabel, spreadPages } from "@/magazine/folio";
 import { initialEngineState, reduce, type EngineEvent } from "@/magazine/engine";
 import { BookScene, type BookMotion } from "./BookScene";
-import { normalizeBookPointer } from "./bookPose";
+import { normalizeBookPointer, withinBookRegion } from "./bookPose";
 import {
   CaptureFarm,
   pageRasterLayout,
@@ -23,6 +23,10 @@ import { GridOverlay } from "@/components/furniture/GridOverlay";
 import "@/styles/book-stage.css";
 
 const TOTAL = SPREADS.length;
+
+/** Margin (px) beyond the paper where hover still flattens the book and a
+    pull still starts a turn. */
+const GRAB_PAD = 48;
 
 function EntryLoader({ progress }: { progress: TextureProgress }) {
   const ratio = progress.total === 0 ? 0 : progress.completed / progress.total;
@@ -237,6 +241,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       startY: number,
       pointerId: number,
     ) => {
+      if (motion.dragging) return;
       if (motion.leaf !== null && motion.target !== null) return;
       dispatch({ type: "DRAG_START", edge });
       const stage = stageRef.current;
@@ -304,13 +309,29 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     [beginDrag],
   );
 
-  // Grab anywhere on the paper: a horizontal pull past a small threshold
-  // becomes a page turn; a plain click stays a click. Never selects text.
+  // Grab anywhere on or near the book — posed mesh and live DOM alike: a
+  // horizontal pull past a small threshold becomes a page turn; a plain click
+  // stays a click. Lives on the stage, not the overlay, so the paper is
+  // grabbable even before the WebGL-to-DOM handoff makes the overlay
+  // interactive. Never selects text.
   const onSurfaceDown = useCallback(
     (e: React.PointerEvent) => {
       if (!texturesReady) return;
       if (e.button !== 0) return;
       if (motion.leaf !== null || motion.dragging) return;
+      if ((e.target as HTMLElement | null)?.closest(".bstage__nav")) return;
+      if (
+        !withinBookRegion({
+          x: e.clientX,
+          y: e.clientY,
+          centerX: window.innerWidth / 2 + motion.shift,
+          centerY: window.innerHeight / 2,
+          halfWidth: pw + GRAB_PAD,
+          halfHeight: ph / 2 + GRAB_PAD,
+        })
+      ) {
+        return;
+      }
       const downX = e.clientX;
       const downY = e.clientY;
       const pointerId = e.pointerId;
@@ -346,7 +367,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       window.addEventListener("pointerup", cleanup);
       window.addEventListener("pointercancel", cleanup);
     },
-    [beginDrag, motion, state, texturesReady],
+    [beginDrag, motion, ph, pw, state, texturesReady],
   );
 
   // Pose choreography: the book rests as a display object and flattens for
@@ -362,18 +383,18 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     (e: React.PointerEvent) => {
       const cx = window.innerWidth / 2 + motion.shift;
       const cy = window.innerHeight / 2;
-      const pointer = normalizeBookPointer({
+      const region = {
         x: e.clientX,
         y: e.clientY,
         centerX: cx,
         centerY: cy,
-        halfWidth: pw + 48,
-        halfHeight: ph / 2 + 48,
-      });
+        halfWidth: pw + GRAB_PAD,
+        halfHeight: ph / 2 + GRAB_PAD,
+      };
+      const pointer = normalizeBookPointer(region);
       motion.pointerX = pointer.x;
       motion.pointerY = pointer.y;
-      hoverRef.current =
-        Math.abs(e.clientX - cx) < pw + 48 && Math.abs(e.clientY - cy) < ph / 2 + 48;
+      hoverRef.current = withinBookRegion(region);
       motion.poseTarget = desiredPose();
     },
     [desiredPose, motion, ph, pw],
@@ -444,6 +465,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     <div
       className="bstage"
       ref={stageRef}
+      onPointerDown={onSurfaceDown}
       onPointerMove={onPointerMove}
       aria-busy={!texturesReady}
     >
@@ -466,7 +488,6 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       <div
         ref={overlayRef}
         className="bstage__spread"
-        onPointerDown={onSurfaceDown}
         style={{
           width: pw * 2,
           height: ph,
@@ -487,10 +508,11 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         </div>
       </div>
 
-      {/* Fore-edge drag zones sit over everything at the page edges. */}
+      {/* Fore-edge drag zones sit over everything at the page edges: the one
+          place a press grabs the sheet instantly, no pull threshold. */}
       <div
         className="bstage__edge bstage__edge--back"
-        style={{ left: `calc(50% + ${shift}px - ${pw}px - 24px)` }}
+        style={{ left: `calc(50% + ${shift}px - ${pw}px - ${GRAB_PAD}px)` }}
         onPointerDown={onEdgeDown("back")}
         role="presentation"
       />
