@@ -34,6 +34,59 @@ const POINTER_YAW = 0.3;
 const POINTER_PITCH = 0.2;
 
 const clamp = (value: number) => Math.min(1, Math.max(-1, value));
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+/** Closed covers occupy only one side of the spine, so their resting book
+ * center is half a page away from the center of an open spread. */
+export function bookRestingShift(
+  spread: number,
+  totalSpreads: number,
+  pageWidth: number,
+): number {
+  if (spread === 0) return -pageWidth / 2;
+  if (spread === totalSpreads - 1) return pageWidth / 2;
+  return 0;
+}
+
+/**
+ * Couple the book center to a boundary cover's physical flip progress.
+ *
+ * Sheet progress has the same meaning in either direction (0 = on the right,
+ * 1 = on the left), so this also follows reverse drags and canceled turns
+ * without starting a second animation. Interior sheets return null because a
+ * full spread is already centered on both sides of their turn.
+ */
+export function bookCoverTurnShift(
+  sheet: number,
+  progress: number,
+  totalSpreads: number,
+  pageWidth: number,
+): number | null {
+  const clampedProgress = clamp01(progress);
+  if (sheet === 0) {
+    return -pageWidth / 2 + (pageWidth / 2) * clampedProgress;
+  }
+  if (sheet === totalSpreads - 2) {
+    return (pageWidth / 2) * clampedProgress;
+  }
+  return null;
+}
+
+/** Long jumps share the same centering choreography as a hand-driven cover.
+ * Smoothstep softens the otherwise-linear riffle clock at both endpoints. */
+export function bookRiffleShift(
+  from: number,
+  to: number,
+  progress: number,
+  totalSpreads: number,
+  pageWidth: number,
+): number {
+  const linear = clamp01(progress);
+  const eased = linear * linear * (3 - 2 * linear);
+  const start = bookRestingShift(from, totalSpreads, pageWidth);
+  const end = bookRestingShift(to, totalSpreads, pageWidth);
+  return start + (end - start) * eased;
+}
 
 /** The visible paper's screen-space frame. Closed covers occupy one side of
     the spine, so treating the spine as their center biases pointer input to a
