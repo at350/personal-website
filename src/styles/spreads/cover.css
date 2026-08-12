@@ -66,17 +66,20 @@
   filter: contrast(1.12) brightness(1.045);
 }
 
-/*
- * Cover foil: the alpha mask is authored in the same 3:4 page coordinates as
- * the captured cover. Its nested contours follow the photographed folded A;
- * spectrum and reflection move, while that pattern remains fixed to paper.
- */
+/* The foil is registered to two existing planes in the paper photograph. The
+   parent owns the mask so both color and reflection stop at those surfaces. */
 .cover2__hologram {
   position: absolute;
   inset: 0;
   z-index: 1;
   overflow: hidden;
   pointer-events: none;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
 }
 
 .cover2__hologram-spectrum,
@@ -102,18 +105,12 @@
   background-position:
     calc(50% + var(--holo-shift-x, 0%))
     calc(50% + var(--holo-shift-y, 0%));
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  opacity: 0.72;
-  filter: saturate(1.12);
+  opacity: 0.54;
+  filter: saturate(1.06);
   transition: background-position 90ms linear;
 }
 
-/* Two displaced highlights reproduce the reference's luminance mask. */
+/* A restrained highlight moves inside the same photographed planes. */
 .cover2__hologram-glare {
   background:
     radial-gradient(
@@ -137,7 +134,7 @@
     calc(50% + var(--holo-shift-x, 0%))
       calc(50% + var(--holo-shift-y, 0%));
   mix-blend-mode: screen;
-  opacity: 0.62;
+  opacity: 0.36;
   transition: background-position 90ms linear;
 }
 

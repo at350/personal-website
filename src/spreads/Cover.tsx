@@ -114,14 +114,15 @@ export function Cover({ face, mode }: SpreadFaceProps) {
         />
       </figure>
 
-      <span className="cover2__hologram" aria-hidden>
-        <span
-          className="cover2__hologram-spectrum"
-          style={{
-            WebkitMaskImage: `url("${withBasePath(COVER_HOLOGRAM_PATTERN_PATH)}")`,
-            maskImage: `url("${withBasePath(COVER_HOLOGRAM_PATTERN_PATH)}")`,
-          }}
-        />
+      <span
+        className="cover2__hologram"
+        aria-hidden
+        style={{
+          WebkitMaskImage: `url("${withBasePath(COVER_HOLOGRAM_PATTERN_PATH)}")`,
+          maskImage: `url("${withBasePath(COVER_HOLOGRAM_PATTERN_PATH)}")`,
+        }}
+      >
+        <span className="cover2__hologram-spectrum" />
         <span className="cover2__hologram-glare" />
       </span>
 
