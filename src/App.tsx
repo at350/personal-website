@@ -12,6 +12,7 @@ import { ReaderView } from "./routes/ReaderView";
 import { WritingPage } from "./routes/WritingPage";
 import { NotFound } from "./routes/NotFound";
 import { applyMeta } from "./lib/meta";
+import { routerBasename } from "./lib/basePath";
 
 function IssueView() {
   const location = useLocation();
@@ -73,7 +74,7 @@ function Meta() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={routerBasename()}>
       <Meta />
       <Routes>
         <Route path="/writing/:slug" element={<WritingPage />} />

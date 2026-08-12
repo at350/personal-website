@@ -10,6 +10,7 @@ import { PaperSheet } from "./paperPhysics";
 import { handoffOpacity } from "./handoff";
 import { bookPoseAngles } from "./bookPose";
 import { paperTurnActivity } from "./paperMaterial";
+import { withBasePath } from "@/lib/basePath";
 import { getPageTexture, onTexturesChanged, pageKey } from "./pageTextures";
 import { SPREADS } from "@/magazine/folio";
 
@@ -89,7 +90,9 @@ function edgeTexture(): THREE.CanvasTexture {
 
 function usePaperBumpTexture() {
   return useMemo(() => {
-    const texture = new THREE.TextureLoader().load("/images/editorial/paper-fiber.webp");
+    const texture = new THREE.TextureLoader().load(
+      withBasePath("/images/editorial/paper-fiber.webp"),
+    );
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(5, 7);

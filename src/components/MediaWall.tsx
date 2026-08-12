@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Link } from "react-router";
 import type { MediaImage, MediaItem, MediaKind, MediaSource } from "@/lib/media/types";
+import { withBasePath } from "@/lib/basePath";
 import "@/styles/spreads/library.css";
 
 /* ————— Shared filter store —————
@@ -144,7 +145,7 @@ function PlateThumb({ image }: { image: MediaImage }) {
           if (el?.complete && el.naturalWidth > 0) setLoaded(true);
         }}
         className="media-plate__thumb"
-        src={image.src}
+        src={withBasePath(image.src)}
         alt={image.alt}
         width={image.width}
         height={image.height}
