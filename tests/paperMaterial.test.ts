@@ -3,7 +3,7 @@ import { ShaderLib } from "three";
 import {
   fadeSettlingActivity,
   injectPaperActivity,
-  PAPER_BASE_RESPONSE,
+  PAPER_MOTION_RESPONSE_MAX,
   paperGleamActivity,
   paperOpticalResponse,
   paperTurnActivity,
@@ -11,12 +11,16 @@ import {
 import { SETTLE_HOLD_MAX, SHEET_REST_ENERGY } from "../src/book3d/settle";
 
 describe("moving paper material", () => {
-  it("keeps the same low optical response at both landing frames", () => {
+  it("uses the exact captured texture at both landing frames", () => {
     expect(paperTurnActivity(0)).toBe(0);
     expect(paperTurnActivity(1)).toBe(0);
-    expect(paperOpticalResponse(paperTurnActivity(0))).toBe(PAPER_BASE_RESPONSE);
-    expect(paperOpticalResponse(paperTurnActivity(1))).toBe(PAPER_BASE_RESPONSE);
-    expect(paperOpticalResponse(1)).toBe(1);
+    expect(paperOpticalResponse(paperTurnActivity(0))).toBe(0);
+    expect(paperOpticalResponse(paperTurnActivity(1))).toBe(0);
+    expect(paperOpticalResponse(1)).toBe(PAPER_MOTION_RESPONSE_MAX);
+  });
+
+  it("keeps the moving accent subordinate to the persistent page sheen", () => {
+    expect(PAPER_MOTION_RESPONSE_MAX).toBeLessThanOrEqual(0.2);
   });
 
   it("reaches full glossy response while the leaf is airborne", () => {
@@ -32,8 +36,8 @@ describe("moving paper material", () => {
 
 describe("paper fragment shader injection", () => {
   // three's meshphysical template applies sheen and clearcoat AFTER the base
-  // outgoingLight line. Keep them on the same baseline-plus-motion response
-  // as the custom paper gleam so no term switches independently at a landing.
+  // outgoingLight line. Keep them on the same motion response as the custom
+  // gleam so every physical term switches off at the canonical landing pixels.
   const patched = injectPaperActivity(ShaderLib.physical.fragmentShader);
 
   it("replaces the base lighting line with the activity-gated paper model", () => {
@@ -41,7 +45,7 @@ describe("paper fragment shader injection", () => {
       "vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;",
     );
     expect(patched).toContain(
-      `float paperResponse = mix(${PAPER_BASE_RESPONSE.toFixed(3)}, 1.0, paperActivity);`,
+      `float paperResponse = ${PAPER_MOTION_RESPONSE_MAX.toFixed(3)} * paperActivity;`,
     );
     expect(patched).toContain("paperGleam");
   });
@@ -66,8 +70,8 @@ describe("gleam envelope", () => {
   it("drops only the motion boost once the sheet truly rests", () => {
     expect(paperGleamActivity(0, 0)).toBe(0);
     expect(paperGleamActivity(1, 0)).toBe(0);
-    expect(paperOpticalResponse(paperGleamActivity(0, 0))).toBe(PAPER_BASE_RESPONSE);
-    expect(paperOpticalResponse(paperGleamActivity(1, 0))).toBe(PAPER_BASE_RESPONSE);
+    expect(paperOpticalResponse(paperGleamActivity(0, 0))).toBe(0);
+    expect(paperOpticalResponse(paperGleamActivity(1, 0))).toBe(0);
   });
 
   it("keeps full response mid-flight", () => {
@@ -83,7 +87,7 @@ describe("gleam envelope", () => {
   it("carries zero motion gleam at any energy the settle gate can swap on", () => {
     // The gate completes when sheetEnergy < SHEET_REST_ENERGY. Whatever frame
     // it fires on, the motion term must already be zero so both layers show
-    // only the same resting sheen at and below that threshold.
+    // only the canonical baked-in sheen at and below that threshold.
     for (const energy of [0, SHEET_REST_ENERGY / 2, SHEET_REST_ENERGY]) {
       expect(paperGleamActivity(1, energy)).toBe(0);
       expect(paperGleamActivity(0, energy)).toBe(0);

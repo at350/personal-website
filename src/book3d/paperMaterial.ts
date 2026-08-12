@@ -2,12 +2,13 @@ import { SHEET_REST_ENERGY } from "./settle";
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
-/** The low optical response shared by resting DOM pages, stack tops, and the
-    active leaf. Motion adds to this floor; it never creates glare from zero. */
-export const PAPER_BASE_RESPONSE = 0.16;
+/** The persistent sheen is baked into the canonical page texture. Physical
+    lighting is therefore motion-only and deliberately capped: it accents the
+    bend without turning the moving sheet into a different paper stock. */
+export const PAPER_MOTION_RESPONSE_MAX = 0.18;
 
 export function paperOpticalResponse(motionActivity: number) {
-  return PAPER_BASE_RESPONSE + (1 - PAPER_BASE_RESPONSE) * clamp01(motionActivity);
+  return PAPER_MOTION_RESPONSE_MAX * clamp01(motionActivity);
 }
 
 /** If the physical settle gate reaches its safety timeout with residual sheet
@@ -27,7 +28,7 @@ export function fadeSettlingActivity(
 /**
  * Motion response is strongest in the air and zero on either stack. Squaring
  * the sine gives the boost a zero slope at both endpoints, so it grows out of
- * the always-on paper sheen instead of appearing on the first moving frame.
+ * the baked-in page sheen instead of appearing on the first moving frame.
  */
 export function paperTurnActivity(progress: number) {
   const clamped = clamp01(progress);
@@ -61,7 +62,7 @@ function motionGleam(energy: number) {
  * mid-flight gloss; motion keeps it breathing while the under-damped sheet is
  * still physically settling, so the highlight dies with the paper's movement
  * instead of cutting out while the page is visibly waving. Exactly zero once
- * the sheet rests; the shared baseline response remains underneath it.
+ * the sheet rests; the canonical texture and its baked sheen remain underneath.
  */
 export function paperGleamActivity(progress: number, energy: number) {
   return Math.min(1, Math.max(paperTurnActivity(progress), motionGleam(energy)));
@@ -69,13 +70,12 @@ export function paperGleamActivity(progress: number, energy: number) {
 
 /**
  * Patch three's meshphysical fragment template so EVERY lighting term runs
- * through one optical response: an always-on paper floor plus the motion
- * activity envelope. The base line gets the paper model, and
+ * through one capped, motion-only optical response. The base line gets the
+ * paper model, and
  * — critically — the sheen and clearcoat post-mixes that three applies AFTER
- * that line are gated too: ungated, clearcoat alone dims a resting page ~2%
- * (times Fresnel at grazing angles) and both otherwise bypass that envelope.
- * At paperActivity = 1 the response is full; at 0 the common low sheen remains
- * so the resting stack, first active frame, and landing frame agree.
+ * that line are gated too. At paperActivity = 0 the output is the captured
+ * page texture exactly, including its persistent sheen; motion adds only a
+ * capped view-dependent accent, then returns to those same pixels at landing.
  */
 export function injectPaperActivity(fragmentShader: string): string {
   return fragmentShader
@@ -86,7 +86,7 @@ export function injectPaperActivity(fragmentShader: string): string {
     .replace(
       "vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;",
       `
-        float paperResponse = mix(${PAPER_BASE_RESPONSE.toFixed(3)}, 1.0, paperActivity);
+        float paperResponse = ${PAPER_MOTION_RESPONSE_MAX.toFixed(3)} * paperActivity;
         float pageAlbedoLuma = max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.035);
         float pageLightLuma = dot(totalDiffuse, vec3(0.2126, 0.7152, 0.0722)) / pageAlbedoLuma;
         float pageLight = smoothstep(0.25, 1.05, pageLightLuma);
