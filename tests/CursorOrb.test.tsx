@@ -52,25 +52,23 @@ afterEach(() => {
 });
 
 describe("CursorOrb", () => {
-  it("snaps in at the pointer, then follows subsequent motion smoothly", () => {
+  it("snaps the ring in at the pointer, then follows subsequent motion smoothly", () => {
     stubMediaQueries();
     const frames = stubAnimationFrames();
     const { container } = render(<CursorOrb />);
     const root = container.querySelector(".cursor-orb")!;
     const ring = container.querySelector<HTMLElement>(".cursor-orb__ring")!;
-    const dot = container.querySelector<HTMLElement>(".cursor-orb__dot")!;
+    expect(container.querySelector(".cursor-orb__dot")).toBeNull();
 
     fireEvent.pointerMove(document.body, { clientX: 100, clientY: 50 });
     expect(root.getAttribute("aria-hidden")).toBe("true");
     expect(root.classList.contains("is-visible")).toBe(true);
     expect(ring.style.transform).toContain("87.00px, 37.00px");
-    expect(dot.style.transform).toContain("97.00px, 47.00px");
 
     frames.run(1, 16.7);
     fireEvent.pointerMove(document.body, { clientX: 200, clientY: 50 });
     frames.run(2, 33.4);
 
-    expect(dot.style.transform).toContain("197.00px, 47.00px");
     expect(ring.style.transform).toContain("103.00px, 37.00px");
   });
 
