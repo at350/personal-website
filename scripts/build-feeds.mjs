@@ -1,6 +1,6 @@
 /* Post-build: write rss.xml and sitemap.xml into dist/. */
-import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 const SITE = process.env.SITE_URL?.replace(/\/$/, "") || "https://alantai.dev";
 const dist = resolve(process.cwd(), "dist");
@@ -63,11 +63,18 @@ ${ROUTES.map((r) => `  <url><loc>${SITE}${r}</loc></url>`).join("\n")}
 `,
 );
 
-// GitHub Pages has no rewrite layer. Its custom 404 document boots the SPA
-// while preserving the requested route for React Router.
-copyFileSync(resolve(dist, "index.html"), resolve(dist, "404.html"));
+// GitHub Pages has no rewrite layer. Give every known route a real static
+// shell, while retaining a 404 shell for unknown paths handled by the app.
+const appShell = resolve(dist, "index.html");
+for (const route of ROUTES) {
+  if (route === "/") continue;
+  const routeShell = resolve(dist, route.slice(1), "index.html");
+  mkdirSync(dirname(routeShell), { recursive: true });
+  copyFileSync(appShell, routeShell);
+}
+copyFileSync(appShell, resolve(dist, "404.html"));
 writeFileSync(resolve(dist, ".nojekyll"), "");
 
 console.log(
-  `feeds: rss.xml + sitemap.xml written for ${ROUTES.length} routes; Pages fallback ready`,
+  `feeds: rss.xml + sitemap.xml and ${ROUTES.length} Pages shells written`,
 );
