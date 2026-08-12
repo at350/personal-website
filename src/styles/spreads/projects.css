@@ -17,10 +17,11 @@
   margin-left: -8cqw; /* the page's grid-break: the numeral hits the raw fore-edge */
   font-family: var(--font-condensed);
   font-weight: 400;
-  font-size: 31cqw;
-  line-height: 0.8;
-  letter-spacing: -0.004em;
+  font-size: 42cqw;
+  line-height: 0.72;
+  letter-spacing: -0.035em;
   color: var(--paper);
+  font-feature-settings: "lnum" 1;
 }
 
 /* Tucked into the counterform under the V. The rule is the page's one red. */
@@ -104,10 +105,25 @@
   padding: 12cqh 8cqw 9cqh;
 }
 
+.proj-index__eyebrow {
+  margin-bottom: 1.4cqh;
+  color: var(--ink-2);
+  font-size: max(11px, 1.35cqw);
+  letter-spacing: 0.12em;
+}
+
 .proj-index__list {
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--hairline);
+}
+
+.proj-index[data-mode="book"] .proj-index__list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-3) transparent;
 }
 
 .proj-index__item {
@@ -117,7 +133,7 @@
 .proj-index__row {
   width: 100%;
   display: grid;
-  grid-template-columns: 7cqw 1fr auto;
+  grid-template-columns: 7cqw minmax(0, 1fr) auto 2.2cqw;
   column-gap: 2.4cqw;
   align-items: baseline;
   padding: 1.9cqh 0;
@@ -150,8 +166,15 @@
 }
 
 .proj-index__meta {
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: max(11px, 1.5cqw);
+  text-align: right;
+}
+
+.proj-index__toggle {
+  color: var(--ink-2);
+  font-size: max(13px, 1.8cqw);
+  line-height: 1;
   text-align: right;
 }
 
@@ -201,10 +224,94 @@
   max-width: 56cqw;
 }
 
+.proj-index__detail {
+  font-family: var(--font-body);
+  line-height: 1.5;
+  font-size: clamp(11px, 1.85cqw, 14px);
+  color: var(--ink-2);
+  max-width: 58cqw;
+}
+
+.proj-tech {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8cqh 1.2cqw;
+}
+
+.proj-tech__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.52em;
+  border: 1px solid var(--hairline);
+  padding: 0.28em 0.65em;
+  color: var(--ink-2);
+  font-size: max(11px, 1.4cqw);
+  white-space: nowrap;
+}
+
+.proj-tech__mark {
+  width: 1.08em;
+  height: 1.08em;
+  flex: 0 0 1.08em;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: -0.08em;
+  line-height: 1;
+}
+
+.proj-tech__mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: grayscale(1) contrast(1.35);
+}
+
+.proj-index__recognition {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(11px, 2cqw, 15px);
+  line-height: 1.5;
+  color: var(--ink-2);
+  max-width: 54cqw;
+}
+
 /* The section's accent. */
 .proj-star {
   color: var(--red);
   font-style: normal;
+}
+
+.proj-index__link {
+  color: var(--ink);
+  font-size: max(11px, 1.5cqw);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 2px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  transition:
+    color 200ms var(--ease-settle),
+    border-color 200ms var(--ease-settle);
+}
+
+.proj-index__links,
+.proj-feature__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5cqh 2cqw;
+}
+
+.proj-index__link:hover,
+.proj-index__link:focus-visible {
+  color: var(--red);
+  border-color: var(--red);
 }
 
 /* ————— pp.10–11 · the well ————— */
@@ -297,6 +404,17 @@
   max-width: 62cqw;
 }
 
+.proj-feature .proj-feature__stack {
+  margin-top: 1.8cqh;
+  gap: 0.65cqh 0.85cqw;
+}
+
+.proj-feature .proj-feature__stack .proj-tech__item {
+  padding: 0;
+  border: 0;
+  font-size: max(11px, 1.35cqw);
+}
+
 .proj-feature__recognition {
   margin-top: 1.6cqh;
   font-family: var(--font-body);
@@ -308,16 +426,22 @@
 }
 
 .proj-feature__link {
-  margin-top: 1.8cqh;
   width: max-content;
   color: var(--ink);
   font-size: max(11px, 1.5cqw);
   text-decoration: none;
   border-bottom: 1px solid var(--ink);
   padding-bottom: 2px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
   transition:
     color 200ms var(--ease-settle),
     border-color 200ms var(--ease-settle);
+}
+
+.proj-feature__links {
+  margin-top: 1.3cqh;
 }
 
 .proj-feature__link:hover,
@@ -326,10 +450,31 @@
   border-color: var(--red);
 }
 
+.proj-rest {
+  margin-top: 2.2cqh;
+  border-top: 1px solid var(--hairline);
+  padding-top: 1.2cqh;
+}
+
+.proj-rest__all {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-2);
+  font-size: max(11px, 1.35cqw);
+  text-decoration: none;
+}
+
+.proj-rest__all:hover,
+.proj-rest__all:focus-visible {
+  color: var(--red);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .proj-index__no,
   .proj-index__reveal,
   .proj-index__body,
+  .proj-index__link,
   .proj-feature__link {
     transition: none;
   }

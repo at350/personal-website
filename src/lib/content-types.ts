@@ -43,9 +43,24 @@ export const ProjectSchema = z.object({
   summary: z.string(),
   detail: z.string(),
   stack: z.array(z.string()).min(2),
+  featureOrder: z.number().int().positive().optional(),
   recognition: z.string().optional(),
-  image: z.string().optional(),
-  link: z.object({ label: z.string(), href: z.string().url() }).optional(),
+  image: z
+    .object({
+      src: z.string().startsWith("/images/"),
+      alt: z.string().min(8),
+    })
+    .optional(),
+  links: z
+    .array(
+      z.object({
+        kind: z.enum(["github", "prototype", "devpost", "case-study"]),
+        label: z.string(),
+        href: z.string().url(),
+      }),
+    )
+    .min(1)
+    .optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

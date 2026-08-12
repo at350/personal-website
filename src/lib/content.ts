@@ -61,13 +61,17 @@ export const about = {
   ],
 } satisfies AboutContent;
 
-export const projects = [
+export const projects: readonly Project[] = [
   {
     id: "architec",
     name: "Architec",
     discipline: "Energy systems",
     year: "2026",
-    image: "/images/projects/editorial/architec-study.webp",
+    featureOrder: 1,
+    image: {
+      src: "/images/projects/editorial/architec-study.webp",
+      alt: "Conceptual Architec study with layered architectural planes, a black building volume, and a red translucent energy plane.",
+    },
     summary:
       "An energy-audit tool that turns commercial-building utility bills into ranked upgrades, projected savings, and payback estimates.",
     detail:
@@ -75,50 +79,79 @@ export const projects = [
     stack: ["Next.js", "FastAPI", "Gemini", "Mapbox", "Three.js"],
     recognition:
       "Placed third overall and won the Appifex AI track at WildHacks.",
-    link: {
-      label: "View on Devpost",
-      href: "https://devpost.com/software/audit-kc5eiw",
-    },
+    links: [
+      {
+        kind: "devpost",
+        label: "Devpost",
+        href: "https://devpost.com/software/audit-kc5eiw",
+      },
+    ],
   },
   {
     id: "greenchain",
     name: "GreenChain",
     discipline: "Supply chains",
     year: "2026",
-    image: "/images/projects/editorial/greenchain-study.webp",
+    featureOrder: 2,
+    image: {
+      src: "/images/projects/editorial/greenchain-study.webp",
+      alt: "Conceptual GreenChain study with black paper nodes, taut threads, white platforms, and one red route through the network.",
+    },
     summary:
       "A supply-chain sustainability platform that researches suppliers, estimates emissions, and makes relationships visible on a globe.",
     detail:
       "A multi-agent research swarm studies manufacturer pages, an XGBoost model estimates emissions, and Three.js maps the resulting network.",
     stack: ["TypeScript", "Python", "Multi-agent systems", "XGBoost", "Three.js"],
     recognition: "Won three sponsor tracks at HackPrinceton.",
-    link: {
-      label: "View on Devpost",
-      href: "https://devpost.com/software/greenchain-1xglhu",
-    },
+    links: [
+      {
+        kind: "github",
+        label: "GitHub",
+        href: "https://github.com/at350/hackprinceton2026-sonar",
+      },
+      {
+        kind: "devpost",
+        label: "Devpost",
+        href: "https://devpost.com/software/greenchain-1xglhu",
+      },
+    ],
   },
   {
     id: "prophis",
     name: "Prophis",
     discipline: "Public health",
     year: "2026",
-    image: "/images/projects/editorial/prophis-study.webp",
+    image: {
+      src: "/images/projects/editorial/prophis-study.webp",
+      alt: "Conceptual Prophis study with layered vellum timelines aligned by a red acetate tab.",
+    },
     summary:
       "Patient-context intelligence that turns a fragmented history into a readable clinical timeline and a wider public-health picture.",
     detail:
       "The interface joins patient events with County Health Rankings and cohort-similarity signals, then supports a retrospective prevention review.",
     stack: ["React", "TypeScript", "Express", "Public-health data"],
-    link: {
-      label: "Open the prototype",
-      href: "https://at350-yhack2026.vercel.app/",
-    },
+    links: [
+      {
+        kind: "prototype",
+        label: "Live prototype",
+        href: "https://at350-yhack2026.vercel.app/",
+      },
+      {
+        kind: "github",
+        label: "GitHub",
+        href: "https://github.com/at350/yhack2026",
+      },
+    ],
   },
   {
     id: "vox-vera",
     name: "Vox Vera",
     discipline: "Go-to-market strategy",
     year: "2026",
-    image: "/images/projects/editorial/vox-vera-study.webp",
+    image: {
+      src: "/images/projects/editorial/vox-vera-study.webp",
+      alt: "Conceptual Vox Vera study with black paper channels and white tokens converging on a red crop frame.",
+    },
     summary:
       "A client strategy project that turned a dense channel dataset into a clearer acquisition and segmentation story.",
     detail:
@@ -130,14 +163,17 @@ export const projects = [
     name: "TerraBlade",
     discipline: "Accessible product design",
     year: "2025",
-    image: "/images/projects/editorial/terrablade-study.webp",
+    image: {
+      src: "/images/projects/editorial/terrablade-study.webp",
+      alt: "Conceptual TerraBlade study with a pale clay slab, black guide rails, and a broad red pulling grip.",
+    },
     summary:
       "An accessible clay slab-forming device built with Envision Unlimited for artists with physical disabilities.",
     detail:
       "From interviews and force constraints through CAD, fabrication, and user testing, the project treated accessibility as an engineering input, not a final check.",
     stack: ["Fusion 360", "User research", "Rapid prototyping", "Fabrication"],
   },
-] satisfies readonly Project[];
+];
 
 export const resume = {
   eyebrow: "Annotated resume",

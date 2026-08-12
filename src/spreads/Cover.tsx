@@ -12,7 +12,7 @@ gsap.registerPlugin(SplitText);
 
 const COVER_LINES = [
   { page: "04", text: "a letter", href: "/about" },
-  { page: "08", text: "five prototypes", href: "/projects" },
+  { page: "08", text: "project files", href: "/projects" },
   { page: "12", text: "the annotated resume", href: "/resume" },
 ] as const;
 
