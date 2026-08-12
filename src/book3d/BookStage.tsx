@@ -7,6 +7,7 @@ import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { ISSUE } from "@/magazine/issue-map";
 import { SPREADS, pageLabel, spreadPages } from "@/magazine/folio";
+import { applyCoverHologramPointer } from "@/magazine/coverHologram";
 import { initialEngineState, reduce, type EngineEvent } from "@/magazine/engine";
 import { BookScene, type BookMotion } from "./BookScene";
 import { bookPointerFrame, normalizeBookPointer, withinBookRegion } from "./bookPose";
@@ -442,6 +443,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.pointerX = pointer.x;
       motion.pointerY = pointer.y;
       motion.pointerActive = true;
+      applyCoverHologramPointer(overlayRef.current, pointer.x, pointer.y);
       hoverRef.current = withinBookRegion({
         ...point,
         halfWidth: frame.halfWidth + GRAB_PAD,
