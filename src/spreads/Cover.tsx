@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
+import { withBasePath } from "@/lib/basePath";
 import { Barcode } from "@/components/furniture/Barcode";
 import { motionOK } from "@/lib/motion";
 import "@/styles/spreads/cover.css";
@@ -67,7 +68,7 @@ export function Cover({ face, mode }: SpreadFaceProps) {
 
       <figure className="cover2__art" aria-hidden>
         <img
-          src="/images/editorial/cover-fold.webp"
+          src={withBasePath("/images/editorial/cover-fold.webp")}
           alt=""
           decoding="async"
         />

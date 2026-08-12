@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 
 export default defineConfig({
+  base: process.env.VITE_BASE?.trim() || "/",
   plugins: [react()],
   server: {
     port: Number(process.env.PORT) || 5173,

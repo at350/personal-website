@@ -1,6 +1,7 @@
 import type { SpreadFaceProps } from "@/magazine/spread-types";
 import type { Project } from "@/lib/content-types";
 import { projects } from "@/lib/content";
+import { withBasePath } from "@/lib/basePath";
 import "@/styles/spreads/projects.css";
 
 /** Alt text written from the actual plates. */
@@ -92,7 +93,7 @@ function Plate({ project }: { project: Project }) {
     <figure className="proj-feature__plate">
       <img
         className="proj-feature__img"
-        src={project.image}
+        src={withBasePath(project.image)}
         alt={PLATE_ALT[project.id] ?? `${project.name} project image.`}
         loading="lazy"
         decoding="async"

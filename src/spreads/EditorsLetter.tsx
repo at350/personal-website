@@ -5,6 +5,7 @@ import { about } from "@/lib/content";
 import { Marginalia } from "@/components/furniture/Marginalia";
 import { EndMark } from "@/components/furniture/EndMark";
 import { motionOK } from "@/lib/motion";
+import { withBasePath } from "@/lib/basePath";
 import "@/styles/spreads/letter.css";
 
 /* The two ✳ asides in the verso's wide margin. */
@@ -82,7 +83,7 @@ export function EditorsLetter({ face }: SpreadFaceProps) {
         <span className="letter__plate-tilt">
           <img
             className="letter__portrait"
-            src={portrait.src}
+            src={withBasePath(portrait.src)}
             alt={portrait.alt}
             decoding="async"
           />

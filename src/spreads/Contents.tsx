@@ -3,6 +3,7 @@ import type { FocusEvent } from "react";
 import { useNavigate } from "react-router";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { siteMeta } from "@/lib/content";
+import { withBasePath } from "@/lib/basePath";
 import "@/styles/spreads/contents.css";
 
 interface Feature {
@@ -98,7 +99,12 @@ function FeaturesPage() {
             data-open={active === index || undefined}
           >
             {feature.image ? (
-              <img src={feature.image} alt="" loading="lazy" decoding="async" />
+              <img
+                src={withBasePath(feature.image)}
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
             ) : (
               <span className="contents2__mark" />
             )}

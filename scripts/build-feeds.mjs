@@ -1,5 +1,5 @@
 /* Post-build: write rss.xml and sitemap.xml into dist/. */
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const SITE = process.env.SITE_URL?.replace(/\/$/, "") || "https://alantai.dev";
@@ -63,4 +63,11 @@ ${ROUTES.map((r) => `  <url><loc>${SITE}${r}</loc></url>`).join("\n")}
 `,
 );
 
-console.log(`feeds: rss.xml + sitemap.xml written for ${ROUTES.length} routes`);
+// GitHub Pages has no rewrite layer. Its custom 404 document boots the SPA
+// while preserving the requested route for React Router.
+copyFileSync(resolve(dist, "index.html"), resolve(dist, "404.html"));
+writeFileSync(resolve(dist, ".nojekyll"), "");
+
+console.log(
+  `feeds: rss.xml + sitemap.xml written for ${ROUTES.length} routes; Pages fallback ready`,
+);

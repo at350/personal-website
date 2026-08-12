@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { projects } from "@/lib/content";
+import { withBasePath } from "@/lib/basePath";
 import "@/styles/spreads/projects.css";
 
 /** Pages 8–9 — the count, then the index. */
@@ -18,7 +19,7 @@ function Count() {
         {projects.map((project, index) => (
           <li className="proj-count__plate" key={project.id}>
             {project.image ? (
-              <img src={project.image} alt="" decoding="async" />
+              <img src={withBasePath(project.image)} alt="" decoding="async" />
             ) : null}
             <span className="proj-count__plate-no" aria-hidden>
               {String(index + 1).padStart(2, "0")}
