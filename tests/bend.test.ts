@@ -69,4 +69,23 @@ describe("2D leaf surface", () => {
       expect(top.z).toBeCloseTo(bottom.z, 6);
     }
   });
+
+  it("never guides the sheet below the stack it lands on", () => {
+    // The tip curl can push a strongly grabbed corner's angle past π late in
+    // the turn, tucking the tip under the fold plane — straight into the page
+    // beneath. The guide must treat the stack top as a floor.
+    let minZ = 0;
+    for (let step = 0; step <= 100; step += 1) {
+      const progress = step / 100;
+      for (const velocity of [0, 1.5, 3]) {
+        for (const grabY of [-1, -0.6, 0, 0.6, 1]) {
+          for (const direction of [1, -1] as const) {
+            const vertices = leafSurface(progress, 450, 600, velocity, grabY, direction);
+            for (const vertex of vertices) minZ = Math.min(minZ, vertex.z);
+          }
+        }
+      }
+    }
+    expect(minZ).toBeGreaterThanOrEqual(-1e-9);
+  });
 });

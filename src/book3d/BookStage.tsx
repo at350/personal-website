@@ -15,8 +15,10 @@ import {
   pageRasterLayout,
   getTextureProgress,
   prefetchAround,
+  refreshSpreadTextures,
   type TextureProgress,
 } from "./pageTextures";
+import { useLibraryFilter } from "@/components/MediaWall";
 import { Folio } from "@/components/furniture/Folio";
 import { RunningHead } from "@/components/furniture/RunningHead";
 import { GridOverlay } from "@/components/furniture/GridOverlay";
@@ -116,6 +118,10 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       grabOffsetY: 0,
       turnDirection: 1,
       released: false,
+      releasedDrag: false,
+      sheetEnergy: 0,
+      settleHold: 0,
+      swapReady: false,
       shift:
         targetSpread === 0
           ? -pw / 2
@@ -155,16 +161,21 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     motion.current = state.current;
     motion.leaf = state.sheet;
     if (state.sheet !== null && !state.dragging && state.settleTarget !== null) {
-      // Auto turns (riffle/keyboard) start from the resting side.
       if (motion.target === null) {
-        motion.released = motion.progress !== 0 && motion.progress !== 1;
+        // Only an explicit pointer-up marks a released drag. Sniffing exact
+        // progress values misreads a drag released at an extreme (progress
+        // pinned to 0/1) as an auto turn and replays the whole flight.
+        motion.released = motion.releasedDrag;
+        motion.releasedDrag = false;
         if (!motion.released) {
+          // Auto turns (riffle/keyboard) start from the resting side.
           motion.grabY = 0;
           motion.grabOffsetY = 0;
           motion.progress = state.direction === 1 ? 0 : 1;
           motion.velocity = state.direction === 1 ? 1.1 : -1.1;
         }
         motion.turnDirection = state.direction === -1 ? -1 : 1;
+        motion.swapReady = false;
       }
       motion.target = state.settleTarget;
       motion.onSettled = () => dispatch({ type: "TICK_COMPLETE" });
@@ -174,6 +185,10 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.progress = 0;
       motion.velocity = 0;
       motion.grabOffsetY = 0;
+      motion.releasedDrag = false;
+      motion.sheetEnergy = 0;
+      motion.settleHold = 0;
+      motion.swapReady = false;
     }
     motion.poseTarget =
       state.sheet !== null || state.dragging
@@ -195,6 +210,20 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   useEffect(() => {
     prefetchAround(state.current);
   }, [state]);
+
+  // The library chips change the wall's DOM at rest; the captured textures a
+  // future flip will fly must follow, or the turn shows the stale filter.
+  const libraryFilter = useLibraryFilter();
+  const librarySpread = useMemo(
+    () => SPREADS.findIndex((def) => def.id === "library"),
+    [],
+  );
+  const seenFilter = useRef(libraryFilter);
+  useEffect(() => {
+    if (seenFilter.current === libraryFilter) return;
+    seenFilter.current = libraryFilter;
+    if (librarySpread >= 0) refreshSpreadTextures(librarySpread);
+  }, [libraryFilter, librarySpread]);
 
   // External navigation. Requests that land mid-turn are queued, not dropped —
   // rapid keyboard/TOC input must never feel ignored.
@@ -252,6 +281,8 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.dragTarget = startProgress;
       motion.velocity = 0;
       motion.dragging = true;
+      motion.releasedDrag = false;
+      motion.swapReady = false;
       motion.grabOffsetY = 0;
       motion.turnPose = motion.pose;
       motion.poseTarget = motion.turnPose;
@@ -285,6 +316,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
           /* released with the pointer */
         }
         motion.dragging = false;
+        motion.releasedDrag = true;
         motion.grabOffsetY = 0;
         dispatch({ type: "DRAG_MOVE", progress: motion.progress });
         dispatch({ type: "DRAG_END", velocity: motion.velocity / 3 });

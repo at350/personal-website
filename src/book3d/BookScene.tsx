@@ -9,7 +9,12 @@ import { LEAF_ROWS, LEAF_SEGMENTS, leafSurface } from "./bend";
 import { PaperSheet } from "./paperPhysics";
 import { handoffOpacity } from "./handoff";
 import { bookPoseAngles } from "./bookPose";
-import { paperTurnActivity } from "./paperMaterial";
+import { injectPaperActivity, paperGleamActivity } from "./paperMaterial";
+import {
+  SETTLE_PROGRESS_TOLERANCE,
+  SETTLE_VELOCITY_TOLERANCE,
+  settleComplete,
+} from "./settle";
 import { withBasePath } from "@/lib/basePath";
 import { getPageTexture, onTexturesChanged, pageKey } from "./pageTextures";
 import { SPREADS } from "@/magazine/folio";
@@ -36,6 +41,18 @@ export interface BookMotion {
   turnDirection: 1 | -1;
   /** True when the current settle came from a released drag (snappier spring). */
   released: boolean;
+  /** Set by the pointer-up handler; the reducer mirror consumes it. An
+      explicit marker — progress alone cannot distinguish a drag released at
+      an exact extreme from an auto turn that must re-seed from the far side. */
+  releasedDrag: boolean;
+  /** Physical motion of the sheet solver, written by the leaf each frame. */
+  sheetEnergy: number;
+  /** Seconds the settle gate has held a nominally landed turn. */
+  settleHold: number;
+  /** The settle gate has fired; the leaf is down and awaiting unmount. The
+      material must read as exactly the resting texture from here on, even if
+      the gate fired via the hold cap with residual sheet energy. */
+  swapReady: boolean;
   /** Horizontal book shift in px (centers the closed cover). */
   shift: number;
   /** Screen-space spine position recorded at turn start. */
@@ -131,45 +148,28 @@ function usePageMaterial(
       ior: 1.45,
     });
     m.userData.paperActivity = 0;
-    // The clearcoat/specular response rises only while the page is airborne.
-    // At both landing frames this resolves to the exact captured texture, so
-    // the physical leaf and the unlit stack/DOM cannot shift color on swap.
+    // Every lighting response — base specular AND three's sheen/clearcoat
+    // post-mixes — rises only while the page is airborne. At both landing
+    // frames this resolves to the exact captured texture, so the physical
+    // leaf and the unlit stack/DOM cannot shift color on swap.
     m.onBeforeCompile = (shader) => {
       shader.uniforms.paperActivity = {
         value: Number(m.userData.paperActivity ?? 0),
       };
       m.userData.paperShader = shader;
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "void main() {",
-        "uniform float paperActivity;\nvoid main() {",
-      );
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;",
-        `
-          float pageAlbedoLuma = max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.035);
-          float pageLightLuma = dot(totalDiffuse, vec3(0.2126, 0.7152, 0.0722)) / pageAlbedoLuma;
-          float pageLight = smoothstep(0.25, 1.05, pageLightLuma);
-          float movingShade = mix(0.94, 1.012, pageLight);
-          float paperShade = mix(1.0, movingShade, paperActivity);
-          float paperFresnel = pow(
-            1.0 - saturate(dot(geometryNormal, geometryViewDir)),
-            2.0
-          );
-          vec3 paperGleam =
-            totalSpecular * (1.7 * paperActivity) +
-            vec3(paperFresnel * 0.12 * paperActivity);
-          vec3 outgoingLight = diffuseColor.rgb * paperShade + paperGleam;
-        `,
-      );
+      shader.fragmentShader = injectPaperActivity(shader.fragmentShader);
     };
-    m.customProgramCacheKey = () => "editorial-paper-lighting-v3";
+    m.customProgramCacheKey = () => "editorial-paper-lighting-v4";
     return m;
   }, [paperBump, unlit]);
-  const applied = useRef<string | null>(null);
+  // Track the applied SOURCE texture, not the key: a refreshed capture keeps
+  // the key but swaps the texture object, and the material must follow.
+  const applied = useRef<THREE.Texture | null>(null);
   useEffect(() => {
     const apply = () => {
       const texture = key ? getPageTexture(key) : null;
-      if (texture && applied.current !== key) {
+      if (texture && applied.current !== texture) {
+        if (mirror && mat.map) mat.map.dispose();
         const t = mirror ? texture.clone() : texture;
         if (mirror) {
           t.wrapS = THREE.RepeatWrapping;
@@ -178,8 +178,9 @@ function usePageMaterial(
         }
         mat.map = t;
         mat.needsUpdate = true;
-        applied.current = key;
+        applied.current = texture;
       } else if (!texture && applied.current !== null) {
+        if (mirror && mat.map) mat.map.dispose();
         mat.map = null;
         mat.needsUpdate = true;
         applied.current = null;
@@ -384,7 +385,12 @@ function Leaf({ motion, pw, ph }: { motion: BookMotion; pw: number; ph: number }
       handleOffsetY: motion.grabOffsetY,
       velocity: motion.velocity,
     });
-    const activity = paperTurnActivity(motion.progress);
+    motion.sheetEnergy = sheet.motionEnergy();
+    // Once the gate fires the page is down, whatever residual energy the hold
+    // cap accepted — the material must be the plain texture at the swap.
+    const activity = motion.swapReady
+      ? 0
+      : paperGleamActivity(motion.progress, motion.sheetEnergy);
     setPaperMaterialActivity(frontMat, activity);
     setPaperMaterialActivity(backMat, activity);
     const pos = g.attributes.position as THREE.BufferAttribute;
@@ -467,22 +473,39 @@ export function BookScene({ motion, pw, ph }: { motion: BookMotion; pw: number; 
       const a = k * (motion.dragTarget - motion.progress) - c * motion.velocity;
       motion.velocity += a * dt;
       motion.progress = Math.min(1, Math.max(0, motion.progress + motion.velocity * dt));
+      motion.settleHold = 0;
     } else if (motion.target !== null && motion.leaf !== null) {
       const k = motion.released ? SPRING_K_RELEASE : SPRING_K_AUTO;
       const c = 2 * Math.sqrt(k) * SPRING_DAMPING;
       const a = k * (motion.target - motion.progress) - c * motion.velocity;
       motion.velocity += a * dt;
       motion.progress += motion.velocity * dt;
-      if (
-        Math.abs(motion.progress - motion.target) < 0.0012 &&
-        Math.abs(motion.velocity) < 0.012
-      ) {
-        motion.progress = motion.target;
-        motion.velocity = 0;
-        const done = motion.onSettled;
-        motion.onSettled = null;
-        motion.target = null;
-        done?.();
+      const nominal =
+        Math.abs(motion.progress - motion.target) < SETTLE_PROGRESS_TOLERANCE &&
+        Math.abs(motion.velocity) < SETTLE_VELOCITY_TOLERANCE;
+      if (nominal) {
+        // The spring has arrived; hold the swap until the sheet itself stops
+        // moving so wobble and gleam finish on screen, not mid-motion.
+        motion.settleHold += dt;
+        if (
+          settleComplete({
+            progressError: motion.progress - motion.target,
+            velocity: motion.velocity,
+            sheetEnergy: motion.sheetEnergy,
+            heldFor: motion.settleHold,
+          })
+        ) {
+          motion.progress = motion.target;
+          motion.velocity = 0;
+          motion.settleHold = 0;
+          motion.swapReady = true;
+          const done = motion.onSettled;
+          motion.onSettled = null;
+          motion.target = null;
+          done?.();
+        }
+      } else {
+        motion.settleHold = 0;
       }
     }
 

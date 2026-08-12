@@ -16,11 +16,14 @@
 //   SUBSTACK_RSS_URL           full substack feed url
 //   X_BEARER_TOKEN + X_USER_ID X API v2 recent posts
 
-import { writeFile } from "node:fs/promises";
+import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import process from "node:process";
 import { XMLParser } from "fast-xml-parser";
 
 const LIVE_JSON_URL = new URL("../src/lib/media/live.json", import.meta.url);
+const THUMBS_DIR_URL = new URL("../public/media/thumbs/", import.meta.url);
+const THUMBS_PUBLIC_PATH = "/media/thumbs/";
 const FETCH_TIMEOUT_MS = 10_000;
 
 // --- minimal helpers (mirror src/lib/media/normalize.ts) --------------------
@@ -251,6 +254,69 @@ function configuredFeeds(env) {
   return feeds;
 }
 
+// --- thumbnail mirror -------------------------------------------------------
+//
+// Remote thumbnail hosts rarely send CORS headers (letterboxd's CDN sends
+// none), and the book's capture farm must fetch image bytes to rasterize
+// pages into turn textures. Mirroring thumbnails into public/ makes every
+// image same-origin: the live wall, the captured textures, and the deployed
+// site all read the same local file. Failures keep the remote URL — a broken
+// mirror must never lose an item.
+
+const THUMB_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"]);
+
+function thumbFileName(src) {
+  const hash = createHash("sha1").update(src).digest("hex").slice(0, 12);
+  let extension = ".jpg";
+  try {
+    const match = /\.[a-z0-9]+$/i.exec(new URL(src).pathname);
+    if (match && THUMB_EXTENSIONS.has(match[0].toLowerCase())) {
+      extension = match[0].toLowerCase();
+    }
+  } catch {
+    /* keep default */
+  }
+  return `${hash}${extension}`;
+}
+
+async function mirrorThumbnails(items) {
+  const remote = items.filter((item) => /^https?:\/\//.test(item.image?.src ?? ""));
+  if (remote.length === 0) return { mirrored: 0, kept: 0 };
+  await mkdir(THUMBS_DIR_URL, { recursive: true });
+
+  let mirrored = 0;
+  const wanted = new Set();
+  for (const item of remote) {
+    const source = item.image.src;
+    const fileName = thumbFileName(source);
+    try {
+      const response = await fetchWithTimeout(source);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length === 0) throw new Error("empty body");
+      await writeFile(new URL(fileName, THUMBS_DIR_URL), bytes);
+      item.image.src = `${THUMBS_PUBLIC_PATH}${fileName}`;
+      wanted.add(fileName);
+      mirrored += 1;
+    } catch (error) {
+      console.warn(
+        `refresh-media: thumb mirror failed for ${source} ` +
+          `(${error?.message ?? error}); keeping remote URL.`,
+      );
+    }
+  }
+
+  // Prune mirrored files no longer referenced by the new snapshot.
+  try {
+    for (const file of await readdir(THUMBS_DIR_URL)) {
+      if (!wanted.has(file)) await unlink(new URL(file, THUMBS_DIR_URL));
+    }
+  } catch {
+    /* pruning is best-effort */
+  }
+
+  return { mirrored, kept: remote.length - mirrored };
+}
+
 async function main() {
   const feeds = configuredFeeds(process.env);
   if (feeds.length === 0) {
@@ -285,11 +351,13 @@ async function main() {
   }
 
   const deduped = [...new Map(items.map((item) => [item.id, item])).values()];
+  const thumbs = await mirrorThumbnails(deduped);
   const snapshot = { items: deduped, generatedAt: new Date().toISOString() };
   await writeFile(LIVE_JSON_URL, `${JSON.stringify(snapshot, null, 2)}\n`);
   console.log(
     `refresh-media: wrote ${deduped.length} item(s) from ` +
-      `${succeeded}/${feeds.length} feed(s) to src/lib/media/live.json`,
+      `${succeeded}/${feeds.length} feed(s) to src/lib/media/live.json ` +
+      `(${thumbs.mirrored} thumb(s) mirrored${thumbs.kept ? `, ${thumbs.kept} remote` : ""})`,
   );
 }
 
