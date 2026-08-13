@@ -43,6 +43,12 @@ export interface CombustionRootTargets {
   flow: Float32Array;
   /** Unit tangent of the sampled hot-front arc, two values per root. */
   tangent: Float32Array;
+  /**
+   * Optional 0..1 estimate of how much active frontier surrounds each root.
+   * Long connected spans widen their attached flame cluster; short embers
+   * stay compact.
+   */
+  span?: Float32Array;
 }
 
 function burnFrontScore(burn: BurnField, index: number) {
@@ -142,6 +148,12 @@ function burnSurfaceAt(burn: BurnField, x: number, y: number) {
   const safeX = clamp(x, 0, burn.width - 1);
   const safeY = clamp(y, 0, burn.height - 1);
   return burn.surface[safeY * burn.width + safeX] ?? 0;
+}
+
+function burnDepthAt(burn: BurnField, x: number, y: number) {
+  const safeX = clamp(x, 0, burn.width - 1);
+  const safeY = clamp(y, 0, burn.height - 1);
+  return burn.burn[safeY * burn.width + safeX] ?? 0;
 }
 
 function swap(
@@ -259,8 +271,27 @@ function updateSources(fluid: CombustionFluid, burn: BurnField) {
       );
       const patch = Math.max(firstPatch, secondPatch * 0.94);
       const intermittent = smoothCurve((patch - 0.675) / 0.18);
-      source[fieldIndex(width, x, y)] = exposedFront * caught * notSpent * hot *
+      const topSource = exposedFront * caught * notSpent * hot *
         (0.74 + grain * 0.58) * intermittent;
+
+      // Once the top sheet is fully open the reaction continues on the
+      // leaves below. Their active boundary is a spatial step in consumed
+      // depth, invisible to the saturated top-sheet surface span — without
+      // this term the whole mid-stack burn produced no attached fire at all.
+      const depthLeft = burnDepthAt(burn, burnX - 2, burnY);
+      const depthRight = burnDepthAt(burn, burnX + 2, burnY);
+      const depthBelow = burnDepthAt(burn, burnX, burnY - 2);
+      const depthAbove = burnDepthAt(burn, burnX, burnY + 2);
+      const depthSpan = Math.max(
+        consumed - Math.min(depthLeft, depthRight, depthBelow, depthAbove),
+        Math.max(depthLeft, depthRight, depthBelow, depthAbove) - consumed,
+      );
+      const deepFront = smoothCurve((depthSpan - 0.22) / 0.6);
+      const opened = smoothCurve((surface - 0.55) / 0.2);
+      const deepSource = deepFront * opened * hot *
+        (0.78 + grain * 0.5) * smoothCurve((patch - 0.5) / 0.3);
+
+      source[fieldIndex(width, x, y)] = Math.max(topSource, deepSource);
     }
   }
 }
@@ -541,10 +572,17 @@ export function writeCombustionTexture(
   }
 }
 
+const ROOT_CANDIDATE_LIMIT = 96;
+const rootCandidateIndices = new Int32Array(ROOT_CANDIDATE_LIMIT);
+const rootCandidateScores = new Float32Array(ROOT_CANDIDATE_LIMIT);
+const rootCandidateTaken = new Uint8Array(ROOT_CANDIDATE_LIMIT);
+
 /**
  * Selects a small, well-separated set of flame roots from the live source.
- * This is fixed-storage non-maximum suppression: it performs no per-frame
- * allocation and never turns the entire burn boundary into visible fire.
+ * One sweep gathers the strongest frontier cells into a bounded candidate
+ * list, then greedy non-maximum suppression distributes the roots along the
+ * whole active contour. This replaced a per-root full-grid rescan whose cost
+ * grew linearly with the root count, and it performs no per-call allocation.
  */
 export function writeCombustionRoots(
   fluid: CombustionFluid,
@@ -563,83 +601,98 @@ export function writeCombustionRoots(
   targets.strength.fill(0);
   targets.flow.fill(0);
   targets.tangent.fill(0);
+  targets.span?.fill(0);
   if (rootCount <= 0) return 0;
 
-  const minimumDistance = Math.max(3.5, Math.min(fluid.width, fluid.height) * .055);
-  const minimumDistanceSquared = minimumDistance * minimumDistance;
-  let written = 0;
+  // Pass 1: bounded strongest-cell gathering across the whole grid.
+  let candidateCount = 0;
+  for (let y = 2; y < fluid.height - 2; y += 1) {
+    for (let x = 2; x < fluid.width - 2; x += 1) {
+      const index = fieldIndex(fluid.width, x, y);
+      const source = fluid.source[index] ?? 0;
+      const atmosphereU = (x + .5) / fluid.width;
+      const atmosphereV = (y + .5) / fluid.height;
+      const pageU = (atmosphereU - .5) * COMBUSTION_EXTENT_X + .5;
+      const pageV = (atmosphereV - .5) * COMBUSTION_EXTENT_Y + .5;
+      let frontScore = 0;
+      if (burn && pageU > 0 && pageU < 1 && pageV > 0 && pageV < 1) {
+        const burnX = clamp(Math.floor(pageU * burn.width), 0, burn.width - 1);
+        const burnY = clamp(Math.floor(pageV * burn.height), 0, burn.height - 1);
+        frontScore = burnFrontScore(burn, burnY * burn.width + burnX);
+      }
+      if (source <= .035 && frontScore <= .08) continue;
 
-  for (let root = 0; root < rootCount; root += 1) {
-    let bestIndex = -1;
-    let bestScore = 0;
-    for (let y = 2; y < fluid.height - 2; y += 1) {
-      for (let x = 2; x < fluid.width - 2; x += 1) {
-        const index = fieldIndex(fluid.width, x, y);
-        const source = fluid.source[index] ?? 0;
-        const atmosphereU = (x + .5) / fluid.width;
-        const atmosphereV = (y + .5) / fluid.height;
-        const pageU = (atmosphereU - .5) * COMBUSTION_EXTENT_X + .5;
-        const pageV = (atmosphereV - .5) * COMBUSTION_EXTENT_Y + .5;
-        let frontScore = 0;
-        if (burn && pageU > 0 && pageU < 1 && pageV > 0 && pageV < 1) {
-          const burnX = clamp(Math.floor(pageU * burn.width), 0, burn.width - 1);
-          const burnY = clamp(Math.floor(pageV * burn.height), 0, burn.height - 1);
-          frontScore = burnFrontScore(burn, burnY * burn.width + burnX);
-        }
-        if (source <= .035 && frontScore <= .08) continue;
-        let separated = true;
-        for (let prior = 0; prior < written; prior += 1) {
-          const priorX = (targets.uv[prior * 2] ?? 0) * fluid.width - .5;
-          const priorY = (targets.uv[prior * 2 + 1] ?? 0) * fluid.height - .5;
-          const dx = x - priorX;
-          const dy = y - priorY;
-          if (dx * dx + dy * dy < minimumDistanceSquared) {
-            separated = false;
-            break;
-          }
-        }
-        if (!separated) continue;
+      const localPeak = source * .42 +
+        Math.max(
+          fluid.source[index - 1] ?? 0,
+          fluid.source[index + 1] ?? 0,
+          fluid.source[index - fluid.width] ?? 0,
+          fluid.source[index + fluid.width] ?? 0,
+        ) * .18 +
+        (fluid.temperature[index] ?? 0) * .13 +
+        frontScore * .58;
+      const materialBreakup = .88 + .12 * Math.sin(
+        x * .73 + y * .41 + fluid.time * 2.2,
+      );
+      const score = localPeak * materialBreakup;
+      if (score < .055) continue;
 
-        const localPeak = source * .42 +
-          Math.max(
-            fluid.source[index - 1] ?? 0,
-            fluid.source[index + 1] ?? 0,
-            fluid.source[index - fluid.width] ?? 0,
-            fluid.source[index + fluid.width] ?? 0,
-          ) * .18 +
-          (fluid.temperature[index] ?? 0) * .13 +
-          frontScore * .58;
-        const materialBreakup = .88 + .12 * Math.sin(
-          x * .73 + y * .41 + fluid.time * 2.2,
-        );
-        let arcAffinity = 1;
-    // Roots 1–2 grow the first short source arc; root 3 may begin a second
-    // arc and root 4 extends it. Keeping adjacent samples near each other lets
-    // their density ribbons merge into a continuous combustion volume.
-        if (written > 0 && root !== 3) {
-          let nearestDistance = 1e5;
-          for (let prior = 0; prior < written; prior += 1) {
-            const priorX = (targets.uv[prior * 2] ?? 0) * fluid.width - .5;
-            const priorY = (targets.uv[prior * 2 + 1] ?? 0) * fluid.height - .5;
-            nearestDistance = Math.min(
-              nearestDistance,
-              Math.hypot(x - priorX, y - priorY),
-            );
-          }
-          const arcDistance = (nearestDistance - 6.5) / 4.5;
-          arcAffinity = .68 + .55 * Math.exp(-arcDistance * arcDistance);
+      if (candidateCount < ROOT_CANDIDATE_LIMIT) {
+        rootCandidateIndices[candidateCount] = index;
+        rootCandidateScores[candidateCount] = score;
+        candidateCount += 1;
+      } else {
+        let weakest = 0;
+        for (let i = 1; i < ROOT_CANDIDATE_LIMIT; i += 1) {
+          if (
+            (rootCandidateScores[i] ?? 0) < (rootCandidateScores[weakest] ?? 0)
+          ) weakest = i;
         }
-        const score = localPeak * materialBreakup * arcAffinity;
-        if (score > bestScore) {
-          bestScore = score;
-          bestIndex = index;
+        if (score > (rootCandidateScores[weakest] ?? 0)) {
+          rootCandidateIndices[weakest] = index;
+          rootCandidateScores[weakest] = score;
         }
       }
     }
-    if (bestIndex < 0 || bestScore < .055) break;
+  }
+  if (candidateCount === 0) return 0;
 
+  // Pass 2: greedy non-maximum suppression over the candidate list.
+  const minimumDistance = Math.max(3.5, Math.min(fluid.width, fluid.height) * .055);
+  const minimumDistanceSquared = minimumDistance * minimumDistance;
+  const spanRadiusSquared = 7 * 7;
+  rootCandidateTaken.fill(0);
+  let written = 0;
+
+  for (let root = 0; root < rootCount; root += 1) {
+    let best = -1;
+    let bestScore = 0;
+    for (let i = 0; i < candidateCount; i += 1) {
+      if ((rootCandidateTaken[i] ?? 0) === 1) continue;
+      const score = rootCandidateScores[i] ?? 0;
+      if (score > bestScore) {
+        bestScore = score;
+        best = i;
+      }
+    }
+    if (best < 0 || bestScore < .055) break;
+
+    const bestIndex = rootCandidateIndices[best] ?? 0;
     const x = bestIndex % fluid.width;
     const y = Math.floor(bestIndex / fluid.width);
+
+    // Suppress the neighbourhood and measure how much frontier surrounds the
+    // chosen cell while walking the same list.
+    let neighbours = 0;
+    for (let i = 0; i < candidateCount; i += 1) {
+      const otherIndex = rootCandidateIndices[i] ?? 0;
+      const dx = (otherIndex % fluid.width) - x;
+      const dy = Math.floor(otherIndex / fluid.width) - y;
+      const distanceSquared = dx * dx + dy * dy;
+      if (distanceSquared <= spanRadiusSquared) neighbours += 1;
+      if (distanceSquared < minimumDistanceSquared) rootCandidateTaken[i] = 1;
+    }
+
     const offset = written * 2;
     targets.uv[offset] = (x + .5) / fluid.width;
     targets.uv[offset + 1] = (y + .5) / fluid.height;
@@ -649,6 +702,9 @@ export function writeCombustionRoots(
       -1,
       1,
     );
+    if (targets.span) {
+      targets.span[written] = clamp((neighbours - 1) / 12, 0, 1);
+    }
     const gradientX = (fluid.source[bestIndex + 1] ?? 0) -
       (fluid.source[bestIndex - 1] ?? 0);
     const gradientY = (fluid.source[bestIndex + fluid.width] ?? 0) -

@@ -372,6 +372,55 @@ describe("combustion fluid", () => {
     }
   });
 
+  it("distributes enough roots along a long mature frontier", () => {
+    // Three isolated roots left most of a long contour visibly cold; a
+    // mature frontier must expose several separated, span-annotated sources.
+    const burn = createBurnField({
+      width: 96,
+      height: 64,
+      leftLayers: 2,
+      rightLayers: 2,
+      seed: 73,
+    });
+    igniteBurnField(burn, 0.5, 0.52, 0.032, 0.92);
+    const fluid = createCombustionFluid(72, 54);
+    for (let frame = 0; frame < 3 / BURN_FIXED_STEP; frame += 1) {
+      stepBurnField(burn, BURN_FIXED_STEP);
+      stepCombustionFluid(fluid, burn, BURN_FIXED_STEP);
+    }
+
+    const targets = {
+      uv: new Float32Array(14),
+      strength: new Float32Array(7),
+      flow: new Float32Array(7),
+      tangent: new Float32Array(14),
+      span: new Float32Array(7),
+    };
+    const count = writeCombustionRoots(fluid, targets, 7, burn);
+    expect(count).toBeGreaterThanOrEqual(4);
+
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (let root = 0; root < count; root += 1) {
+      const x = (targets.uv[root * 2] ?? 0) * fluid.width;
+      const y = (targets.uv[root * 2 + 1] ?? 0) * fluid.height;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+    // The selected roots wrap a substantial part of the ring instead of
+    // crowding one hot corner.
+    expect(Math.max(maxX - minX, maxY - minY)).toBeGreaterThan(
+      fluid.width * 0.16,
+    );
+    expect(
+      Math.max(...Array.from(targets.span.subarray(0, count))),
+    ).toBeGreaterThan(0);
+  });
+
   it("uses fixed steps so equivalent frame schedules remain deterministic", () => {
     const firstBurn = createBurnField({
       width: 28,

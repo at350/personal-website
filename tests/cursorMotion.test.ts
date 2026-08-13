@@ -98,6 +98,24 @@ describe("cursor flame motion", () => {
     expect(irregular.velocityY).toBeCloseTo(regular.velocityY, 8);
   });
 
+  it("gives the upper body 40-80 ms of gaseous resistance behind the root", () => {
+    // The ignition contact renders at the raw pointer position every frame;
+    // only this simulated body may trail. Its catch-up time constant defines
+    // the perceived resistance of the upper plume.
+    let state = { x: 0, y: 0, velocityX: 0, velocityY: 0 };
+    const dt = 1 / 120;
+    let elapsed = 0;
+    let reachedNearly = 0;
+    while (elapsed < 0.4) {
+      state = stepCursorFlameBody(state, 100, 0, dt);
+      elapsed += dt;
+      if (!reachedNearly && state.x >= 63.2) reachedNearly = elapsed;
+    }
+    expect(reachedNearly).toBeGreaterThan(0.04);
+    expect(reachedNearly).toBeLessThan(0.08);
+    expect(state.x).toBeGreaterThan(97);
+  });
+
   it("bends the gas body upward over the final 90 viewport pixels", () => {
     expect(cursorFlameBottomResponse(600, 720)).toEqual({
       pressure: 0,

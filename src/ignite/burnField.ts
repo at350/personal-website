@@ -426,7 +426,6 @@ function filteredCellValue(
   source: Float32Array,
   x: number,
   y: number,
-  preserveEdge = false,
 ) {
   const centerIndex = y * field.width + x;
   const centerCapacity = field.capacity[centerIndex] ?? 0;
@@ -446,15 +445,12 @@ function filteredCellValue(
       // magazine seam.
       if ((field.capacity[sampleIndex] ?? 0) !== centerCapacity) continue;
       const spatialWeight = offsetX === 0 || offsetY === 0 ? 2 : 1;
-      // Surface topology is a material boundary, not a blurred smoke field.
-      // A small bilateral range term removes cell noise while retaining the
-      // signed edge that the fragment shader reconstructs and antialiases.
-      const rangeWeight = preserveEdge
-        ? 1 / (1 + Math.abs((source[sampleIndex] ?? 0) - center) * 18)
-        : 1;
-      const sampleWeight = spatialWeight * rangeWeight;
-      total += (source[sampleIndex] ?? 0) * sampleWeight;
-      weight += sampleWeight;
+      // The kernel is a plain tent. An earlier bilateral range term preserved
+      // the raw cell steps so faithfully that the rendered contour hugged the
+      // simulation lattice; a smooth scalar ramp is what lets the shader's
+      // sub-texel iso-cut meander between cells instead of outlining them.
+      total += (source[sampleIndex] ?? 0) * spatialWeight;
+      weight += spatialWeight;
     }
   }
   return total / weight;
@@ -476,13 +472,7 @@ export function writeBurnTexture(field: BurnField, target: Uint8Array) {
     for (let x = 0; x < field.width; x += 1) {
       const index = y * field.width + x;
       const offset = index * 4;
-      const filteredSurface = filteredCellValue(
-        field,
-        field.surface,
-        x,
-        y,
-        true,
-      );
+      const filteredSurface = filteredCellValue(field, field.surface, x, y);
       const filteredHeat = filteredCellValue(field, field.heat, x, y);
       const filteredBurnDepth = filteredCellValue(field, field.burn, x, y);
       target[offset] = Math.round(
@@ -501,62 +491,99 @@ export function writeBurnTexture(field: BurnField, target: Uint8Array) {
   }
 }
 
+function catmullRomWeights(t: number): [number, number, number, number] {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return [
+    -0.5 * t3 + t2 - 0.5 * t,
+    1.5 * t3 - 2.5 * t2 + 1,
+    -1.5 * t3 + 2 * t2 + 0.5 * t,
+    0.5 * t3 - 0.5 * t2,
+  ];
+}
+
 /**
- * Bilinearly expands the compact simulation texture for display. The burn
- * solver deliberately stays coarse enough for a deterministic 30 Hz update,
- * while the renderer gets a denser scalar field whose cut can be antialiased
- * without revealing individual simulation cells. Each magazine half is
- * sampled independently so a missing cover never bleeds across the spine.
+ * CPU mirror of the page shader's clamped Catmull-Rom reconstruction of the
+ * surface channel. The renderer performs this on the GPU (nine clamped
+ * bilinear taps per visible cut fragment); this mirror exists so tests can
+ * assert the reconstructed iso-contour is C1-smooth — bilinear ramps left
+ * faint polyline corners on every simulation texel, which read as a stepped
+ * mask at close zoom. Coordinates are normalized page UV; taps never cross
+ * the magazine spine, so a missing cover cannot bleed across halves.
  */
-export function upsampleBurnTexture(
+export function sampleSmoothBurnSurface(
   source: Uint8Array,
   sourceWidth: number,
   sourceHeight: number,
-  target: Uint8Array,
-  targetWidth: number,
-  targetHeight: number,
-) {
+  u: number,
+  v: number,
+): number {
   if (source.length !== sourceWidth * sourceHeight * 4) {
     throw new Error("Burn texture source storage has the wrong size");
   }
-  if (target.length !== targetWidth * targetHeight * 4) {
-    throw new Error("Burn texture target storage has the wrong size");
+  const half = Math.floor(sourceWidth / 2);
+  const leftHalf = u < 0.5;
+  const minX = leftHalf ? 0 : half;
+  const maxX = leftHalf ? half - 1 : sourceWidth - 1;
+  const x = u * sourceWidth - 0.5;
+  const y = v * sourceHeight - 0.5;
+  const baseX = Math.floor(x);
+  const baseY = Math.floor(y);
+  const wx = catmullRomWeights(clamp(x - baseX, 0, 1));
+  const wy = catmullRomWeights(clamp(y - baseY, 0, 1));
+  let value = 0;
+  for (let tapY = 0; tapY < 4; tapY += 1) {
+    const sampleY = clamp(baseY - 1 + tapY, 0, sourceHeight - 1);
+    let row = 0;
+    for (let tapX = 0; tapX < 4; tapX += 1) {
+      const sampleX = clamp(baseX - 1 + tapX, minX, maxX);
+      row += (source[(sampleY * sourceWidth + sampleX) * 4] ?? 0) * wx[tapX]!;
+    }
+    value += row * wy[tapY]!;
   }
-  const sourceHalf = Math.floor(sourceWidth / 2);
-  const targetHalf = Math.floor(targetWidth / 2);
-  for (let y = 0; y < targetHeight; y += 1) {
-    const sourceY = (y + 0.5) * sourceHeight / targetHeight - 0.5;
-    const y0 = clamp(Math.floor(sourceY), 0, sourceHeight - 1);
-    const y1 = Math.min(sourceHeight - 1, y0 + 1);
-    const fy = clamp(sourceY - y0, 0, 1);
-    for (let x = 0; x < targetWidth; x += 1) {
-      const leftHalf = x < targetHalf;
-      const localX = leftHalf ? x : x - targetHalf;
-      const localTargetWidth = leftHalf ? targetHalf : targetWidth - targetHalf;
-      const halfStart = leftHalf ? 0 : sourceHalf;
-      const halfWidth = leftHalf ? sourceHalf : sourceWidth - sourceHalf;
-      const sourceX = (localX + 0.5) * halfWidth / localTargetWidth - 0.5;
-      const localX0 = clamp(Math.floor(sourceX), 0, halfWidth - 1);
-      const localX1 = Math.min(halfWidth - 1, localX0 + 1);
-      const x0 = halfStart + localX0;
-      const x1 = halfStart + localX1;
-      const fx = clamp(sourceX - localX0, 0, 1);
-      const targetOffset = (y * targetWidth + x) * 4;
-      const row0 = y0 * sourceWidth;
-      const row1 = y1 * sourceWidth;
-      for (let channel = 0; channel < 4; channel += 1) {
-        const topLeft = source[(row0 + x0) * 4 + channel] ?? 0;
-        const topRight = source[(row0 + x1) * 4 + channel] ?? 0;
-        const bottomLeft = source[(row1 + x0) * 4 + channel] ?? 0;
-        const bottomRight = source[(row1 + x1) * 4 + channel] ?? 0;
-        const top = topLeft + (topRight - topLeft) * fx;
-        const bottom = bottomLeft + (bottomRight - bottomLeft) * fx;
-        target[targetOffset + channel] = Math.round(
-          top + (bottom - top) * fy,
-        );
+  return clamp(value / 255, 0, 1);
+}
+
+export interface BurnDepthRange {
+  leftMax: number;
+  leftMin: number;
+  rightMax: number;
+  rightMin: number;
+}
+
+/**
+ * Per-side consumed-depth extrema, used to skip whole page meshes: a leaf
+ * deeper than everything the fire has reached cannot be seen through any
+ * hole above it, and a leaf whose entire half has burned past it has no
+ * remaining material to draw.
+ */
+export function measureBurnDepthRange(field: BurnField): BurnDepthRange {
+  const half = Math.floor(field.width / 2);
+  let leftMax = 0;
+  let leftMin = Number.POSITIVE_INFINITY;
+  let rightMax = 0;
+  let rightMin = Number.POSITIVE_INFINITY;
+  for (let y = 0; y < field.height; y += 1) {
+    const row = y * field.width;
+    for (let x = 0; x < field.width; x += 1) {
+      const index = row + x;
+      if ((field.capacity[index] ?? 0) <= 0) continue;
+      const burn = field.burn[index] ?? 0;
+      if (x < half) {
+        if (burn > leftMax) leftMax = burn;
+        if (burn < leftMin) leftMin = burn;
+      } else {
+        if (burn > rightMax) rightMax = burn;
+        if (burn < rightMin) rightMin = burn;
       }
     }
   }
+  return {
+    leftMax,
+    leftMin: Number.isFinite(leftMin) ? leftMin : 0,
+    rightMax,
+    rightMin: Number.isFinite(rightMin) ? rightMin : 0,
+  };
 }
 
 /** Finds a hot point without allocating a list of every burning cell. */

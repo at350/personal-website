@@ -26,7 +26,9 @@ interface IgniteAtmosphereProps {
 
 const FLUID_WIDTH = 144;
 const FLUID_HEIGHT = 108;
-const FLAME_ROOTS = 3;
+// Seven trackable roots cover a long active contour with separated flame
+// clusters; three left most of the frontier visibly cold.
+const FLAME_ROOTS = 7;
 
 const atmosphereVertex = /* glsl */ `
   varying vec2 vFieldPosition;
@@ -71,7 +73,7 @@ const smokeFragment = /* glsl */ `
 const flameFieldFragment = /* glsl */ `
   precision highp float;
 
-  #define FLAME_ROOT_COUNT 3
+  #define FLAME_ROOT_COUNT 7
 
   uniform float uTime;
   uniform sampler2D uFluid;
@@ -153,8 +155,26 @@ const flameFieldFragment = /* glsl */ `
       float branchBias = profile.w;
       vec2 root = rootData.xy;
       vec2 rootDelta = vFieldPosition - root;
+      // Cheap spatial rejection: with seven live clusters most fragments are
+      // far from most roots, and skipping their noise work keeps the larger
+      // root count no more expensive than the old three.
+      if (
+        abs(rootDelta.x) > arcWidth * 2.7 ||
+        rootDelta.y < -16.0 ||
+        rootDelta.y > rise * 1.42
+      ) continue;
       vec2 tangent = normalize(uTangents[rootIndex] + vec2(1e-5, 0.0));
       float time = uTime * (1.0 + float(rootIndex) * .073) + phase;
+
+      // Fuel feed breathes: each cluster periodically drives a taller tongue
+      // and drops back, so the frontier reads as live rolling fire instead of
+      // a constant decal.
+      float tonguePulse = smoothstep(
+        .45,
+        .95,
+        .5 + .5 * sin(time * 1.35 + phase * 2.7)
+      );
+      rise *= .84 + tonguePulse * .42;
 
       // A short Gaussian source lies exactly along the sampled cut tangent.
       // It is intentionally dim: the readable volume begins as the gas rises,
@@ -180,8 +200,12 @@ const flameFieldFragment = /* glsl */ `
 
       float widthPulse = .92 + .08 * sin(time * 2.1 + level * 12.0 + phase);
       float halfWidth = arcWidth * mix(.32, .075, pow(level, .72)) * widthPulse;
+      // A tongue is never wider than it is tall. Untied, a wide span with a
+      // low pulse collapsed into a rounded-rectangle lozenge.
+      halfWidth = min(halfWidth, rise * .4);
       float lateral = (rootDelta.x - centreX) / max(halfWidth, .75);
       float ribbon = exp(-lateral * lateral * 1.05) * verticalGate;
+      ribbon *= 1.0 - smoothstep(.58, 1.0, level) * .3;
 
       // Coherent low-frequency erosion travels upward with the gas. It changes
       // the ribbon's density without cutting it into separate round sprites.
@@ -240,33 +264,36 @@ const flameFieldFragment = /* glsl */ `
     // burn contour, while its texture still breaks the analytic ribbon apart.
     float advected = smoothstep(.075, .57, fluid.r) * rootReach;
     float advectedHeat = smoothstep(.10, .70, fluid.g) * rootReach;
-    float density = boundedUnion(ribbonDensity * .96, advected * .42);
-    density = boundedUnion(density, sourceDensity * .28);
+    float density = boundedUnion(ribbonDensity * .98, advected * .46);
+    density = boundedUnion(density, sourceDensity * .34);
+    // The narrow contact band along the char lip stays yellow-white hot, so
+    // every cluster is visibly anchored to burning paper.
     float heat = boundedUnion(coreDensity, advectedHeat * .78);
+    heat = boundedUnion(heat, sourceDensity * .58);
 
     float aa = max(fwidth(density) * 1.35, .0045);
-    float envelope = smoothstep(.14 - aa, .22 + aa, density);
-    float body = smoothstep(.16, .42, density);
-    float hot = smoothstep(.13, .48, heat) * smoothstep(.13, .29, density);
-    float whiteCore = smoothstep(.52, .86, heat) *
-      smoothstep(.30, .60, density);
+    float envelope = smoothstep(.125 - aa, .205 + aa, density);
+    float body = smoothstep(.15, .4, density);
+    float hot = smoothstep(.13, .46, heat) * smoothstep(.125, .27, density);
+    float whiteCore = smoothstep(.5, .84, heat) *
+      smoothstep(.27, .56, density);
 
     // Alpha grows continuously toward the centre. There is no brighter or
     // more opaque perimeter, hence no neon outline around each tongue.
-    float alpha = envelope * mix(.004, .61, body);
-    alpha += hot * .21 + whiteCore * .12;
+    float alpha = envelope * mix(.005, .7, body);
+    alpha += hot * .26 + whiteCore * .15;
     if (alpha < .006) discard;
 
     vec3 ember = vec3(.36, .018, .001);
     vec3 orange = vec3(1.0, .22, .006);
     vec3 yellow = vec3(1.0, .72, .045);
     vec3 whiteHot = vec3(1.0, .975, .74);
-    vec3 color = mix(ember, orange, smoothstep(.14, .38, density));
+    vec3 color = mix(ember, orange, smoothstep(.13, .36, density));
     color = mix(color, yellow, hot * .92);
-    color = mix(color, whiteHot, whiteCore * .88);
+    color = mix(color, whiteHot, whiteCore * .9);
     // Premultiplication prevents the low-alpha ember envelope from being
     // interpreted by the compositor as a flat translucent red decal.
-    float finalAlpha = clamp(alpha, 0.0, .82);
+    float finalAlpha = clamp(alpha, 0.0, .88);
     gl_FragColor = vec4(color * finalAlpha, finalAlpha);
   }
 `;
@@ -285,6 +312,7 @@ interface FlameFieldSystem {
   currentUv: Float32Array;
   currentIntensity: Float32Array;
   currentFlow: Float32Array;
+  currentSpan: Float32Array;
   currentTangent: Float32Array;
   candidateUsed: Uint8Array;
   slotCandidate: Int8Array;
@@ -394,11 +422,13 @@ function makeFlameFieldSystem(
       strength: new Float32Array(FLAME_ROOTS),
       flow: new Float32Array(FLAME_ROOTS),
       tangent: new Float32Array(FLAME_ROOTS * 2),
+      span: new Float32Array(FLAME_ROOTS),
     },
     candidateCount: 0,
     currentUv: new Float32Array(FLAME_ROOTS * 2),
     currentIntensity: new Float32Array(FLAME_ROOTS),
     currentFlow: new Float32Array(FLAME_ROOTS),
+    currentSpan: new Float32Array(FLAME_ROOTS),
     currentTangent: new Float32Array(FLAME_ROOTS * 2),
     candidateUsed: new Uint8Array(FLAME_ROOTS),
     slotCandidate: new Int8Array(FLAME_ROOTS),
@@ -511,12 +541,16 @@ function updateFlameField(
       system.currentFlow[index] +=
         ((system.candidates.flow[candidate] ?? 0) - system.currentFlow[index]!) *
         .28;
+      system.currentSpan[index] +=
+        ((system.candidates.span?.[candidate] ?? 0) -
+          system.currentSpan[index]!) * .22;
     } else {
       system.currentIntensity[index] = advanceFlameEnvelope(
         system.currentIntensity[index] ?? 0,
         0,
       );
       system.currentFlow[index] *= .86;
+      system.currentSpan[index] *= .93;
     }
 
     const intensity = system.currentIntensity[index] ?? 0;
@@ -547,9 +581,16 @@ function updateFlameField(
     );
 
     const profile = system.profiles[index]!;
+    const span = system.currentSpan[index] ?? 0;
+    // A long surrounding frontier widens the attached cluster; the buoyant
+    // column may never overrun the top of the atmosphere quad, which would
+    // read as gas clipping against an invisible boundary.
+    const rootY = (v - .5) * ph * COMBUSTION_EXTENT_Y;
+    const quadTop = ph * COMBUSTION_EXTENT_Y * .5;
+    const maximumRise = Math.max(26, (quadTop - rootY - 12) / 1.42);
     system.profileUniforms[index]!.set(
-      profile.arcWidth * (.84 + intensity * .16),
-      profile.rise * (.74 + intensity * .26),
+      profile.arcWidth * (.66 + intensity * .12 + span * .42),
+      Math.min(profile.rise * (.74 + intensity * .26), maximumRise),
       profile.phase,
       profile.branchBias,
     );
@@ -563,6 +604,7 @@ export function IgniteAtmosphere({
   reducedMotion,
 }: IgniteAtmosphereProps) {
   const accumulator = useRef(0);
+  const completeSince = useRef<number | null>(null);
   const simulationRef = useRef<AtmosphereSimulation | null>(null);
   const flameSystemRef = useRef<FlameFieldSystem | null>(null);
   const simulation = useMemo(
@@ -598,6 +640,16 @@ export function IgniteAtmosphere({
       activeFlameSystem.material.uniforms.uTime.value = clock.elapsedTime;
     }
     if (reducedMotion || !field.ignited) return;
+    // Residual smoke needs a few seconds to disperse after the last paper is
+    // consumed; once it has, the fluid holds nothing visible and stepping it
+    // every frame would only heat the main thread at the terminal ash state.
+    if (field.complete) {
+      if (completeSince.current === null) {
+        completeSince.current = clock.elapsedTime;
+      } else if (clock.elapsedTime - completeSince.current > 7) {
+        return;
+      }
+    }
     const activeSimulation = simulationRef.current;
     if (!activeSimulation || !activeFlameSystem) return;
     const advanced = advanceCombustionFluid(
