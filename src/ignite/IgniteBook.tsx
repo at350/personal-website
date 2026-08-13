@@ -242,6 +242,66 @@ function useCachedPageTexture(key: string) {
   return getPageTexture(key);
 }
 
+/**
+ * Shadow-pass material that knows about the burn cut. The reading book's
+ * leaves cast the soft desk shadow; without an equivalent caster the shadow
+ * vanished the instant Ignite mounted. A plain depth material would bring it
+ * back as an eternal full rectangle, so this one discards consumed fragments
+ * — the shadow erodes together with the paper. The soft 4px-radius shadow
+ * cannot resolve the ragged procedural threshold, so a constant cut suffices.
+ */
+function useBurnDepthMaterial(
+  burnMap: THREE.DataTexture,
+  side: "left" | "right",
+  layer: number,
+  maxLayers: number,
+) {
+  const material = useMemo(() => {
+    const depth = new THREE.MeshDepthMaterial({
+      depthPacking: THREE.RGBADepthPacking,
+    });
+    depth.defines = { USE_UV: "" };
+    depth.customProgramCacheKey = () => "ignite-burn-depth-v1";
+    depth.onBeforeCompile = (shader) => {
+      shader.uniforms.igniteMap = { value: burnMap };
+      shader.uniforms.igniteLayer = { value: layer };
+      shader.uniforms.igniteMaxLayers = { value: maxLayers };
+      shader.uniforms.igniteUvOffset = { value: side === "left" ? 0 : 0.5 };
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "void main() {",
+          `uniform sampler2D igniteMap;
+          uniform float igniteLayer;
+          uniform float igniteMaxLayers;
+          uniform float igniteUvOffset;
+          void main() {`,
+        )
+        .replace(
+          "vec4 diffuseColor = vec4( 1.0 );",
+          `vec4 diffuseColor = vec4( 1.0 );
+          vec2 igniteShadowUv = vec2(vUv.x * .5 + igniteUvOffset, vUv.y);
+          vec4 igniteShadowState = texture2D(igniteMap, igniteShadowUv);
+          float igniteShadowCapacity = igniteShadowState.a * igniteMaxLayers;
+          if (igniteShadowCapacity < igniteLayer + .45) discard;
+          float igniteShadowLower = clamp(
+            igniteShadowState.b * igniteMaxLayers - igniteLayer,
+            0.0,
+            1.0
+          );
+          float igniteShadowPhase = mix(
+            igniteShadowLower,
+            igniteShadowState.r,
+            1.0 - step(.5, igniteLayer)
+          );
+          if (igniteShadowPhase > .42) discard;`,
+        );
+    };
+    return depth;
+  }, [burnMap, layer, maxLayers, side]);
+  useEffect(() => () => material.dispose(), [material]);
+  return material;
+}
+
 function useBurnPageMaterial(
   source: THREE.Texture | null,
   burnMap: THREE.DataTexture,
@@ -916,17 +976,25 @@ function BurnPage({
     pw,
     ph,
   );
+  const depthMaterial = useBurnDepthMaterial(
+    burnMap,
+    entry.side,
+    entry.layer,
+    maxLayers,
+  );
   return (
     <mesh
       ref={(mesh) => registerMesh(entry.side, entry.layer, mesh)}
       geometry={geometry}
       material={material}
+      customDepthMaterial={depthMaterial}
       position={[
         entry.side === "left" ? -pw / 2 : pw / 2,
         0,
         -entry.layer * IGNITE_LAYER_GAP,
       ]}
       renderOrder={Math.max(1, 30 - entry.layer)}
+      castShadow
       receiveShadow
     />
   );

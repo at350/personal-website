@@ -1,5 +1,5 @@
 const MINIMUM_LIVE_TARGET = 0.58;
-const ROOT_RESPONSE = 0.62;
+const ROOT_RESPONSE = 0.7;
 const ROOT_FADE_RETENTION = 0.925;
 
 /**

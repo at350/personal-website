@@ -230,6 +230,29 @@ function heatAt(field: BurnField, x: number, y: number) {
   return field.heat[safeY * field.width + safeX] ?? 0;
 }
 
+/**
+ * Largest step in consumed depth between a cell and its four neighbours.
+ * Cells that never held paper count as flat, not as a permanent cliff.
+ */
+function burnDepthSpanAt(
+  field: BurnField,
+  x: number,
+  y: number,
+  centerBurn: number,
+) {
+  let span = 0;
+  for (let direction = 0; direction < 4; direction += 1) {
+    const nx = x + (direction === 0 ? -1 : direction === 1 ? 1 : 0);
+    const ny = y + (direction === 2 ? -1 : direction === 3 ? 1 : 0);
+    if (nx < 0 || nx >= field.width || ny < 0 || ny >= field.height) continue;
+    const index = ny * field.width + nx;
+    if ((field.capacity[index] ?? 0) <= 0) continue;
+    const difference = Math.abs((field.burn[index] ?? 0) - centerBurn);
+    if (difference > span) span = difference;
+  }
+  return span;
+}
+
 /** One fixed combustion step. Call through `advanceBurnField` from rAF. */
 export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
   if (field.complete || !field.ignited) return;
@@ -275,8 +298,19 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
           NEIGHBOUR_PREHEAT_RATE
         : 0;
       const layerProgress = capacity === 0 ? 0 : burn / capacity;
+      // Flames live where fresh fuel meets air: at each sheet's advancing
+      // edge and wherever the first sheet is still catching. The already
+      // opened interior only smoulders — its source barely balances cooling.
+      // Without this, every touched cell kept generating full heat until its
+      // whole column was spent, so the entire stack burned down in lockstep
+      // and any local re-ignition read as the whole page speeding up.
+      const depthSpan = burnDepthSpanAt(field, x, y, burn);
+      const frontierOxygen = Math.min(1, depthSpan / 0.3);
+      const freshSheet = 1 - Math.min(1, burn);
+      const smolder = 0.12 +
+        0.88 * Math.max(frontierOxygen, freshSheet);
       const source = combusting
-        ? 0.92 - Math.min(0.2, layerProgress * 0.2)
+        ? (0.92 - Math.min(0.2, layerProgress * 0.2)) * smolder
         : 0;
       const cooling = stillFuel ? 0.11 : 0.82;
       const next = clamp(

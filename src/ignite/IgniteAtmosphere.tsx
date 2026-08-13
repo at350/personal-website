@@ -193,15 +193,15 @@ const flameFieldFragment = /* glsl */ `
       float level = clamp(y / rise, 0.0, 1.0);
       float verticalGate = smoothstep(-5.0, 2.6, rootDelta.y) *
         (1.0 - smoothstep(.76, 1.03, level));
-      float slowSway = sin(time * .73 + level * 5.4 + branchBias * 4.0);
-      float fastSway = sin(time * 1.81 - level * 8.7 + phase * .37);
+      float slowSway = sin(time * 1.1 + level * 5.4 + branchBias * 4.0);
+      float fastSway = sin(time * 2.7 - level * 8.7 + phase * .37);
       float centreX = slowSway * arcWidth * (.028 + level * .105);
-      centreX += fastSway * arcWidth * (.01 + level * .042);
+      centreX += fastSway * arcWidth * (.012 + level * .05);
       centreX += rootData.w * rise * level * .11;
       centreX += branchBias * arcWidth * level * .12;
 
-      float widthPulse = .92 + .08 * sin(time * 2.1 + level * 12.0 + phase);
-      float halfWidth = arcWidth * mix(.32, .075, pow(level, .72)) * widthPulse;
+      float widthPulse = .9 + .1 * sin(time * 3.1 + level * 12.0 + phase);
+      float halfWidth = arcWidth * mix(.3, .055, pow(level, .72)) * widthPulse;
       // A tongue is never wider than it is tall. Untied, a wide span with a
       // low pulse collapsed into a rounded-rectangle lozenge.
       halfWidth = min(halfWidth, rise * .4);
@@ -209,18 +209,32 @@ const flameFieldFragment = /* glsl */ `
       float ribbon = exp(-lateral * lateral * 1.05) * verticalGate;
       ribbon *= 1.0 - smoothstep(.58, 1.0, level) * .3;
 
-      // Coherent low-frequency erosion travels upward with the gas. It changes
-      // the ribbon's density without cutting it into separate round sprites.
+      // Real flames churn: the whole cluster brightens and dims several
+      // times a second, and soot-dark gaps race up through the body much
+      // faster than the envelope moves. Without these two fast components
+      // the tongues read as calm painted shapes drifting with the frontier.
+      float flicker = .6 + .4 * noise21(vec2(
+        time * 3.6 + phase * 7.0,
+        float(rootIndex) * 3.7
+      ));
+      float streakGap = .55 + .45 * noise21(vec2(
+        (rootDelta.x - centreX) * .12 + phase,
+        level * 2.6 - time * 3.3
+      ));
+
+      // Coherent erosion travels upward with the gas. It changes the
+      // ribbon's density without cutting it into separate round sprites.
       float materialNoise = noise21(vec2(
-        (rootDelta.x - centreX) * .07 + phase,
-        level * 6.2 - time * 1.05
+        (rootDelta.x - centreX) * .1 + phase,
+        level * 4.6 - time * 2.1
       ));
       float broadBillow = noise21(vec2(
-        (rootDelta.x - centreX) * .032 + phase * .37,
-        level * 3.1 - time * .62
+        (rootDelta.x - centreX) * .04 + phase * .37,
+        level * 2.6 - time * 1.25
       ));
-      float billow = .62 + materialNoise * .22 + broadBillow * .16;
-      billow *= .88 + .12 * sin(level * 17.0 - time * 2.25 + phase);
+      float billow = .58 + materialNoise * .24 + broadBillow * .18;
+      billow *= (.84 + .16 * sin(level * 17.0 - time * 3.4 + phase)) *
+        flicker * streakGap;
       // The physical fluid decides where the analytic support is luminous.
       // This removes the last solid triangular fill while keeping a coherent
       // sub-pixel spine during the fluid's first few frames after ignition.
@@ -455,7 +469,11 @@ function assignFlameCandidates(
   system.candidateUsed.fill(0);
   system.slotCandidate.fill(-1);
 
-  const maximumTrackingDistanceSquared = 18 * 18;
+  // A root may only track small frontier drift. Beyond a couple of cells the
+  // old flame dies out in place and a fresh one catches at the new location:
+  // translating the whole tongue across the page is exactly what read as a
+  // sprite gliding along the frontier.
+  const maximumTrackingDistanceSquared = 6.5 * 6.5;
   for (let slot = 0; slot < FLAME_ROOTS; slot += 1) {
     if ((system.currentIntensity[slot] ?? 0) < .012) continue;
     const offset = slot * 2;
@@ -528,13 +546,13 @@ function updateFlameField(
         system.currentTangent[offset] = targetTangentX;
         system.currentTangent[offset + 1] = targetTangentY;
       } else {
-        system.currentUv[offset] += (targetU - system.currentUv[offset]!) * .34;
+        system.currentUv[offset] += (targetU - system.currentUv[offset]!) * .5;
         system.currentUv[offset + 1] +=
-          (targetV - system.currentUv[offset + 1]!) * .34;
+          (targetV - system.currentUv[offset + 1]!) * .5;
         system.currentTangent[offset] +=
-          (targetTangentX - system.currentTangent[offset]!) * .24;
+          (targetTangentX - system.currentTangent[offset]!) * .35;
         system.currentTangent[offset + 1] +=
-          (targetTangentY - system.currentTangent[offset + 1]!) * .24;
+          (targetTangentY - system.currentTangent[offset + 1]!) * .35;
       }
       system.currentIntensity[index] = advanceFlameEnvelope(
         system.currentIntensity[index] ?? 0,

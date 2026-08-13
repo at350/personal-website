@@ -294,6 +294,40 @@ describe("burn field", () => {
     expect(maximumCellDelta).toBeLessThan(0.04);
   });
 
+  it("re-ignites locally where the flame touches instead of accelerating the sheet", () => {
+    const field = createBurnField({
+      width: 96,
+      height: 64,
+      leftLayers: 2,
+      rightLayers: 2,
+      seed: 73,
+    });
+    igniteBurnField(field, 0.3, 0.5, 0.032, 0.92);
+    run(field, 90);
+
+    const cellIndex = (u: number, v: number) =>
+      Math.round(v * (field.height - 1)) * field.width +
+      Math.round(u * (field.width - 1));
+    const before = field.burn.slice();
+    // Hold the cursor flame on the far side for just over a second.
+    for (let frame = 0; frame < 36; frame += 1) {
+      igniteBurnField(field, 0.7, 0.5, 0.032, 0.92);
+      stepBurnField(field, BURN_FIXED_STEP);
+    }
+    const growthAt = (u: number, v: number) =>
+      (field.burn[cellIndex(u, v)] ?? 0) - (before[cellIndex(u, v)] ?? 0);
+
+    const touched = growthAt(0.7, 0.5);
+    const oldInterior = growthAt(0.3, 0.5);
+    const farQuiet = growthAt(0.92, 0.08);
+    // The touched spot catches into its own local fire...
+    expect(touched).toBeGreaterThan(0.12);
+    // ...while the previously burned interior only smoulders on...
+    expect(touched).toBeGreaterThan(oldInterior * 3);
+    // ...and paper away from both fires stays cold.
+    expect(farQuiet).toBeLessThan(0.02);
+  });
+
   it("produces identical state through fixed-step accumulation", () => {
     const create = () =>
       createBurnField({
