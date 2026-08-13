@@ -57,15 +57,40 @@ function motionGleam(energy: number) {
   return knee * Math.min(1, raised * GLEAM_ENERGY_GAIN) * GLEAM_MOTION_CAP;
 }
 
+/** Progress distance from either stack inside which the energy gleam is fully
+    retired, and the distance where it is unrestricted. A landed sheet keeps
+    waving (and holding energy) for a beat before the canonical texture swap;
+    without this ramp that residual energy paints the settled page with a gray
+    specular wash until the physics finally rest. */
+export const GLEAM_LANDING_FADE_START = 0.045;
+export const GLEAM_LANDING_FADE_END = 0.16;
+
+function landingProximityFade(progress: number) {
+  const p = clamp01(progress);
+  const edgeDistance = Math.min(p, 1 - p);
+  const t = clamp01(
+    (edgeDistance - GLEAM_LANDING_FADE_START) /
+      (GLEAM_LANDING_FADE_END - GLEAM_LANDING_FADE_START),
+  );
+  return t * t * (3 - 2 * t);
+}
+
 /**
  * The gleam envelope the materials actually follow. Position gives the broad
  * mid-flight gloss; motion keeps it breathing while the under-damped sheet is
- * still physically settling, so the highlight dies with the paper's movement
- * instead of cutting out while the page is visibly waving. Exactly zero once
- * the sheet rests; the canonical texture and its baked sheen remain underneath.
+ * still airborne. Both terms fade out continuously over the final approach —
+ * a sheet lying on a stack must show the exact canonical pixels even while it
+ * finishes waving, or the landed page reads as a lingering gray wash next to
+ * the unlit stacks and the DOM twin it must match.
  */
 export function paperGleamActivity(progress: number, energy: number) {
-  return Math.min(1, Math.max(paperTurnActivity(progress), motionGleam(energy)));
+  return Math.min(
+    1,
+    Math.max(
+      paperTurnActivity(progress),
+      motionGleam(energy) * landingProximityFade(progress),
+    ),
+  );
 }
 
 /**

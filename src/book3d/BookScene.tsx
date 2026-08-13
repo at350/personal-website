@@ -421,11 +421,18 @@ function GlossLight({ pw, ph }: { pw: number; ph: number }) {
 }
 
 function Leaf({
+  sheet,
   motion,
   pw,
   ph,
   paperBump,
 }: {
+  /** Committed engine sheet. Mounting must follow React state, not the
+      mutable motion mirror: a render that catches the mirror mid-update can
+      unmount the leaf while the landing stack is still computed hidden, and
+      at the cover/back boundary nothing sits beneath — the page flashes the
+      gray void for a frame. Props are commit-consistent; refs are not. */
+  sheet: number | null;
   motion: BookMotion;
   pw: number;
   ph: number;
@@ -433,8 +440,8 @@ function Leaf({
 }) {
   const mesh = useRef<THREE.Mesh>(null);
   const backMesh = useRef<THREE.Mesh>(null);
-  const frontKey = motion.leaf !== null ? pageKey(motion.leaf, "recto") : null;
-  const backKey = motion.leaf !== null ? pageKey(motion.leaf + 1, "verso") : null;
+  const frontKey = sheet !== null ? pageKey(sheet, "recto") : null;
+  const backKey = sheet !== null ? pageKey(sheet + 1, "verso") : null;
   const frontMat = usePageMaterial(frontKey, false, paperBump);
   const backMat = usePageMaterial(backKey, true, paperBump);
   const hologramMat = useCoverHologramMaterial(motion);
@@ -463,14 +470,14 @@ function Leaf({
     outline.setIndex(indices);
     return outline;
   }, [geometry]);
-  const sheet = useMemo(
+  const paperSheet = useMemo(
     () => new PaperSheet(pw, ph, LEAF_SEGMENTS, LEAF_ROWS),
     [ph, pw],
   );
   const activeLeaf = useRef<number | null>(null);
 
   useFrame((_, rawDt) => {
-    if (motion.leaf === null) {
+    if (sheet === null || motion.leaf === null) {
       activeLeaf.current = null;
       motion.coverVertices = null;
       return;
@@ -485,10 +492,10 @@ function Leaf({
       motion.turnDirection,
     );
     if (activeLeaf.current !== motion.leaf) {
-      sheet.reset(target);
+      paperSheet.reset(target);
       activeLeaf.current = motion.leaf;
     }
-    const vertices = sheet.step(target, {
+    const vertices = paperSheet.step(target, {
       dt: rawDt,
       dragging: motion.dragging,
       grabY: motion.grabY,
@@ -497,7 +504,7 @@ function Leaf({
     });
     const boundaryCover = isBoundaryCoverSheet(motion.leaf, SPREADS.length);
     motion.coverVertices = boundaryCover ? vertices : null;
-    motion.sheetEnergy = sheet.motionEnergy();
+    motion.sheetEnergy = paperSheet.motionEnergy();
     // Once the gate fires the page is down, whatever residual energy the hold
     // cap accepted — remove the physical accent and show the canonical texture.
     const motionActivity = paperGleamActivity(motion.progress, motion.sheetEnergy);
@@ -519,12 +526,12 @@ function Leaf({
     g.computeVertexNormals();
   }, -1);
 
-  if (motion.leaf === null) return null;
+  if (sheet === null) return null;
   return (
     <group>
       <mesh ref={mesh} geometry={geometry} material={frontMat} castShadow receiveShadow />
       <mesh ref={backMesh} geometry={geometry} material={backMat} castShadow receiveShadow />
-      {isMovingCoverSheet(motion.leaf) ? (
+      {isMovingCoverSheet(sheet) ? (
         <mesh
           geometry={geometry}
           material={hologramMat}
@@ -775,6 +782,11 @@ const POSE_DROP = 0.994; // posed book sits a breath smaller — object, not pag
 
 interface BookSceneProps {
   motion: BookMotion;
+  /** Committed engine state. The scene graph (leaf mount, stack counts and
+      visibility) must derive from these props, never from the mutable motion
+      mirror, so every React commit is internally consistent. */
+  sheet: number | null;
+  current: number;
   riffle: RiffleTransition | null;
   pw: number;
   ph: number;
@@ -792,6 +804,8 @@ interface BookSceneProps {
 
 export function BookScene({
   motion,
+  sheet,
+  current,
   riffle,
   pw,
   ph,
@@ -966,22 +980,22 @@ export function BookScene({
   const riffleStacks = riffle ? riffleStackCounts(TOTAL_LEAVES, riffle) : null;
   const leftCount = riffleStacks
     ? riffleStacks.left
-    : motion.leaf !== null
-      ? motion.leaf
-      : motion.current;
+    : sheet !== null
+      ? sheet
+      : current;
   const rightCount = riffleStacks
     ? riffleStacks.right
-    : TOTAL_LEAVES - leftCount - (motion.leaf !== null ? 1 : 0);
+    : TOTAL_LEAVES - leftCount - (sheet !== null ? 1 : 0);
   const staticLeft = riffle
     ? Math.min(riffle.from, riffle.to)
-    : motion.leaf !== null
-      ? motion.leaf
-      : motion.current;
+    : sheet !== null
+      ? sheet
+      : current;
   const staticRight = riffle
     ? Math.max(riffle.from, riffle.to)
-    : motion.leaf !== null
-      ? motion.leaf + 1
-      : motion.current;
+    : sheet !== null
+      ? sheet + 1
+      : current;
   const leftTop =
     leftCount === 0 || SPREADS[staticLeft]?.kind === "cover"
       ? null
@@ -1016,8 +1030,8 @@ export function BookScene({
       <group ref={group}>
         {ignite?.active ? (
           <IgniteBook
-            key={`${motion.current}:${ignite.revision}`}
-            currentSpread={motion.current}
+            key={`${current}:${ignite.revision}`}
+            currentSpread={current}
             pointer={ignite.pointer}
             pw={pw}
             ph={ph}
@@ -1051,14 +1065,10 @@ export function BookScene({
               <planeGeometry args={[pw * 2, ph]} />
               <shadowMaterial transparent opacity={0.15} depthWrite={false} />
             </mesh>
-            {isTiltableCoverStack(
-              motion.current,
-              motion.leaf,
-              riffle !== null,
-            ) ? (
+            {isTiltableCoverStack(current, sheet, riffle !== null) ? (
               <TiltedCoverHologram motion={motion} pw={pw} ph={ph} />
             ) : null}
-            <Leaf motion={motion} pw={pw} ph={ph} paperBump={paperBump} />
+            <Leaf sheet={sheet} motion={motion} pw={pw} ph={ph} paperBump={paperBump} />
             <FastRiffle
               transition={riffle}
               motion={motion}

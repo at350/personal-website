@@ -76,6 +76,26 @@ describe("cover hologram", () => {
     expect(coverHologramFlipEnvelope(0.999999)).toBeLessThan(0.000004);
   });
 
+  it("retires the foil over the landing approach, not at the last instant", () => {
+    // The settling sheet keeps waving at the endpoint for a beat before the
+    // canonical texture swap. Full-strength foil during that window reads as a
+    // gray wash on the just-landed cover ("flashes gray before it settles").
+    expect(coverHologramFlipEnvelope(0.03)).toBe(0);
+    expect(coverHologramFlipEnvelope(0.97)).toBe(0);
+    expect(coverHologramFlipEnvelope(0.08)).toBeLessThan(0.15);
+    expect(coverHologramFlipEnvelope(0.92)).toBeLessThan(0.15);
+    // Mid-flight strength is untouched.
+    expect(coverHologramFlipEnvelope(0.2)).toBeGreaterThan(0.5);
+    expect(coverHologramFlipEnvelope(0.8)).toBeGreaterThan(0.5);
+    // The ramp is monotone on the way out.
+    const approach = [0.2, 0.14, 0.1, 0.06, 0.045, 0.02];
+    for (let i = 1; i < approach.length; i += 1) {
+      expect(coverHologramFlipEnvelope(approach[i]!)).toBeLessThanOrEqual(
+        coverHologramFlipEnvelope(approach[i - 1]!),
+      );
+    }
+  });
+
   it("reveals tilt only after pointer interaction and before the flat handoff", () => {
     expect(coverHologramTiltEnvelope(false, 0)).toBe(0);
     expect(coverHologramTiltEnvelope(false, 0.5)).toBe(0);

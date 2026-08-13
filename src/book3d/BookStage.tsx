@@ -1020,6 +1020,8 @@ export function BookStage({
           <Suspense fallback={null}>
             <BookScene
               motion={motion}
+              sheet={state.sheet}
+              current={state.current}
               riffle={state.riffle}
               pw={pw}
               ph={ph}
@@ -1170,7 +1172,11 @@ export function BookStage({
 
       {!texturesReady ? <EntryLoader progress={textureProgress} /> : null}
 
-      <CaptureFarm onProgress={onTextureProgress} onReady={onTexturesReady} />
+      <CaptureFarm
+        displayWidth={pw}
+        onProgress={onTextureProgress}
+        onReady={onTexturesReady}
+      />
     </div>
   );
 }

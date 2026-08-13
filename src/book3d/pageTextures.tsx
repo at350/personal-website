@@ -24,6 +24,30 @@ export function pageRasterLayout(visiblePageWidth: number) {
   };
 }
 
+/** The farm lays pages out at CAPTURE_W CSS pixels, but the texture must hold
+    exactly the DEVICE pixels the page occupies on screen. A fixed capture
+    ratio leaves the texture minified at rest (GPU trilinear softens the type,
+    so a settled WebGL page reads gray and fuzzy next to its DOM twin — the
+    handoff pops like a refresh). Matching the display footprint makes the
+    resting texture map 1:1 and the swap pixel-invisible. */
+let captureDisplayWidth = CAPTURE_W;
+
+export function setCaptureDisplayWidth(visiblePageWidth: number) {
+  if (Number.isFinite(visiblePageWidth) && visiblePageWidth > 0) {
+    captureDisplayWidth = visiblePageWidth;
+  }
+}
+
+export function capturePixelRatio(
+  displayWidth = captureDisplayWidth,
+  devicePixelRatio = typeof window !== "undefined"
+    ? window.devicePixelRatio || 1
+    : 1,
+): number {
+  const ratio = (displayWidth * Math.min(devicePixelRatio, 2)) / CAPTURE_W;
+  return Math.min(3, Math.max(0.5, ratio));
+}
+
 const cache = new Map<string, THREE.CanvasTexture>();
 const inFlight = new Map<string, Promise<boolean>>();
 const spreadRefreshes = new Map<number, Promise<boolean>>();
@@ -123,7 +147,7 @@ function capture(key: string, refresh = false): Promise<boolean> {
     await document.fonts.ready;
     await settleImages(el);
     const options = {
-      pixelRatio: 2,
+      pixelRatio: capturePixelRatio(),
       width: CAPTURE_W,
       height: CAPTURE_H,
       backgroundColor: "#ffffff",
@@ -163,9 +187,10 @@ function capture(key: string, refresh = false): Promise<boolean> {
     if (refresh) return false;
     // Last-resort paper still counts as a texture. The entry screen must never
     // trap a reader because one page contains an uncooperative remote asset.
+    const ratio = capturePixelRatio();
     const canvas = document.createElement("canvas");
-    canvas.width = CAPTURE_W * 2;
-    canvas.height = CAPTURE_H * 2;
+    canvas.width = Math.round(CAPTURE_W * ratio);
+    canvas.height = Math.round(CAPTURE_H * ratio);
     const context = canvas.getContext("2d");
     if (context) {
       context.fillStyle = "#ffffff";
@@ -339,13 +364,18 @@ export function FarmFace({
 
 /** Offscreen live copies of every page, kept out of the a11y tree. */
 export function CaptureFarm({
+  displayWidth,
   onProgress,
   onReady,
 }: {
+  /** Visible page width in CSS px, so captures match the on-screen device
+      pixels exactly (see setCaptureDisplayWidth). */
+  displayWidth?: number;
   onProgress?: (progress: TextureProgress) => void;
   onReady?: (progress: TextureProgress) => void;
 }) {
   useEffect(() => {
+    if (displayWidth !== undefined) setCaptureDisplayWidth(displayWidth);
     let active = true;
     void preloadAllPageTextures((progress) => {
       if (active) onProgress?.(progress);
@@ -355,7 +385,7 @@ export function CaptureFarm({
     return () => {
       active = false;
     };
-  }, [onProgress, onReady]);
+  }, [displayWidth, onProgress, onReady]);
   return (
     <div
       aria-hidden
