@@ -308,8 +308,15 @@ describe("burn field", () => {
     const cellIndex = (u: number, v: number) =>
       Math.round(v * (field.height - 1)) * field.width +
       Math.round(u * (field.width - 1));
+    // First second of holding: the fresh spot catches while the passed-over
+    // interior's residual glow is still dying out.
+    for (let frame = 0; frame < 36; frame += 1) {
+      igniteBurnField(field, 0.7, 0.5, 0.032, 0.92);
+      stepBurnField(field, BURN_FIXED_STEP);
+    }
+    // Second second: the interior has cooled below ignition; only real fires
+    // — the touched spot and live frontiers — keep consuming.
     const before = field.burn.slice();
-    // Hold the cursor flame on the far side for just over a second.
     for (let frame = 0; frame < 36; frame += 1) {
       igniteBurnField(field, 0.7, 0.5, 0.032, 0.92);
       stepBurnField(field, BURN_FIXED_STEP);
@@ -320,9 +327,9 @@ describe("burn field", () => {
     const touched = growthAt(0.7, 0.5);
     const oldInterior = growthAt(0.3, 0.5);
     const farQuiet = growthAt(0.92, 0.08);
-    // The touched spot catches into its own local fire...
+    // The touched spot burns as its own local fire...
     expect(touched).toBeGreaterThan(0.12);
-    // ...while the previously burned interior only smoulders on...
+    // ...while the previously burned interior has smouldered out...
     expect(touched).toBeGreaterThan(oldInterior * 3);
     // ...and paper away from both fires stays cold.
     expect(farQuiet).toBeLessThan(0.02);

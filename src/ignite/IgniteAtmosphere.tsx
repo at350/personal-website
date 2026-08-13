@@ -191,7 +191,7 @@ const flameFieldFragment = /* glsl */ `
 
       float y = max(rootDelta.y, 0.0);
       float level = clamp(y / rise, 0.0, 1.0);
-      float verticalGate = smoothstep(-5.0, 2.6, rootDelta.y) *
+      float verticalGate = smoothstep(-9.0, 5.0, rootDelta.y) *
         (1.0 - smoothstep(.76, 1.03, level));
       float slowSway = sin(time * 1.1 + level * 5.4 + branchBias * 4.0);
       float fastSway = sin(time * 2.7 - level * 8.7 + phase * .37);
@@ -208,6 +208,12 @@ const flameFieldFragment = /* glsl */ `
       float lateral = (rootDelta.x - centreX) / max(halfWidth, .75);
       float ribbon = exp(-lateral * lateral * 1.05) * verticalGate;
       ribbon *= 1.0 - smoothstep(.58, 1.0, level) * .3;
+
+      // Near the paper the tongue takes the shape of its tangent-oriented
+      // source ellipse instead of ending on the horizontal line of its own
+      // root row — a straight bottom edge is what read as a chopped sprite.
+      float footBlend = smoothstep(3.0, 15.0, rootDelta.y);
+      ribbon *= mix(clamp(source * 2.6, 0.0, 1.0), 1.0, footBlend);
 
       // Real flames churn: the whole cluster brightens and dims several
       // times a second, and soot-dark gaps race up through the body much
@@ -473,7 +479,7 @@ function assignFlameCandidates(
   // old flame dies out in place and a fresh one catches at the new location:
   // translating the whole tongue across the page is exactly what read as a
   // sprite gliding along the frontier.
-  const maximumTrackingDistanceSquared = 6.5 * 6.5;
+  const maximumTrackingDistanceSquared = 4.5 * 4.5;
   for (let slot = 0; slot < FLAME_ROOTS; slot += 1) {
     if ((system.currentIntensity[slot] ?? 0) < .012) continue;
     const offset = slot * 2;
@@ -546,9 +552,9 @@ function updateFlameField(
         system.currentTangent[offset] = targetTangentX;
         system.currentTangent[offset + 1] = targetTangentY;
       } else {
-        system.currentUv[offset] += (targetU - system.currentUv[offset]!) * .5;
+        system.currentUv[offset] += (targetU - system.currentUv[offset]!) * .6;
         system.currentUv[offset + 1] +=
-          (targetV - system.currentUv[offset + 1]!) * .5;
+          (targetV - system.currentUv[offset + 1]!) * .6;
         system.currentTangent[offset] +=
           (targetTangentX - system.currentTangent[offset]!) * .35;
         system.currentTangent[offset + 1] +=

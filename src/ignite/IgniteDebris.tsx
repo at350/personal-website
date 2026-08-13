@@ -3,9 +3,9 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { BurnField } from "./burnField";
 
-export const DEFAULT_SETTLED_ASH_COUNT = 320;
+export const DEFAULT_SETTLED_ASH_COUNT = 430;
 export const MAX_SETTLED_ASH_COUNT = 560;
-export const DEFAULT_SETTLED_FIBRE_COUNT = 148;
+export const DEFAULT_SETTLED_FIBRE_COUNT = 168;
 export const MAX_SETTLED_FIBRE_COUNT = 176;
 export const DEFAULT_ATTACHED_REMNANT_COUNT = 96;
 export const MAX_LATENT_REMNANT_FRACTION = 0.25;
@@ -128,7 +128,7 @@ export function createClusteredAshLayout(
     scatter[offset + 1] = Math.sin(angle) * distance;
     // Most of the deposit is fine grit; a short tail of larger, curled carbon
     // pieces keeps it recognisably made from paper rather than dust alone.
-    const size = 0.0028 + Math.pow(random(), 2.2) * 0.024;
+    const size = 0.003 + Math.pow(random(), 2.0) * 0.0252;
     scale[offset] = size;
     scale[offset + 1] = size * (0.28 + random() * 0.67);
     rotation[index] = random() * Math.PI * 2;
@@ -195,7 +195,7 @@ export function createSettledFibreLayout(
     scale[offset + 1] = 0.0016 + random() * 0.0045;
     rotation[index] = random() * Math.PI * 2;
     bend[index] = (random() * 2 - 1) * (0.16 + random() * 0.34);
-    threshold[index] = 0.03 + Math.pow(random(), 1.6) * 0.47;
+    threshold[index] = 0.02 + Math.pow(random(), 1.6) * 0.46;
     seed[index] = random();
     tone[index] = random();
   }
@@ -286,7 +286,7 @@ export function updateResidueTextureState(
       // few percent per sheet, so the raw ratio is deliberately tiny. Lift it
       // into a useful visual range without flattening it; the shader's island
       // mask, not saturation, is what prevents a page-shaped deposit.
-      state.target[index] = THREE.MathUtils.clamp(ratio * 64, 0, 1);
+      state.target[index] = THREE.MathUtils.clamp(ratio * 78, 0, 1);
     }
   }
 
@@ -550,24 +550,24 @@ const POWDER_FRAGMENT = /* glsl */ `
     float fine = powderNoise(vUv * vec2(340.0, 236.0));
     // Friable edges: thin deposit dissolves into grit instead of ending on a
     // clean vector boundary.
-    float presence = smoothstep(.012 + grain * .05, .24, residue);
-    float patch = smoothstep(.3, .85, mottle * .6 + residue * .5);
-    float alpha = presence * (.15 + patch * .32) * (.68 + fine * .32);
+    float presence = smoothstep(.01 + grain * .045, .22, residue);
+    float patch = smoothstep(.28, .84, mottle * .6 + residue * .5);
+    float alpha = presence * (.2 + patch * .38) * (.68 + fine * .32);
     // Friable coverage: thin deposit breaks into islands of grit instead of
     // filming the whole consumed footprint at a uniform opacity.
-    alpha *= smoothstep(.12, .52, mottle * .7 + residue * .4);
+    alpha *= smoothstep(.08, .46, mottle * .7 + residue * .4);
     if (alpha < .01) discard;
     vec3 powder = vec3(.55, .53, .49);
     vec3 warmGrey = vec3(.4, .37, .33);
-    vec3 charBrown = vec3(.2, .155, .115);
-    vec3 soot = vec3(.1, .092, .082);
+    vec3 charBrown = vec3(.19, .145, .105);
+    vec3 soot = vec3(.09, .082, .073);
     vec3 color = mix(powder, warmGrey, smoothstep(.15, .62, mottle));
     color = mix(
       color,
       charBrown,
-      smoothstep(.46, .88, mottle * .5 + residue * .55)
+      smoothstep(.4, .84, mottle * .5 + residue * .55)
     );
-    color = mix(color, soot, smoothstep(.62, .97, residue) * .5);
+    color = mix(color, soot, smoothstep(.58, .95, residue) * .6);
     gl_FragColor = vec4(color, alpha);
   }
 `;

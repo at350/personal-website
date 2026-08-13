@@ -124,6 +124,15 @@ const FRAGMENT_SHADER = /* glsl */ `
       crossFlow * 5.2 - broadFlow * 2.4
     ) * (.38 + .62 * warpRamp);
 
+    // Air resistance: a fast-moving flame bends over, the tip trailing the
+    // root by an amount that grows with height. This is a shear of the
+    // sampling domain, so the root stays pinned while the body streams
+    // behind the motion like a real flame carried through air.
+    float bendHeight = clamp(local.y - bodyOrigin.y + 8.0, 0.0, 96.0);
+    float bendStrength = (.3 + speed * .55);
+    warped.x += motion.x * bendHeight * bendStrength;
+    warped.y -= motion.y * bendHeight * bendStrength * .38;
+
     float lagLean = -motion.x * (5.0 + 11.0 * speed);
     float slowSway = sin(time * 1.83) * 2.9;
     float middleSway = sin(time * 2.57 + 1.4) * 4.1;
@@ -380,6 +389,8 @@ const FRAGMENT_SHADER = /* glsl */ `
       broadFlow * 8.0,
       crossFlow * 4.0
     );
+    smokeWarped.x += motion.x * bendHeight * bendStrength;
+    smokeWarped.y -= motion.y * bendHeight * bendStrength * .38;
     vec2 smokeA = upperCenter + vec2(
       sin(time * .79) * 4.0 - motion.x * 5.0,
       24.0
@@ -587,8 +598,8 @@ export function IgniteCursor() {
       let bodyOffsetX = plumeBody.x - cursorX;
       let bodyOffsetY = cursorY - plumeBody.y;
       const bodyOffsetLength = Math.hypot(bodyOffsetX, bodyOffsetY);
-      if (bodyOffsetLength > 22) {
-        const scale = 22 / bodyOffsetLength;
+      if (bodyOffsetLength > 30) {
+        const scale = 30 / bodyOffsetLength;
         bodyOffsetX *= scale;
         bodyOffsetY *= scale;
       }

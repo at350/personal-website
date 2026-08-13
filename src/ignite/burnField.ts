@@ -38,6 +38,8 @@ export interface BurnField {
   totalFuel: number;
   burnedFuel: number;
   maximumHeat: number;
+  /** Accumulated fixed-step simulation time; drives deterministic flutter. */
+  simTime: number;
   ignited: boolean;
   caught: boolean;
   complete: boolean;
@@ -78,10 +80,34 @@ const clamp = (value: number, minimum: number, maximum: number) =>
 
 const smoothCurve = (value: number) => value * value * (3 - 2 * value);
 
+function sampleValueLattice(
+  lattice: Float32Array,
+  latticeWidth: number,
+  x: number,
+  y: number,
+  spacing: number,
+) {
+  const latticeY = y / spacing;
+  const y0 = Math.floor(latticeY);
+  const yMix = smoothCurve(latticeY - y0);
+  const latticeX = x / spacing;
+  const x0 = Math.floor(latticeX);
+  const xMix = smoothCurve(latticeX - x0);
+  const row0 = y0 * latticeWidth;
+  const row1 = (y0 + 1) * latticeWidth;
+  const top = (lattice[row0 + x0] ?? 0.5) * (1 - xMix) +
+    (lattice[row0 + x0 + 1] ?? 0.5) * xMix;
+  const bottom = (lattice[row1 + x0] ?? 0.5) * (1 - xMix) +
+    (lattice[row1 + x0 + 1] ?? 0.5) * xMix;
+  return top * (1 - yMix) + bottom * yMix;
+}
+
 /**
- * Paper is irregular at a fibre scale, but it is not white noise. A sparse
- * value-noise lattice gives neighbouring cells similar resistance so the
- * flame edge meanders in broad folds instead of outlining every grid cell.
+ * Paper is irregular at a fibre scale, but it is not white noise. Two sparse
+ * value-noise lattices give neighbouring cells similar resistance — a broad
+ * one lays out big easy/stubborn patches (dry margins, dense ink) and a
+ * finer one textures them — so the flame front fingers ahead in some places
+ * and stalls in others instead of expanding as one even wave.
  */
 function fillCoherentGrain(
   target: Float32Array,
@@ -89,33 +115,45 @@ function fillCoherentGrain(
   height: number,
   random: () => number,
 ) {
-  const spacing = 14;
-  const latticeWidth = Math.ceil((width - 1) / spacing) + 2;
-  const latticeHeight = Math.ceil((height - 1) / spacing) + 2;
-  const lattice = new Float32Array(latticeWidth * latticeHeight);
-  for (let index = 0; index < lattice.length; index += 1) {
-    lattice[index] = random();
+  const broadSpacing = 34;
+  const fineSpacing = 14;
+  const broadWidth = Math.ceil((width - 1) / broadSpacing) + 2;
+  const broadHeight = Math.ceil((height - 1) / broadSpacing) + 2;
+  const broadLattice = new Float32Array(broadWidth * broadHeight);
+  for (let index = 0; index < broadLattice.length; index += 1) {
+    broadLattice[index] = random();
+  }
+  const fineWidth = Math.ceil((width - 1) / fineSpacing) + 2;
+  const fineHeight = Math.ceil((height - 1) / fineSpacing) + 2;
+  const fineLattice = new Float32Array(fineWidth * fineHeight);
+  for (let index = 0; index < fineLattice.length; index += 1) {
+    fineLattice[index] = random();
   }
 
   for (let y = 0; y < height; y += 1) {
-    const latticeY = y / spacing;
-    const y0 = Math.floor(latticeY);
-    const yMix = smoothCurve(latticeY - y0);
     for (let x = 0; x < width; x += 1) {
-      const latticeX = x / spacing;
-      const x0 = Math.floor(latticeX);
-      const xMix = smoothCurve(latticeX - x0);
-      const row0 = y0 * latticeWidth;
-      const row1 = (y0 + 1) * latticeWidth;
-      const top = (lattice[row0 + x0] ?? 0.5) * (1 - xMix) +
-        (lattice[row0 + x0 + 1] ?? 0.5) * xMix;
-      const bottom = (lattice[row1 + x0] ?? 0.5) * (1 - xMix) +
-        (lattice[row1 + x0 + 1] ?? 0.5) * xMix;
-      const broadNoise = top * (1 - yMix) + bottom * yMix;
+      const broadNoise = sampleValueLattice(
+        broadLattice,
+        broadWidth,
+        x,
+        y,
+        broadSpacing,
+      );
+      const fineNoise = sampleValueLattice(
+        fineLattice,
+        fineWidth,
+        x,
+        y,
+        fineSpacing,
+      );
       // A very faint directional fibre keeps the edge organic without making
       // the simulation grid legible.
       const fibre = Math.sin(x * 0.19 + y * 0.035) * 0.035;
-      target[y * width + x] = clamp(0.17 + broadNoise * 0.66 + fibre, 0, 1);
+      target[y * width + x] = clamp(
+        0.06 + broadNoise * 0.55 + fineNoise * 0.32 + fibre,
+        0,
+        1,
+      );
     }
   }
 }
@@ -169,6 +207,7 @@ export function createBurnField({
     totalFuel,
     burnedFuel: 0,
     maximumHeat: 0,
+    simTime: 0,
     ignited: false,
     caught: false,
     complete: totalFuel === 0,
@@ -231,26 +270,28 @@ function heatAt(field: BurnField, x: number, y: number) {
 }
 
 /**
- * Largest step in consumed depth between a cell and its four neighbours.
- * Cells that never held paper count as flat, not as a permanent cliff.
+ * How far this cell's consumption leads its least-burned paper neighbour.
+ * A true frontier eats into fresh fuel, so the drop toward the shallow side
+ * is what marks it; uneven pacing between two equally deep interior cells is
+ * not a frontier. Cells that never held paper count as flat, not as a cliff.
  */
-function burnDepthSpanAt(
+function burnFrontierDropAt(
   field: BurnField,
   x: number,
   y: number,
   centerBurn: number,
 ) {
-  let span = 0;
+  let shallowest = centerBurn;
   for (let direction = 0; direction < 4; direction += 1) {
     const nx = x + (direction === 0 ? -1 : direction === 1 ? 1 : 0);
     const ny = y + (direction === 2 ? -1 : direction === 3 ? 1 : 0);
     if (nx < 0 || nx >= field.width || ny < 0 || ny >= field.height) continue;
     const index = ny * field.width + nx;
     if ((field.capacity[index] ?? 0) <= 0) continue;
-    const difference = Math.abs((field.burn[index] ?? 0) - centerBurn);
-    if (difference > span) span = difference;
+    const neighbourBurn = field.burn[index] ?? 0;
+    if (neighbourBurn < shallowest) shallowest = neighbourBurn;
   }
-  return span;
+  return centerBurn - shallowest;
 }
 
 /** One fixed combustion step. Call through `advanceBurnField` from rAF. */
@@ -258,6 +299,7 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
   if (field.complete || !field.ignited) return;
 
   const elapsed = clamp(dt, 0, 1 / 20);
+  field.simTime += elapsed;
   let burnedFuel = 0;
   let maximumHeat = 0;
 
@@ -293,9 +335,17 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
       // This remains a four-neighbour, connected wave: no distant cell can
       // ignite before the front physically reaches one of its neighbours.
       const conduction = (carriedHeat - heat) * HEAT_CONDUCTION_RATE;
+      // Real fronts surge and stall: convection gusts feed one stretch of
+      // the edge and starve another for a moment. The flutter is a smooth
+      // deterministic function of place and accumulated fixed-step time, so
+      // frame schedules cannot change the burn.
+      const flutter = 1 + 0.4 * Math.sin(
+        x * 0.19 + y * 0.127 + field.simTime * 1.7 +
+          (field.grain[index] ?? 0.5) * 6.3,
+      );
       const neighbourPreheat = stillFuel
         ? smoothCurve(clamp((hottest - 0.24) / 0.64, 0, 1)) *
-          NEIGHBOUR_PREHEAT_RATE
+          NEIGHBOUR_PREHEAT_RATE * flutter
         : 0;
       const layerProgress = capacity === 0 ? 0 : burn / capacity;
       // Flames live where fresh fuel meets air: at each sheet's advancing
@@ -304,15 +354,19 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
       // Without this, every touched cell kept generating full heat until its
       // whole column was spent, so the entire stack burned down in lockstep
       // and any local re-ignition read as the whole page speeding up.
-      const depthSpan = burnDepthSpanAt(field, x, y, burn);
-      const frontierOxygen = Math.min(1, depthSpan / 0.3);
-      const freshSheet = 1 - Math.min(1, burn);
-      const smolder = 0.12 +
-        0.88 * Math.max(frontierOxygen, freshSheet);
+      const frontierDrop = burnFrontierDropAt(field, x, y, burn);
+      const frontierOxygen = clamp((frontierDrop - 0.3) / 0.45, 0, 1);
+      const freshSheet = clamp(1 - burn * 1.4, 0, 1);
+      const activity = Math.max(frontierOxygen, freshSheet);
+      const smolder = 0.1 + 0.9 * activity;
       const source = combusting
         ? (0.92 - Math.min(0.2, layerProgress * 0.2)) * smolder
         : 0;
-      const cooling = stillFuel ? 0.11 : 0.82;
+      // Once the front has passed, the residual glow dies within a second or
+      // two: passed-over cells cool below ignition and stop consuming until
+      // the advancing frontier's conducted heat re-lights them. This is what
+      // keeps combustion a local phenomenon.
+      const cooling = stillFuel ? 0.11 + (1 - activity) * 0.9 : 0.82;
       const next = clamp(
         heat +
           (conduction + neighbourPreheat + source - cooling) * elapsed,
@@ -345,7 +399,7 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
     // in one to three fixed steps, while each cell still takes visible time to
     // char and open. This produces a broad burning region instead of a tiny
     // cursor crater that smoulders for a minute.
-    const resistance = 0.004 + (field.grain[index] ?? 0.5) * 0.008;
+    const resistance = 0.002 + (field.grain[index] ?? 0.5) * 0.012;
     const canAdvance =
       (x > 0 && field.surfaceSeed[index - 1] === 1 &&
         (field.surface[index - 1] ?? 0) >= resistance) ||
@@ -385,8 +439,15 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
       const flameContact = clamp((heat - 0.9) / 0.45, 0, 1);
       // The boost is gated entirely on exposure so the virgin top sheet's
       // approved catch and first-perforation timing stay exactly as tuned.
+      // Wide grain modulation: easy patches race to nearly triple the pace
+      // of stubborn ones, so consumption fingers instead of washing evenly.
+      // It fades in with establishment — the first fraction of the catch
+      // keeps the narrow spread so ignition timing stays as tuned.
+      const narrowSpread = 0.88 + grain * 0.24;
+      const wideSpread = 0.55 + grain * 0.95;
+      const establishment = Math.min(1, burn * 2);
       const rate = PAPER_BURN_RATE *
-        (0.88 + grain * 0.24) *
+        (narrowSpread + (wideSpread - narrowSpread) * establishment) *
         (0.72 + heat * 0.58) *
         (1 + exposure * (0.5 + flameContact * 0.75));
       burn = Math.min(capacity, burn + rate * elapsed);
@@ -404,7 +465,7 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
       // and paper resistance have had time to shape an irregular connected
       // front. A fast cut merely reproduces the circular ignition brush.
       const surfaceRate = SURFACE_PYROLYSIS_RATE *
-        (0.58 + grain * 0.84) *
+        (0.4 + grain * 1.2) *
         (0.7 + heat * 0.48);
       field.surface[index] = Math.min(1, surface + surfaceRate * elapsed);
     }

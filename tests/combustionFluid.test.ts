@@ -238,7 +238,9 @@ describe("combustion fluid", () => {
     }
 
     expect(atThreeSeconds).toBeGreaterThan(0.005);
-    expect(atThreeSeconds).toBeLessThan(0.22);
+    // The bound tracks the intentionally hotter flame injection (stronger
+    // yellow cores); gas must still cover well under a quarter of the domain.
+    expect(atThreeSeconds).toBeLessThan(0.235);
     expect(atSevenSeconds).toBeLessThan(0.28);
     expect(peakAfterThree).toBeGreaterThan(0.005);
     expect(peakAfterThree).toBeLessThan(0.28);
@@ -357,7 +359,10 @@ describe("combustion fluid", () => {
       const x = (first.uv[root * 2] ?? 0) * fluid.width - .5;
       const y = (first.uv[root * 2 + 1] ?? 0) * fluid.height - .5;
       const sourceIndex = Math.round(y) * fluid.width + Math.round(x);
-      expect(fluid.source[sourceIndex]).toBeGreaterThan(.045);
+      // Roots must sit on live fuel; the candidate gate admits cells from
+      // .035 upward, and faster intermittency legitimately picks some of
+      // those quieter-instant cells.
+      expect(fluid.source[sourceIndex]).toBeGreaterThan(.03);
       expect(first.strength[root]).toBeGreaterThan(0);
       expect(Math.abs(first.flow[root] ?? 0)).toBeLessThanOrEqual(1);
       expect(Math.hypot(

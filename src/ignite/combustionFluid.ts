@@ -275,29 +275,28 @@ function updateSources(fluid: CombustionFluid, burn: BurnField) {
       // Keep a low live floor so the connected reaction never collapses into
       // isolated graphic dots; stronger patches still form the taller tongues.
       const firstPatch = 0.5 + 0.5 * Math.sin(
-        burnX * 0.105 + burnY * 0.073 + grain * 5.9 + fluid.time * 0.64,
+        burnX * 0.17 + burnY * 0.121 + grain * 5.9 + fluid.time * 0.64,
       );
       const secondPatch = 0.5 + 0.5 * Math.sin(
-        burnX * -0.064 + burnY * 0.129 + grain * 3.7 - fluid.time * 0.43,
+        burnX * -0.11 + burnY * 0.2 + grain * 3.7 - fluid.time * 0.43,
       );
       const patch = Math.max(firstPatch, secondPatch * 0.94);
       const intermittent = smoothCurve((patch - 0.675) / 0.18);
       const topSource = exposedFront * caught * notSpent * hot *
-        (0.74 + grain * 0.58) * intermittent;
+        (0.86 + grain * 0.6) * intermittent;
 
       // Once the top sheet is fully open the reaction continues on the
-      // leaves below. Their active boundary is a spatial step in consumed
-      // depth, invisible to the saturated top-sheet surface span — without
-      // this term the whole mid-stack burn produced no attached fire at all.
+      // leaves below. Their active boundary is where consumption leads into
+      // fresher fuel — invisible to the saturated top-sheet surface span.
+      // The drop is one-sided: uneven pacing between equally deep interior
+      // cells is not a frontier and must not light gas.
       const depthLeft = burnDepthAt(burn, burnX - 2, burnY, consumed);
       const depthRight = burnDepthAt(burn, burnX + 2, burnY, consumed);
       const depthBelow = burnDepthAt(burn, burnX, burnY - 2, consumed);
       const depthAbove = burnDepthAt(burn, burnX, burnY + 2, consumed);
-      const depthSpan = Math.max(
-        consumed - Math.min(depthLeft, depthRight, depthBelow, depthAbove),
-        Math.max(depthLeft, depthRight, depthBelow, depthAbove) - consumed,
-      );
-      const deepFront = smoothCurve((depthSpan - 0.22) / 0.6);
+      const frontierDrop = consumed -
+        Math.min(depthLeft, depthRight, depthBelow, depthAbove);
+      const deepFront = smoothCurve((frontierDrop - 0.3) / 0.55);
       const opened = smoothCurve((surface - 0.55) / 0.2);
       const deepSource = deepFront * opened * hot *
         (0.78 + grain * 0.5) * smoothCurve((patch - 0.5) / 0.3);
@@ -308,8 +307,8 @@ function updateSources(fluid: CombustionFluid, burn: BurnField) {
 }
 
 function injectSources(fluid: CombustionFluid, dt: number) {
-  const flameRetention = Math.exp(-40 * dt);
-  const heatRetention = Math.exp(-31 * dt);
+  const flameRetention = Math.exp(-54 * dt);
+  const heatRetention = Math.exp(-42 * dt);
   const smokeRetention = Math.exp(-0.34 * dt);
   for (let index = 0; index < fluid.source.length; index += 1) {
     const source = fluid.source[index] ?? 0;
