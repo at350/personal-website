@@ -50,6 +50,28 @@ describe("ExperienceDock", () => {
     ).toBe("true");
   });
 
+  it("publishes controlled mode changes without duplicating selections", () => {
+    const onModeChange = vi.fn();
+    const { rerender } = render(
+      <ExperienceDock mode="read" onModeChange={onModeChange} />,
+    );
+
+    const read = screen.getByRole("button", { name: /Read: Regular experience/ });
+    fireEvent.click(read);
+    const ignite = screen.getByRole("button", { name: /Ignite: Flame playground/ });
+    fireEvent.click(ignite);
+    expect(onModeChange).toHaveBeenCalledTimes(1);
+    expect(onModeChange).toHaveBeenLastCalledWith("ignite");
+
+    rerender(<ExperienceDock mode="ignite" onModeChange={onModeChange} />);
+    const selectedIgnite = screen.getByRole("button", {
+      name: /Ignite: Flame playground/,
+    });
+    expect(selectedIgnite.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(selectedIgnite);
+    expect(onModeChange).toHaveBeenCalledTimes(1);
+  });
+
   it("opens on the first touch even when pointer focus lands before click", () => {
     render(<ExperienceDock />);
 

@@ -13,6 +13,7 @@ export type ExperienceMode = "read" | "ignite" | "drift" | "focus" | "shuffle";
 
 interface ExperienceDockProps {
   defaultMode?: ExperienceMode;
+  mode?: ExperienceMode;
   onModeChange?: (mode: ExperienceMode) => void;
 }
 
@@ -118,9 +119,12 @@ const OPEN_HEIGHT =
  */
 export function ExperienceDock({
   defaultMode = "read",
+  mode: controlledMode,
   onModeChange,
 }: ExperienceDockProps) {
-  const [selectedMode, setSelectedMode] = useState<ExperienceMode>(defaultMode);
+  const [uncontrolledMode, setUncontrolledMode] =
+    useState<ExperienceMode>(defaultMode);
+  const selectedMode = controlledMode ?? uncontrolledMode;
   const [expanded, setExpanded] = useState(false);
   const [availableHeight, setAvailableHeight] = useState(viewportHeight);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -235,23 +239,30 @@ export function ExperienceDock({
   }, [closeDock, expanded, selectedIndex]);
 
   const selectMode = useCallback(
-    (mode: ExperienceMode) => {
+    (nextMode: ExperienceMode) => {
       const expandedAtPointerDown = expandedAtPointerDownRef.current;
       expandedAtPointerDownRef.current = null;
 
       if (
-        mode === selectedMode &&
+        nextMode === selectedMode &&
         (!expanded || expandedAtPointerDown === false)
       ) {
         openDock();
         return;
       }
 
-      setSelectedMode(mode);
-      onModeChange?.(mode);
+      if (controlledMode === undefined) setUncontrolledMode(nextMode);
+      onModeChange?.(nextMode);
       closeDock();
     },
-    [closeDock, expanded, onModeChange, openDock, selectedMode],
+    [
+      closeDock,
+      controlledMode,
+      expanded,
+      onModeChange,
+      openDock,
+      selectedMode,
+    ],
   );
   const onPointerEnter = useCallback(
     (event: PointerEvent<HTMLElement>) => {

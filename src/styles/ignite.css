@@ -1,0 +1,159 @@
+.ignite-cursor {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+html.ignite-hides-cursor .bstage,
+html.ignite-hides-cursor .bstage canvas,
+html.ignite-hides-cursor .bstage__spread {
+  cursor: none !important;
+}
+
+html.ignite-hides-cursor .experience-dock,
+html.ignite-hides-cursor .experience-dock *,
+html.ignite-hides-cursor .ignite-hud,
+html.ignite-hides-cursor .ignite-hud * {
+  cursor: auto !important;
+}
+
+html.ignite-hides-cursor .experience-dock button,
+html.ignite-hides-cursor .ignite-hud button {
+  cursor: pointer !important;
+}
+
+html.ignite-active .cursor-orb {
+  display: none;
+}
+
+.bstage.bstage--ignite {
+  background: var(--void);
+  touch-action: none;
+}
+
+.bstage--ignite .bstage__edge,
+.bstage--ignite .bstage__nav {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.bstage--ignite-ready .bstage__spread {
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+.ignite-hud {
+  position: absolute;
+  right: max(clamp(18px, 3vw, 42px), calc(env(safe-area-inset-right) + 12px));
+  bottom: max(clamp(18px, 3vh, 34px), calc(env(safe-area-inset-bottom) + 12px));
+  z-index: 115;
+  display: grid;
+  width: min(300px, calc(100vw - 92px));
+  gap: 8px;
+  padding: 13px 15px 14px;
+  border: 1px solid rgba(14, 14, 12, 0.12);
+  border-radius: 12px;
+  background: rgba(250, 249, 246, 0.78);
+  box-shadow:
+    0 12px 32px rgba(14, 14, 12, 0.1),
+    inset 0 1px rgba(255, 255, 255, 0.72);
+  color: rgba(14, 14, 12, 0.86);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  animation: ignite-hud-in 420ms var(--ease-settle) both;
+}
+
+@keyframes ignite-hud-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ignite-hud__eyebrow {
+  color: #d44315;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+}
+
+.ignite-hud__message {
+  min-height: 1.35em;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ignite-hud__track {
+  display: block;
+  width: 100%;
+  height: 1px;
+  overflow: hidden;
+  background: rgba(14, 14, 12, 0.14);
+}
+
+.ignite-hud__track > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #dc4518;
+  transform-origin: left center;
+  transition: transform 220ms linear;
+}
+
+.ignite-hud__reset {
+  justify-self: start;
+  margin-top: 3px;
+  padding: 6px 9px;
+  border: 1px solid rgba(14, 14, 12, 0.22);
+  border-radius: 999px;
+  color: rgba(14, 14, 12, 0.82);
+  font-size: 9px;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.ignite-hud__reset:hover,
+.ignite-hud__reset:focus-visible {
+  background: rgba(14, 14, 12, 0.88);
+  color: #fffaf1;
+}
+
+.ignite-hud.is-burning:not(.is-complete) .ignite-hud__eyebrow {
+  color: #b93612;
+}
+
+.ignite-hud.is-complete .ignite-hud__track {
+  background: rgba(14, 14, 12, 0.22);
+}
+
+@media (max-width: 700px) {
+  .ignite-hud {
+    right: 12px;
+    bottom: 12px;
+    width: min(270px, calc(100vw - 84px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ignite-hud,
+  .ignite-hud__track > span {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .ignite-cursor {
+    display: none;
+  }
+}

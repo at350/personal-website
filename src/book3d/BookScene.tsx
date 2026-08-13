@@ -55,6 +55,8 @@ import {
   riffleStackCounts,
   type RiffleTransition,
 } from "@/magazine/riffle";
+import { IgniteBook } from "@/ignite/IgniteBook";
+import type { IgnitePointerState } from "@/ignite/types";
 
 export const CAM_FOV = 22;
 
@@ -777,6 +779,15 @@ interface BookSceneProps {
   pw: number;
   ph: number;
   onRiffleComplete: () => void;
+  ignite?: {
+    active: boolean;
+    revision: number;
+    pointer: IgnitePointerState;
+    reducedMotion: boolean;
+    onIgnition?: () => void;
+    onProgress?: (progress: number) => void;
+    onComplete?: () => void;
+  };
 }
 
 export function BookScene({
@@ -785,6 +796,7 @@ export function BookScene({
   pw,
   ph,
   onRiffleComplete,
+  ignite,
 }: BookSceneProps) {
   const group = useRef<THREE.Group>(null);
   const light = useRef<THREE.DirectionalLight>(null);
@@ -1002,45 +1014,61 @@ export function BookScene({
         shadow-camera-far={ph * 4}
       />
       <group ref={group}>
-        <Stack
-          side="left"
-          count={leftCount}
-          topKey={leftTop}
-          pw={pw}
-          ph={ph}
-          paperBump={paperBump}
-        />
-        <Stack
-          side="right"
-          count={rightCount}
-          topKey={rightTop}
-          pw={pw}
-          ph={ph}
-          paperBump={paperBump}
-        />
-        {/* One always-on receiver spanning the whole spread. Per-stack
-            receivers used to blink out whenever a side's count hit zero
-            mid-turn, taking the flying leaf's shadow with them. */}
-        <mesh position={[0, 0, 0.16]} receiveShadow renderOrder={1}>
-          <planeGeometry args={[pw * 2, ph]} />
-          <shadowMaterial transparent opacity={0.15} depthWrite={false} />
-        </mesh>
-        {isTiltableCoverStack(
-          motion.current,
-          motion.leaf,
-          riffle !== null,
-        ) ? (
-          <TiltedCoverHologram motion={motion} pw={pw} ph={ph} />
-        ) : null}
-        <Leaf motion={motion} pw={pw} ph={ph} paperBump={paperBump} />
-        <FastRiffle
-          transition={riffle}
-          motion={motion}
-          paperBump={paperBump}
-          pw={pw}
-          ph={ph}
-          onComplete={onRiffleComplete}
-        />
+        {ignite?.active ? (
+          <IgniteBook
+            key={`${motion.current}:${ignite.revision}`}
+            currentSpread={motion.current}
+            pointer={ignite.pointer}
+            pw={pw}
+            ph={ph}
+            reducedMotion={ignite.reducedMotion}
+            onIgnition={ignite.onIgnition}
+            onProgress={ignite.onProgress}
+            onComplete={ignite.onComplete}
+          />
+        ) : (
+          <>
+            <Stack
+              side="left"
+              count={leftCount}
+              topKey={leftTop}
+              pw={pw}
+              ph={ph}
+              paperBump={paperBump}
+            />
+            <Stack
+              side="right"
+              count={rightCount}
+              topKey={rightTop}
+              pw={pw}
+              ph={ph}
+              paperBump={paperBump}
+            />
+            {/* One always-on receiver spanning the whole spread. Per-stack
+                receivers used to blink out whenever a side's count hit zero
+                mid-turn, taking the flying leaf's shadow with them. */}
+            <mesh position={[0, 0, 0.16]} receiveShadow renderOrder={1}>
+              <planeGeometry args={[pw * 2, ph]} />
+              <shadowMaterial transparent opacity={0.15} depthWrite={false} />
+            </mesh>
+            {isTiltableCoverStack(
+              motion.current,
+              motion.leaf,
+              riffle !== null,
+            ) ? (
+              <TiltedCoverHologram motion={motion} pw={pw} ph={ph} />
+            ) : null}
+            <Leaf motion={motion} pw={pw} ph={ph} paperBump={paperBump} />
+            <FastRiffle
+              transition={riffle}
+              motion={motion}
+              paperBump={paperBump}
+              pw={pw}
+              ph={ph}
+              onComplete={onRiffleComplete}
+            />
+          </>
+        )}
         {/* The desk: pure shadow on the white void. */}
         <mesh position={[0, 0, -TOTAL_LEAVES * LEAF_THICKNESS - 2]} receiveShadow>
           <planeGeometry args={[pw * 6, ph * 4]} />

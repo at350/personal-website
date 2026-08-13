@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import {
   bookLocationForSpread,
@@ -18,7 +18,11 @@ import { NotFound } from "./routes/NotFound";
 import { applyMeta } from "./lib/meta";
 import { routerBasename } from "./lib/basePath";
 import { CursorOrb } from "./components/CursorOrb";
-import { ExperienceDock } from "./components/ExperienceDock";
+import {
+  ExperienceDock,
+  type ExperienceMode,
+} from "./components/ExperienceDock";
+import { IgniteCursor } from "./components/IgniteCursor";
 
 function IssueView() {
   const location = useLocation();
@@ -40,6 +44,8 @@ function BookView() {
   const location = useLocation();
   const navigate = useNavigate();
   const target = spreadForBookLocation(location.pathname, location.state);
+  const [experienceMode, setExperienceMode] =
+    useState<ExperienceMode>("read");
 
   const onSettled = useCallback(
     (index: number) => {
@@ -57,9 +63,17 @@ function BookView() {
   return (
     <>
       <Suspense fallback={<div style={{ minHeight: "100vh", background: "#fff" }} />}>
-        <BookStage targetSpread={target} onSpreadSettled={onSettled} />
+        <BookStage
+          targetSpread={target}
+          onSpreadSettled={onSettled}
+          experienceMode={experienceMode}
+        />
       </Suspense>
-      <ExperienceDock />
+      {experienceMode === "ignite" ? <IgniteCursor /> : null}
+      <ExperienceDock
+        mode={experienceMode}
+        onModeChange={setExperienceMode}
+      />
     </>
   );
 }

@@ -4,6 +4,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
+import { useReducedMotion } from "motion/react";
 import * as THREE from "three";
 import { ISSUE } from "@/magazine/issue-map";
 import { SPREADS, pageLabel, spreadPages } from "@/magazine/folio";
@@ -32,6 +33,8 @@ import {
 import { Folio } from "@/components/furniture/Folio";
 import { RunningHead } from "@/components/furniture/RunningHead";
 import { GridOverlay } from "@/components/furniture/GridOverlay";
+import type { ExperienceMode } from "@/components/ExperienceDock";
+import type { IgnitePointerState } from "@/ignite/types";
 import "@/styles/book-stage.css";
 
 const TOTAL = SPREADS.length;
@@ -121,9 +124,14 @@ export function OverlayFace({
 interface BookStageProps {
   targetSpread: number;
   onSpreadSettled?: (index: number) => void;
+  experienceMode?: ExperienceMode;
 }
 
-export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
+export function BookStage({
+  targetSpread,
+  onSpreadSettled,
+  experienceMode = "read",
+}: BookStageProps) {
   const [state, dispatch] = useReducer(
     (s: ReturnType<typeof initialEngineState>, e: EngineEvent) => reduce(s, e, TOTAL),
     targetSpread,
@@ -137,6 +145,27 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     () => textureProgress.total > 0 && textureProgress.loaded === textureProgress.total,
   );
   const [textureRefreshPending, setTextureRefreshPending] = useState(false);
+  const igniteActive = experienceMode === "ignite";
+  const prefersReducedMotion = Boolean(useReducedMotion());
+  const [igniteReady, setIgniteReady] = useState(false);
+  const igniteReadyRef = useRef(false);
+  const [igniteStarted, setIgniteStarted] = useState(false);
+  const [igniteComplete, setIgniteComplete] = useState(false);
+  const [igniteProgress, setIgniteProgress] = useState(0);
+  const [igniteRevision, bumpIgniteRevision] = useReducer(
+    (revision: number) => revision + 1,
+    0,
+  );
+  const ignitePointer = useMemo<IgnitePointerState>(
+    () => ({
+      u: 0.5,
+      v: 0.5,
+      inside: false,
+      pressed: false,
+      pointerType: "mouse",
+    }),
+    [],
+  );
   const textureRefreshesPending = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -197,6 +226,29 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+  const wasIgniteActive = useRef(false);
+
+  useEffect(() => {
+    if (igniteActive === wasIgniteActive.current) return;
+    wasIgniteActive.current = igniteActive;
+    ignitePointer.inside = false;
+    ignitePointer.pressed = false;
+    igniteReadyRef.current = false;
+    if (igniteActive) {
+      motion.poseTarget = 1;
+    }
+    queueMicrotask(() => {
+      if (wasIgniteActive.current !== igniteActive) return;
+      setIgniteReady(false);
+      setIgniteStarted(false);
+      setIgniteComplete(false);
+      setIgniteProgress(0);
+      if (igniteActive) {
+        bumpIgniteRevision();
+        setTocOpen(false);
+      }
+    });
+  }, [igniteActive, ignitePointer, motion]);
 
   const busy =
     state.sheet !== null ||
@@ -210,6 +262,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   }, [state.riffle, state.sheet]);
   const launchTurn = useCallback(
     (to: number) => {
+      if (igniteActive) return false;
       if (launchingTurn.current) return false;
       if (!isSpreadTextureFresh(currentSpread)) return false;
       launchingTurn.current = true;
@@ -223,7 +276,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       dispatch({ type: "TURN", to });
       return true;
     },
-    [currentSpread, motion],
+    [currentSpread, igniteActive, motion],
   );
   const onTextureProgress = useCallback((progress: TextureProgress) => {
     setTextureProgress(progress);
@@ -270,14 +323,18 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       motion.coverVertices = null;
     }
     motion.poseTarget =
-      state.sheet !== null || state.dragging || state.riffle !== null
+      igniteActive
+        ? state.sheet !== null || state.dragging || state.riffle !== null
+          ? motion.turnPose
+          : 1
+        : state.sheet !== null || state.dragging || state.riffle !== null
         ? motion.turnPose
         : touchOnly
           ? 1
           : hoverRef.current
             ? 1
             : 0;
-  }, [dispatch, motion, pw, state, touchOnly]);
+  }, [dispatch, igniteActive, motion, pw, state, touchOnly]);
 
   // The overlay only appears once the landed mesh reaches its new resting
   // center. During a cover turn, BookScene moves that center with the sheet.
@@ -296,6 +353,80 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       }),
     [atBack, atCover, motion, ph, pw],
   );
+
+  const updateIgnitePointer = useCallback(
+    (event: globalThis.PointerEvent) => {
+      const spineX = window.innerWidth / 2 + motion.shift;
+      const left = spineX - pw;
+      const top = window.innerHeight / 2 - ph / 2;
+      const u = (event.clientX - left) / (pw * 2);
+      const v = 1 - (event.clientY - top) / ph;
+      const target = event.target instanceof Element ? event.target : null;
+      const overChrome = Boolean(
+        target?.closest(".experience-dock, .ignite-hud, .bstage__nav"),
+      );
+      const onExistingFace = u < 0.5
+        ? currentSpread > 0
+        : currentSpread < TOTAL - 1;
+      ignitePointer.u = Math.min(1, Math.max(0, u));
+      ignitePointer.v = Math.min(1, Math.max(0, v));
+      ignitePointer.pointerType = event.pointerType || "mouse";
+      ignitePointer.inside =
+        igniteActive &&
+        igniteReady &&
+        !overChrome &&
+        onExistingFace &&
+        u >= 0 &&
+        u <= 1 &&
+        v >= 0 &&
+        v <= 1;
+    },
+    [
+      currentSpread,
+      igniteActive,
+      ignitePointer,
+      igniteReady,
+      motion,
+      ph,
+      pw,
+    ],
+  );
+
+  useEffect(() => {
+    if (!igniteActive) return;
+    const onMove = (event: globalThis.PointerEvent) => {
+      updateIgnitePointer(event);
+    };
+    const onDown = (event: globalThis.PointerEvent) => {
+      updateIgnitePointer(event);
+      ignitePointer.pressed = event.button === 0 && ignitePointer.inside;
+    };
+    const release = () => {
+      ignitePointer.pressed = false;
+    };
+    const park = () => {
+      ignitePointer.inside = false;
+      ignitePointer.pressed = false;
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) park();
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerdown", onDown, { passive: true });
+    window.addEventListener("pointerup", release, { passive: true });
+    window.addEventListener("pointercancel", park, { passive: true });
+    window.addEventListener("blur", park);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", park);
+      window.removeEventListener("blur", park);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      park();
+    };
+  }, [igniteActive, ignitePointer, updateIgnitePointer]);
 
   // Texture prefetch around the action.
   useEffect(() => {
@@ -360,8 +491,18 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   const reportedSpread = useRef<number | null>(null);
   const pendingTarget = useRef<number | null>(null);
   useEffect(() => {
+    if (!igniteActive) return;
+    pendingTarget.current = null;
+    tapQueue.current = [];
+    heldArrowKeys.current = { left: false, right: false, active: null };
+  }, [igniteActive]);
+  useEffect(() => {
     if (prevTarget.current === targetSpread) return;
     prevTarget.current = targetSpread;
+    if (igniteActive) {
+      pendingTarget.current = null;
+      return;
+    }
     const to = Math.min(Math.max(targetSpread, 0), TOTAL - 1);
     // The parent mirrors a settled spread into the URL. Consume that echo
     // without treating it as a new absolute request if another turn has
@@ -377,14 +518,15 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     }
     pendingTarget.current = null;
     if (to !== currentSpread && !launchTurn(to)) pendingTarget.current = to;
-  }, [busy, currentSpread, launchTurn, targetSpread]);
+  }, [busy, currentSpread, igniteActive, launchTurn, targetSpread]);
 
   useEffect(() => {
+    if (igniteActive) return;
     if (busy || pendingTarget.current === null) return;
     const to = pendingTarget.current;
     if (to === currentSpread) pendingTarget.current = null;
     else if (launchTurn(to)) pendingTarget.current = null;
-  }, [busy, currentSpread, launchTurn]);
+  }, [busy, currentSpread, igniteActive, launchTurn]);
 
   // One drag engine for edge zones (instant) and the page surface (threshold).
   const beginDrag = useCallback(
@@ -394,6 +536,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       startY: number,
       pointerId: number,
     ) => {
+      if (igniteActive) return;
       if (busy) return;
       if (motion.dragging) return;
       if (motion.leaf !== null && motion.target !== null) return;
@@ -459,18 +602,19 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       window.addEventListener("pointerup", up);
       window.addEventListener("pointercancel", up);
     },
-    [busy, motion, ph, pw],
+    [busy, igniteActive, motion, ph, pw],
   );
 
   const onEdgeDown = useCallback(
     (edge: "fore" | "back") => (e: React.PointerEvent) => {
       e.preventDefault();
+      if (igniteActive) return;
       if (busy) return;
       const { clientX, clientY, pointerId } = e;
       if (!isSpreadTextureFresh(currentSpread)) return;
       beginDrag(edge, clientX, clientY, pointerId);
     },
-    [beginDrag, busy, currentSpread],
+    [beginDrag, busy, currentSpread, igniteActive],
   );
 
   // Grab anywhere on or near the book — posed mesh and live DOM alike: a
@@ -480,6 +624,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   // interactive. Never selects text.
   const onSurfaceDown = useCallback(
     (e: React.PointerEvent) => {
+      if (igniteActive) return;
       if (!texturesReady) return;
       if (busy) return;
       if (e.button !== 0) return;
@@ -542,6 +687,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     [
       beginDrag,
       busy,
+      igniteActive,
       motion,
       pointerFrame,
       state,
@@ -556,9 +702,10 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     if (motion.leaf !== null || motion.dragging || state.riffle !== null) {
       return motion.turnPose;
     }
+    if (igniteActive) return 1;
     if (touchOnly) return 1;
     return hoverRef.current ? 1 : 0;
-  }, [motion, state.riffle, touchOnly]);
+  }, [igniteActive, motion, state.riffle, touchOnly]);
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -599,6 +746,22 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     motion.onPose = (_pose: number, handoff: number) => {
       const el = overlayRef.current;
       if (!el) return;
+      if (igniteActive) {
+        if (
+          !igniteReadyRef.current &&
+          !busy &&
+          handoff > 0.985
+        ) {
+          igniteReadyRef.current = true;
+          setIgniteReady(true);
+        }
+        if (igniteReadyRef.current) {
+          el.style.opacity = "0";
+          el.style.visibility = "hidden";
+          el.style.pointerEvents = "none";
+          return;
+        }
+      }
       el.style.opacity = String(handoff);
       el.style.visibility = handoff < 0.02 ? "hidden" : "visible";
       el.style.pointerEvents = handoff > 0.98 ? "auto" : "none";
@@ -606,11 +769,12 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     return () => {
       motion.onPose = null;
     };
-  }, [motion]);
+  }, [busy, igniteActive, motion]);
 
   // Deliberate absolute jumps (TOC, Home/End) keep their latest destination.
   const goAbsolute = useCallback(
     (to: number) => {
+      if (igniteActive) return;
       if (!texturesReady) return;
       const clamped = Math.min(Math.max(to, 0), TOTAL - 1);
       if (busy) pendingTarget.current = clamped;
@@ -621,7 +785,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         }
       }
     },
-    [busy, currentSpread, launchTurn, texturesReady],
+    [busy, currentSpread, igniteActive, launchTurn, texturesReady],
   );
 
   // Held arrows advance one page at a time. Button activations use the finite
@@ -629,6 +793,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
   const goAdjacent = useCallback(
     (offset: ArrowDirection) => {
       if (
+        igniteActive ||
         !texturesReady ||
         busy ||
         launchingTurn.current ||
@@ -640,11 +805,12 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       const to = Math.min(Math.max(currentSpread + offset, 0), TOTAL - 1);
       return to !== currentSpread && launchTurn(to);
     },
-    [busy, currentSpread, launchTurn, texturesReady],
+    [busy, currentSpread, igniteActive, launchTurn, texturesReady],
   );
 
   const enqueueAdjacent = useCallback(
     (offset: ArrowDirection) => {
+      if (igniteActive) return;
       if (!texturesReady) return;
       const to = Math.min(Math.max(currentSpread + offset, 0), TOTAL - 1);
       if (
@@ -659,7 +825,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       tapQueue.current.push(offset);
       wakeTapDrain();
     },
-    [busy, currentSpread, texturesReady],
+    [busy, currentSpread, igniteActive, texturesReady],
   );
 
   const onRiffleComplete = useCallback(() => {
@@ -679,6 +845,15 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
           "button, a, input, textarea, select, [contenteditable='true'], [role='toolbar']",
         )
       ) {
+        return;
+      }
+      if (igniteActive) {
+        if (
+          ["ArrowRight", "ArrowLeft", "Home", "End", "g"].includes(e.key)
+        ) {
+          e.preventDefault();
+        }
+        if (e.key === "Escape") setTocOpen(false);
         return;
       }
       const arrowDirection: ArrowDirection | null =
@@ -740,13 +915,14 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       window.removeEventListener("blur", clearHeldArrows);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [goAbsolute, goAdjacent, texturesReady]);
+  }, [goAbsolute, goAdjacent, igniteActive, texturesReady]);
 
   // Every completed button activation is one relative turn intent. Drain at
   // most one valid entry per resting boundary so rapid taps remain distinct,
   // ordered page flips instead of collapsing into a jump. Impossible entries
   // at a physical boundary are discarded without blocking later input.
   useEffect(() => {
+    if (igniteActive) return;
     if (busy || launchingTurn.current || pendingTarget.current !== null) return;
     while (tapQueue.current.length > 0) {
       const offset = tapQueue.current[0]!;
@@ -758,12 +934,13 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       if (launchTurn(to)) tapQueue.current.shift();
       return;
     }
-  }, [busy, currentSpread, launchTurn, tapRevision]);
+  }, [busy, currentSpread, igniteActive, launchTurn, tapRevision]);
 
   // A held arrow advances once at each resting boundary. Deliberate absolute
   // navigation and finite button taps win first, and the synchronous launch
   // latch prevents the route effect from publishing an intermediate spread.
   useEffect(() => {
+    if (igniteActive) return;
     const direction = heldArrowKeys.current.active;
     if (
       busy ||
@@ -775,7 +952,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
       return;
     }
     goAdjacent(direction);
-  }, [busy, goAdjacent, heldDirection, tapRevision]);
+  }, [busy, goAdjacent, heldDirection, igniteActive, tapRevision]);
 
   useEffect(() => {
     if (
@@ -789,6 +966,25 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
     }
   }, [busy, onSpreadSettled, state]);
 
+  const onIgnition = useCallback(() => {
+    setIgniteStarted(true);
+  }, []);
+  const onIgniteProgress = useCallback((progress: number) => {
+    setIgniteProgress(progress);
+  }, []);
+  const onIgniteComplete = useCallback(() => {
+    setIgniteProgress(1);
+    setIgniteComplete(true);
+  }, []);
+  const resetIgnite = useCallback(() => {
+    ignitePointer.inside = false;
+    ignitePointer.pressed = false;
+    setIgniteStarted(false);
+    setIgniteComplete(false);
+    setIgniteProgress(0);
+    bumpIgniteRevision();
+  }, [ignitePointer]);
+
   const pages = spreadPages(state.current);
   const rasterLayout = pageRasterLayout(pw);
   const folioLine = pages
@@ -801,8 +997,9 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
 
   return (
     <div
-      className="bstage"
+      className={`bstage${igniteActive ? " bstage--ignite" : ""}${igniteReady ? " bstage--ignite-ready" : ""}`}
       ref={stageRef}
+      data-experience={experienceMode}
       // Native image dragging wins before the surface gesture reaches its
       // horizontal threshold. Keep drag ownership with the page-turn engine.
       onDragStart={(event) => event.preventDefault()}
@@ -827,9 +1024,53 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
               pw={pw}
               ph={ph}
               onRiffleComplete={onRiffleComplete}
+              ignite={
+                igniteActive && igniteReady
+                  ? {
+                      active: true,
+                      revision: igniteRevision,
+                      pointer: ignitePointer,
+                      reducedMotion: prefersReducedMotion,
+                      onIgnition,
+                      onProgress: onIgniteProgress,
+                      onComplete: onIgniteComplete,
+                    }
+                  : undefined
+              }
             />
           </Suspense>
         </Canvas>
+      ) : null}
+
+      {igniteActive ? (
+        <aside
+          className={`ignite-hud${igniteStarted ? " is-burning" : ""}${igniteComplete ? " is-complete" : ""}`}
+        >
+          <span className="ignite-hud__eyebrow mono-label">Ignite / armed</span>
+          <p className="ignite-hud__message" role="status" aria-live="polite">
+            {!igniteReady
+              ? "Flattening the paper…"
+              : igniteComplete
+                ? "Only ash remains."
+                : igniteStarted
+                  ? igniteProgress < 0.01
+                    ? "The paper has caught. The flame is spreading."
+                    : `${Math.max(1, Math.round(igniteProgress * 100))}% consumed`
+                  : "Move the flame across the paper. Hold to burn deeper."}
+          </p>
+          <span className="ignite-hud__track" aria-hidden="true">
+            <span style={{ transform: `scaleX(${igniteProgress})` }} />
+          </span>
+          {igniteComplete ? (
+            <button
+              type="button"
+              className="ignite-hud__reset mono-label"
+              onClick={resetIgnite}
+            >
+              restore issue
+            </button>
+          ) : null}
+        </aside>
       ) : null}
 
       <div
@@ -874,7 +1115,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         <button
           className="bstage__arrow mono-label"
           onClick={() => enqueueAdjacent(-1)}
-          disabled={!texturesReady}
+          disabled={!texturesReady || igniteActive}
           aria-disabled={!busy && currentSpread === 0}
           aria-label="Previous spread"
         >
@@ -884,6 +1125,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
           className="bstage__folio mono-label"
           aria-expanded={tocOpen}
           aria-label="Contents"
+          disabled={igniteActive}
           onClick={() => setTocOpen((v) => !v)}
         >
           {folioLine}
@@ -891,7 +1133,7 @@ export function BookStage({ targetSpread, onSpreadSettled }: BookStageProps) {
         <button
           className="bstage__arrow mono-label"
           onClick={() => enqueueAdjacent(1)}
-          disabled={!texturesReady}
+          disabled={!texturesReady || igniteActive}
           aria-disabled={!busy && currentSpread === TOTAL - 1}
           aria-label="Next spread"
         >

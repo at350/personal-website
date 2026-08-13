@@ -68,12 +68,13 @@ function stubMatchMedia() {
   );
 }
 
-function renderStage(targetSpread = 0) {
+function renderStage(targetSpread = 0, experienceMode: "read" | "ignite" = "read") {
   const onSpreadSettled = vi.fn();
   const view = render(
     <BookStage
       targetSpread={targetSpread}
       onSpreadSettled={onSpreadSettled}
+      experienceMode={experienceMode}
     />,
   );
   const stage = view.container.querySelector(".bstage")!;
@@ -118,6 +119,30 @@ afterEach(() => {
 });
 
 describe("BookStage page-turn input", () => {
+  it("locks navigation and exposes an armed status in Ignite mode", () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1, "ignite");
+
+    expect(stage.getAttribute("data-experience")).toBe("ignite");
+    expect(stage.classList.contains("bstage--ignite")).toBe(true);
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", {
+        name: "Previous spread",
+      }).disabled,
+    ).toBe(true);
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", { name: "Next spread" })
+        .disabled,
+    ).toBe(true);
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", { name: "Contents" })
+        .disabled,
+    ).toBe(true);
+    expect(screen.getAllByRole("status")[0]?.textContent).toContain(
+      "Flattening the paper",
+    );
+  });
+
   it("keeps the cover foil pointer live while the chassis pose is locked", () => {
     stubMatchMedia();
     const { stage } = renderStage(1);
