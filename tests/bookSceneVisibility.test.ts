@@ -22,3 +22,33 @@ describe("BookScene stack visibility handoff", () => {
     expect(stackSource).not.toMatch(/\b(?:m|outline)\.visible\s*=/);
   });
 });
+
+describe("BookScene scene graph derives from committed state", () => {
+  // The motion object is a mutable mirror written by an effect AFTER each
+  // commit. A render that reads it can catch it mid-update: the leaf unmounts
+  // while the landing stack is still computed hidden, and at the cover/back
+  // boundary nothing sits beneath — the landed page flashes the gray void for
+  // a frame. Leaf mounting and stack counts must come from the `sheet` and
+  // `current` props (commit-consistent), never from motion at render time.
+  const leafStart = source.indexOf("function Leaf(");
+  const leafEnd = source.indexOf("const FAST_LEAF_SEGMENTS", leafStart);
+  const leafSource = source.slice(leafStart, leafEnd);
+  const sceneStart = source.indexOf("export function BookScene(");
+  const sceneSource = source.slice(sceneStart);
+
+  it("mounts the leaf and its faces from the committed sheet prop", () => {
+    expect(leafSource).toContain("if (sheet === null) return null;");
+    expect(leafSource).toContain('sheet !== null ? pageKey(sheet, "recto")');
+    expect(leafSource).toContain('sheet !== null ? pageKey(sheet + 1, "verso")');
+    expect(leafSource).not.toMatch(/motion\.leaf !== null \? pageKey/);
+  });
+
+  it("computes stack counts and tops from committed props", () => {
+    const countsStart = sceneSource.indexOf("const riffleStacks");
+    const countsEnd = sceneSource.indexOf("return (", countsStart);
+    const countsSource = sceneSource.slice(countsStart, countsEnd);
+    expect(countsSource).not.toContain("motion.leaf");
+    expect(countsSource).not.toContain("motion.current");
+    expect(countsSource).toContain("sheet !== null");
+  });
+});

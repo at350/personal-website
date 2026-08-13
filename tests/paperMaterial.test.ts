@@ -78,10 +78,26 @@ describe("gleam envelope", () => {
     expect(paperGleamActivity(0.5, 0)).toBeCloseTo(1, 6);
   });
 
-  it("stays alive at nominal completion while the paper still moves", () => {
-    // The old sin(π·p) envelope killed the gleam while the under-damped sheet
-    // was still visibly waving — the "gleam just disappears" pop.
-    expect(paperGleamActivity(0.999, 0.3)).toBeGreaterThan(0.2);
+  it("keeps the energy gleam alive through the approach, not on the stack", () => {
+    // Motion keeps the highlight breathing while the sheet is airborne...
+    expect(paperGleamActivity(0.8, 0.3)).toBeGreaterThan(0.2);
+    // ...but a landed sheet must show the canonical pixels even while it is
+    // still waving. Residual energy on the settled page painted the cover and
+    // back page with a lingering gray wash ("flashes gray before it settles").
+    expect(paperGleamActivity(0.999, 0.3)).toBeLessThan(0.001);
+    expect(paperGleamActivity(1, 0.3)).toBe(0);
+    expect(paperGleamActivity(0.001, 0.3)).toBeLessThan(0.001);
+    expect(paperGleamActivity(0, 0.3)).toBe(0);
+  });
+
+  it("fades the energy gleam continuously over the landing approach", () => {
+    const approach = [0.8, 0.16, 0.12, 0.08, 0.045, 0.02, 0].map((progress) =>
+      paperGleamActivity(progress, 0.3),
+    );
+    for (let index = 1; index < approach.length; index += 1) {
+      expect(approach[index]!).toBeLessThanOrEqual(approach[index - 1]!);
+    }
+    expect(approach.at(-1)).toBe(0);
   });
 
   it("carries zero motion gleam at any energy the settle gate can swap on", () => {
@@ -96,12 +112,13 @@ describe("gleam envelope", () => {
 
   it("dies continuously with the motion, not in one step", () => {
     const decay = [0.3, 0.2, 0.12, 0.06, 0.02, 0].map((energy) =>
-      paperGleamActivity(1, energy),
+      paperGleamActivity(0.8, energy),
     );
     for (let i = 1; i < decay.length; i += 1) {
       expect(decay[i]!).toBeLessThanOrEqual(decay[i - 1]!);
     }
-    expect(decay.at(-1)).toBe(0);
+    // Once the energy is spent, only the positional turn boost remains.
+    expect(decay.at(-1)).toBeCloseTo(paperTurnActivity(0.8), 6);
     expect(decay[0]!).toBeLessThanOrEqual(0.55);
   });
 
