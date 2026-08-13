@@ -150,10 +150,21 @@ function burnSurfaceAt(burn: BurnField, x: number, y: number) {
   return burn.surface[safeY * burn.width + safeX] ?? 0;
 }
 
-function burnDepthAt(burn: BurnField, x: number, y: number) {
+function burnDepthAt(
+  burn: BurnField,
+  x: number,
+  y: number,
+  fallback: number,
+) {
   const safeX = clamp(x, 0, burn.width - 1);
   const safeY = clamp(y, 0, burn.height - 1);
-  return burn.burn[safeY * burn.width + safeX] ?? 0;
+  const index = safeY * burn.width + safeX;
+  // Cells that never held paper (the empty half of a spread, past the page
+  // edge) are no depth cliff: comparing against their permanent zero kept
+  // spine and edge cells reading as an active frontier forever, which parked
+  // immortal flames on the left margin long after the fire had moved on.
+  if ((burn.capacity[index] ?? 0) <= 0) return fallback;
+  return burn.burn[index] ?? 0;
 }
 
 function swap(
@@ -278,10 +289,10 @@ function updateSources(fluid: CombustionFluid, burn: BurnField) {
       // leaves below. Their active boundary is a spatial step in consumed
       // depth, invisible to the saturated top-sheet surface span — without
       // this term the whole mid-stack burn produced no attached fire at all.
-      const depthLeft = burnDepthAt(burn, burnX - 2, burnY);
-      const depthRight = burnDepthAt(burn, burnX + 2, burnY);
-      const depthBelow = burnDepthAt(burn, burnX, burnY - 2);
-      const depthAbove = burnDepthAt(burn, burnX, burnY + 2);
+      const depthLeft = burnDepthAt(burn, burnX - 2, burnY, consumed);
+      const depthRight = burnDepthAt(burn, burnX + 2, burnY, consumed);
+      const depthBelow = burnDepthAt(burn, burnX, burnY - 2, consumed);
+      const depthAbove = burnDepthAt(burn, burnX, burnY + 2, consumed);
       const depthSpan = Math.max(
         consumed - Math.min(depthLeft, depthRight, depthBelow, depthAbove),
         Math.max(depthLeft, depthRight, depthBelow, depthAbove) - consumed,

@@ -51,7 +51,7 @@ describe("ignite material conservation", () => {
     expect(Array.from(new Set(first.cluster)).length).toBeGreaterThanOrEqual(14);
     // Fragments trail the fine powder: none pop out at first perforation,
     // yet a solid share has revealed by mid-consumption of the local stack.
-    expect(Math.min(...first.threshold)).toBeGreaterThanOrEqual(0.05);
+    expect(Math.min(...first.threshold)).toBeGreaterThanOrEqual(0.015);
     expect(first.threshold.filter((gate) => gate < 0.2).length)
       .toBeGreaterThanOrEqual(DEFAULT_SETTLED_ASH_COUNT * 0.25);
     expect(Math.max(...first.scale)).toBeLessThanOrEqual(0.029);
@@ -226,7 +226,7 @@ describe("ignite material conservation", () => {
     expect(IGNITE_LAYER_GAP).toBeLessThanOrEqual(0.1);
     expect(IGNITE_PAGE_SEGMENTS_X).toBeGreaterThanOrEqual(80);
     expect(IGNITE_PAGE_SEGMENTS_Y).toBeGreaterThanOrEqual(100);
-    expect(source).toContain("ignite-progressive-paper-v7");
+    expect(source).toContain("ignite-progressive-paper-v8");
     expect(source).toContain("state.b * igniteMaxLayers");
     expect(source).toContain("physicalDepth - layerIndex");
     expect(source).toContain("igniteUpperHole");
@@ -247,7 +247,13 @@ describe("ignite material conservation", () => {
     expect(source).toContain("igniteCurlLift");
     expect(source).toContain("igniteFibreCorrugation");
     expect(source).toContain("igniteBoundaryDistanceTexels");
-    expect(source).toContain("igniteFoldNormal");
+    // The captured pages must render verbatim: scene lighting is replaced by
+    // a procedural fold response so intact paper never greys out under the
+    // stage lights while the curl lip still shades.
+    expect(source).toContain("igniteFoldShade");
+    expect(source).toContain(
+      "vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;",
+    );
     expect(source).toContain("igniteCharredUnderside");
     expect(source).toContain("IGNITE_PAGE_SEGMENTS_X");
     expect(source).toContain("smoothstep(.625, .71, igniteEmberMacro)");

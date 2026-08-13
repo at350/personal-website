@@ -287,7 +287,11 @@ describe("burn field", () => {
 
     expect(field.complete).toBe(true);
     expect(progressBeforeCompletion).toBeGreaterThan(0.9999);
-    expect(maximumCellDelta).toBeLessThan(0.016);
+    // Exposed sheets under direct flame contact intentionally consume up to
+    // ~2.25x the base rate so mid-stack burning stays responsive. Even at
+    // that peak a single fixed step eats about 3% of one layer — a full
+    // sheet still needs over a second, nowhere near a visible snap.
+    expect(maximumCellDelta).toBeLessThan(0.04);
   });
 
   it("produces identical state through fixed-step accumulation", () => {

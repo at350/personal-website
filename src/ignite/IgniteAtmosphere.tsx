@@ -178,18 +178,20 @@ const flameFieldFragment = /* glsl */ `
 
       // A short Gaussian source lies exactly along the sampled cut tangent.
       // It is intentionally dim: the readable volume begins as the gas rises,
-      // not as a glowing stripe laid over the paper.
+      // not as a glowing stripe laid over the paper. Its vertical spread also
+      // blends the tongue into the char lip, so no cluster ends on the hard
+      // horizontal line of its own root.
       float source = orientedGaussian(
         vFieldPosition,
-        root + vec2(0.0, 1.2),
+        root + vec2(0.0, .6),
         tangent,
-        vec2(arcWidth * .19, 2.35)
+        vec2(arcWidth * .19, 3.4)
       ) * intensity;
       sourceDensity = boundedUnion(sourceDensity, source);
 
       float y = max(rootDelta.y, 0.0);
       float level = clamp(y / rise, 0.0, 1.0);
-      float verticalGate = smoothstep(-1.5, 2.8, rootDelta.y) *
+      float verticalGate = smoothstep(-5.0, 2.6, rootDelta.y) *
         (1.0 - smoothstep(.76, 1.03, level));
       float slowSway = sin(time * .73 + level * 5.4 + branchBias * 4.0);
       float fastSway = sin(time * 1.81 - level * 8.7 + phase * .37);
@@ -265,7 +267,7 @@ const flameFieldFragment = /* glsl */ `
     float advected = smoothstep(.075, .57, fluid.r) * rootReach;
     float advectedHeat = smoothstep(.10, .70, fluid.g) * rootReach;
     float density = boundedUnion(ribbonDensity * .98, advected * .46);
-    density = boundedUnion(density, sourceDensity * .34);
+    density = boundedUnion(density, sourceDensity * .42);
     // The narrow contact band along the char lip stays yellow-white hot, so
     // every cluster is visibly anchored to burning paper.
     float heat = boundedUnion(coreDensity, advectedHeat * .78);

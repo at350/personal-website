@@ -259,14 +259,17 @@ function useBurnPageMaterial(
       map: source,
       color: 0xffffff,
       side: THREE.DoubleSide,
-      toneMapped: false,
+      // The reading book runs the same captured pages through the default
+      // tone-mapping pipeline; matching it keeps the flatten transition
+      // seamless instead of shifting the paper's white point.
+      toneMapped: true,
       roughness: 0.92,
       metalness: 0,
       flatShading: false,
       alphaTest: 0.015,
       alphaToCoverage: true,
     });
-    next.customProgramCacheKey = () => "ignite-progressive-paper-v7";
+    next.customProgramCacheKey = () => "ignite-progressive-paper-v8";
     next.onBeforeCompile = (shader) => {
       shader.uniforms.igniteMap = { value: burnMap };
       shader.uniforms.igniteLayer = { value: layer };
@@ -579,22 +582,19 @@ function useBurnPageMaterial(
           }`,
         )
         .replace(
-          "#include <normal_fragment_maps>",
-          `#include <normal_fragment_maps>
-          // The stock plane normal does not know about vertex curl. This
-          // gently turns the surface toward the torn opening so its lighting
-          // reads as a lifted, corrugated paper lip.
-          float igniteFoldNormalWeight = smoothstep(.08, .72, vIgniteCurl);
-          vec3 igniteFoldNormal = normalize(vec3(
-            vIgniteCurlDirection.x * (.5 + vIgniteCorrugation * .09),
-            vIgniteCurlDirection.y * (.5 - vIgniteCorrugation * .09),
-            .82
-          ));
-          normal = normalize(mix(
-            normal,
-            gl_FrontFacing ? igniteFoldNormal : -igniteFoldNormal,
-            igniteFoldNormalWeight * .58
-          ));`,
+          "vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;",
+          `// The captured pages are already lit artwork; the reading book
+          // reproduces them exactly rather than relighting them, and the
+          // burning stack must match or the whole magazine greys out the
+          // moment Ignite mounts. Scene lighting is replaced by a small
+          // procedural fold response so only the curling lip picks up
+          // directional shading and corrugation.
+          float igniteFoldShade = 1.0
+            - vIgniteCurl * .14
+            + dot(vIgniteCurlDirection, vec2(-.42, .58)) * vIgniteCurl * .3
+            + vIgniteCorrugation * vIgniteCurl * .12;
+          vec3 outgoingLight = diffuseColor.rgb *
+            clamp(igniteFoldShade, .55, 1.2);`,
         )
         .replace(
           "#include <map_fragment>",

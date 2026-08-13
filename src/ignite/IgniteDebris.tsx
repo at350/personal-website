@@ -132,10 +132,12 @@ export function createClusteredAshLayout(
     scale[offset] = size;
     scale[offset + 1] = size * (0.28 + random() * 0.67);
     rotation[index] = random() * Math.PI * 2;
-    // Discrete fragments follow the fine powder, not the first perforation:
-    // low floors sprinkled identical chips over freshly burned paper, which
-    // read as confetti rather than accumulated residue.
-    threshold[index] = 0.05 + Math.pow(random(), 1.55) * 0.4;
+    // Fragments accumulate across the whole burn: the first pieces settle
+    // shortly after a spot's first sheet is consumed and the tail keeps
+    // arriving as deeper leaves go, so the deposit visibly grows with the
+    // fire instead of appearing all at once at the terminal state. The
+    // non-zero floor still keeps chips off freshly singed paper.
+    threshold[index] = 0.02 + Math.pow(random(), 1.8) * 0.46;
     seed[index] = random();
     tone[index] = random();
     lift[index] = 0.0008 + random() * 0.005;
@@ -193,7 +195,7 @@ export function createSettledFibreLayout(
     scale[offset + 1] = 0.0016 + random() * 0.0045;
     rotation[index] = random() * Math.PI * 2;
     bend[index] = (random() * 2 - 1) * (0.16 + random() * 0.34);
-    threshold[index] = 0.06 + Math.pow(random(), 1.45) * 0.45;
+    threshold[index] = 0.03 + Math.pow(random(), 1.6) * 0.47;
     seed[index] = random();
     tone[index] = random();
   }
@@ -548,12 +550,12 @@ const POWDER_FRAGMENT = /* glsl */ `
     float fine = powderNoise(vUv * vec2(340.0, 236.0));
     // Friable edges: thin deposit dissolves into grit instead of ending on a
     // clean vector boundary.
-    float presence = smoothstep(.02 + grain * .06, .3, residue);
+    float presence = smoothstep(.012 + grain * .05, .24, residue);
     float patch = smoothstep(.3, .85, mottle * .6 + residue * .5);
-    float alpha = presence * (.1 + patch * .3) * (.68 + fine * .32);
+    float alpha = presence * (.15 + patch * .32) * (.68 + fine * .32);
     // Friable coverage: thin deposit breaks into islands of grit instead of
     // filming the whole consumed footprint at a uniform opacity.
-    alpha *= smoothstep(.18, .62, mottle * .7 + residue * .4);
+    alpha *= smoothstep(.12, .52, mottle * .7 + residue * .4);
     if (alpha < .01) discard;
     vec3 powder = vec3(.55, .53, .49);
     vec3 warmGrey = vec3(.4, .37, .33);

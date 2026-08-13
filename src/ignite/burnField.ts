@@ -339,11 +339,22 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
       field.surfaceSeed[index] === 1
     ) {
       const grain = field.grain[index] ?? 0.5;
+      const surface = field.surface[index] ?? 0;
       // Paper catches quickly; stack depth determines how long the whole
-      // magazine survives, not how slowly the exposed fibres react.
+      // magazine survives, not how slowly the exposed fibres react. Once the
+      // top sheet has opened, the leaves below face the flame directly and
+      // consume faster, and holding the cursor flame on an exposed sheet
+      // (heat pinned near its ceiling) visibly accelerates it further —
+      // without this the deep stack smoulders so slowly it reads as stalled
+      // and relighting appears to do nothing.
+      const exposure = clamp((surface - 0.85) / 0.15, 0, 1);
+      const flameContact = clamp((heat - 0.9) / 0.45, 0, 1);
+      // The boost is gated entirely on exposure so the virgin top sheet's
+      // approved catch and first-perforation timing stay exactly as tuned.
       const rate = PAPER_BURN_RATE *
         (0.88 + grain * 0.24) *
-        (0.72 + heat * 0.58);
+        (0.72 + heat * 0.58) *
+        (1 + exposure * (0.5 + flameContact * 0.75));
       burn = Math.min(capacity, burn + rate * elapsed);
       field.burn[index] = burn;
       if (burn >= BURN_CATCH_DEPTH) field.caught = true;
