@@ -39,8 +39,8 @@ jobs:
       - name: Build for GitHub Pages
         run: npm run build
         env:
-          VITE_BASE: /personal-website/
-          SITE_URL: https://at350.github.io/personal-website
+          VITE_BASE: /
+          SITE_URL: https://alantai.me
 
       - name: Configure Pages
         uses: actions/configure-pages@v6

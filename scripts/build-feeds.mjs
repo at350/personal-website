@@ -2,7 +2,7 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-const SITE = process.env.SITE_URL?.replace(/\/$/, "") || "https://alantai.dev";
+const SITE = process.env.SITE_URL?.replace(/\/$/, "") || "https://alantai.me";
 const dist = resolve(process.cwd(), "dist");
 
 // Content is TypeScript; keep this script dependency-free by extracting the
