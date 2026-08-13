@@ -5,49 +5,68 @@
   width: 58px;
   z-index: 120;
   isolation: isolate;
-  color: var(--paper);
+  color: var(--ink);
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Dark liquid glass keeps its silhouette legible over both white paper and
-   image-heavy spreads. */
+/* The regular Liquid Glass treatment keeps the dock translucent while adding
+   enough luminosity for the controls to stay legible over text and imagery. */
 .experience-dock__surface {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 999px;
   background:
-    linear-gradient(155deg, rgba(49, 48, 44, 0.68), rgba(10, 10, 9, 0.78)),
-    rgba(14, 14, 12, 0.32);
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.72) 0%,
+      rgba(246, 247, 246, 0.52) 45%,
+      rgba(225, 228, 226, 0.4) 100%
+    ),
+    rgba(246, 247, 246, 0.42);
   box-shadow:
-    0 14px 30px rgba(14, 14, 12, 0.16),
-    0 3px 9px rgba(14, 14, 12, 0.13),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 1px 0 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.36);
+    0 18px 38px rgba(14, 14, 12, 0.13),
+    0 4px 11px rgba(14, 14, 12, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 1px 0 0 rgba(255, 255, 255, 0.48),
+    inset -1px 0 0 rgba(14, 14, 12, 0.07),
+    inset 0 -1px 0 rgba(14, 14, 12, 0.14);
+  -webkit-backdrop-filter: blur(18px) saturate(170%) brightness(1.05);
+  backdrop-filter: blur(18px) saturate(170%) brightness(1.05);
 }
 
 .experience-dock__surface::before {
   content: "";
   position: absolute;
   inset: -1px;
-  background: linear-gradient(
-    100deg,
-    rgba(255, 255, 255, 0.14),
-    transparent 24%,
-    transparent 76%,
-    rgba(255, 255, 255, 0.04)
-  );
-  opacity: 0.72;
+  background:
+    radial-gradient(
+      ellipse 130% 18% at 28% 22%,
+      rgba(255, 255, 255, 0.9) 0,
+      rgba(255, 255, 255, 0.32) 18%,
+      transparent 58%
+    ),
+    linear-gradient(
+      105deg,
+      rgba(255, 255, 255, 0.48),
+      transparent 22%,
+      transparent 70%,
+      rgba(255, 255, 255, 0.2)
+    );
+  opacity: 0.68;
+  mix-blend-mode: screen;
 }
 
 .experience-dock__surface::after {
   content: "";
   position: absolute;
-  inset: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  inset: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.46);
   border-radius: inherit;
+  box-shadow:
+    inset 7px 0 13px rgba(255, 255, 255, 0.18),
+    inset -6px 0 12px rgba(14, 14, 12, 0.04);
   pointer-events: none;
 }
 
@@ -58,12 +77,22 @@
   width: 36px;
   height: 36px;
   z-index: 1;
-  border: 1px solid rgba(215, 38, 30, 0.7);
+  border: 1px solid rgba(215, 38, 30, 0.48);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(
+      150deg,
+      rgba(255, 255, 255, 0.7),
+      rgba(215, 38, 30, 0.12) 58%,
+      rgba(215, 38, 30, 0.2)
+    ),
+    rgba(255, 255, 255, 0.28);
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.12),
-    0 1px 4px rgba(0, 0, 0, 0.12);
+    inset 0 1px 1px rgba(255, 255, 255, 0.88),
+    inset 0 -1px 0 rgba(215, 38, 30, 0.13),
+    0 3px 9px rgba(120, 20, 15, 0.12);
+  -webkit-backdrop-filter: blur(8px) saturate(145%);
+  backdrop-filter: blur(8px) saturate(145%);
   pointer-events: none;
 }
 
@@ -76,7 +105,7 @@
   height: 44px;
   place-items: center;
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.62);
+  color: rgba(14, 14, 12, 0.52);
   outline-offset: -3px;
   transform-origin: center;
   transition:
@@ -86,17 +115,20 @@
 }
 
 .experience-dock__mode[aria-pressed="true"] {
-  color: rgba(255, 255, 255, 0.98);
+  color: rgba(14, 14, 12, 0.95);
 }
 
 .experience-dock__mode:focus-visible {
-  outline-color: rgba(255, 255, 255, 0.92);
+  outline-color: rgba(215, 38, 30, 0.78);
 }
 
 .experience-dock[data-expanded="true"] .experience-dock__mode:hover,
 .experience-dock[data-expanded="true"] .experience-dock__mode:focus-visible {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64),
+    0 2px 8px rgba(14, 14, 12, 0.06);
 }
 
 .experience-dock__icon {
@@ -108,7 +140,9 @@
   stroke-width: 1.55;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.22));
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.75))
+    drop-shadow(0 1px 1px rgba(14, 14, 12, 0.08));
 }
 
 .experience-dock__icon-wrap {
@@ -124,13 +158,21 @@
   min-width: max-content;
   gap: 1px;
   padding: 8px 10px 7px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 10px;
-  background: rgba(14, 14, 12, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.78),
+      rgba(238, 240, 238, 0.62)
+    ),
+    rgba(246, 247, 246, 0.5);
   box-shadow:
-    0 8px 24px rgba(14, 14, 12, 0.2),
-    inset 0 1px rgba(255, 255, 255, 0.1);
-  color: var(--paper);
+    0 10px 28px rgba(14, 14, 12, 0.13),
+    0 2px 8px rgba(14, 14, 12, 0.08),
+    inset 0 1px rgba(255, 255, 255, 0.9),
+    inset 0 -1px rgba(14, 14, 12, 0.08);
+  color: var(--ink);
   text-align: left;
   pointer-events: none;
   opacity: 0;
@@ -141,8 +183,8 @@
     opacity 150ms ease,
     filter 180ms ease,
     transform 240ms var(--ease-settle);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(20px) saturate(165%) brightness(1.04);
+  backdrop-filter: blur(20px) saturate(165%) brightness(1.04);
 }
 
 .experience-dock__label > span {
@@ -153,12 +195,31 @@
 }
 
 .experience-dock__label small {
-  color: rgba(255, 255, 255, 0.48);
+  color: rgba(14, 14, 12, 0.46);
   font-family: var(--font-mono);
   font-size: 8.5px;
   line-height: 1.25;
   letter-spacing: 0.09em;
   text-transform: uppercase;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .experience-dock__surface,
+  .experience-dock__label {
+    background: rgba(246, 247, 246, 0.94);
+  }
+}
+
+@media (prefers-contrast: more) {
+  .experience-dock__surface,
+  .experience-dock__label {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(14, 14, 12, 0.3);
+  }
+
+  .experience-dock__mode {
+    color: rgba(14, 14, 12, 0.76);
+  }
 }
 
 .experience-dock[data-expanded="true"] .experience-dock__mode:focus-visible

@@ -752,11 +752,11 @@ function useBurnPageMaterial(
             igniteMacro * .68 + igniteBroad * .32
           );
           float igniteUnderTone = clamp(
-            mix(.94, .76, igniteUnderMottle)
-              - igniteExposureAge * .035
+            mix(.94, .72, igniteUnderMottle)
+              - igniteExposureAge * .05
               - igniteHeat * .018
               + (igniteFibre - .5) * .025,
-            .7,
+            .6,
             .96
           );
           float igniteUnderShade = igniteUpperHole
@@ -778,7 +778,7 @@ function useBurnPageMaterial(
           diffuseColor.rgb = mix(
             diffuseColor.rgb,
             igniteUnderSoot,
-            clamp(igniteUnderClump + igniteUnderFibre, 0.0, .24)
+            clamp(igniteUnderClump + igniteUnderFibre, 0.0, .34)
           );
 
           // Every sheet owns a different torn threshold, but only its intact
@@ -791,7 +791,7 @@ function useBurnPageMaterial(
             .72,
             igniteMacro * .82 + igniteBroad * .18
           );
-          float igniteCarbonWidth = mix(1.25, 2.05, igniteWidthVariation);
+          float igniteCarbonWidth = mix(1.7, 2.75, igniteWidthVariation);
           float igniteBrownWidth = igniteCarbonWidth
             + mix(.85, 1.55, igniteMid);
           float igniteTanWidth = min(
@@ -827,8 +827,8 @@ function useBurnPageMaterial(
             )
           );
           float igniteCharClump = smoothstep(
-            .34,
-            .68,
+            .26,
+            .6,
             igniteMacro * .74 + igniteBroad * .19 + igniteFibre * .07
           );
           float igniteCarbon = max(

@@ -3,9 +3,9 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { BurnField } from "./burnField";
 
-export const DEFAULT_SETTLED_ASH_COUNT = 430;
+export const DEFAULT_SETTLED_ASH_COUNT = 500;
 export const MAX_SETTLED_ASH_COUNT = 560;
-export const DEFAULT_SETTLED_FIBRE_COUNT = 168;
+export const DEFAULT_SETTLED_FIBRE_COUNT = 176;
 export const MAX_SETTLED_FIBRE_COUNT = 176;
 export const DEFAULT_ATTACHED_REMNANT_COUNT = 96;
 export const MAX_LATENT_REMNANT_FRACTION = 0.25;
@@ -286,7 +286,7 @@ export function updateResidueTextureState(
       // few percent per sheet, so the raw ratio is deliberately tiny. Lift it
       // into a useful visual range without flattening it; the shader's island
       // mask, not saturation, is what prevents a page-shaped deposit.
-      state.target[index] = THREE.MathUtils.clamp(ratio * 78, 0, 1);
+      state.target[index] = THREE.MathUtils.clamp(ratio * 92, 0, 1);
     }
   }
 
@@ -550,24 +550,24 @@ const POWDER_FRAGMENT = /* glsl */ `
     float fine = powderNoise(vUv * vec2(340.0, 236.0));
     // Friable edges: thin deposit dissolves into grit instead of ending on a
     // clean vector boundary.
-    float presence = smoothstep(.01 + grain * .045, .22, residue);
-    float patch = smoothstep(.28, .84, mottle * .6 + residue * .5);
-    float alpha = presence * (.2 + patch * .38) * (.68 + fine * .32);
+    float presence = smoothstep(.01 + grain * .045, .2, residue);
+    float patch = smoothstep(.26, .82, mottle * .6 + residue * .5);
+    float alpha = presence * (.24 + patch * .44) * (.68 + fine * .32);
     // Friable coverage: thin deposit breaks into islands of grit instead of
     // filming the whole consumed footprint at a uniform opacity.
-    alpha *= smoothstep(.08, .46, mottle * .7 + residue * .4);
+    alpha *= smoothstep(.06, .4, mottle * .7 + residue * .4);
     if (alpha < .01) discard;
     vec3 powder = vec3(.55, .53, .49);
-    vec3 warmGrey = vec3(.4, .37, .33);
-    vec3 charBrown = vec3(.19, .145, .105);
-    vec3 soot = vec3(.09, .082, .073);
+    vec3 warmGrey = vec3(.38, .35, .31);
+    vec3 charBrown = vec3(.17, .13, .095);
+    vec3 soot = vec3(.075, .068, .06);
     vec3 color = mix(powder, warmGrey, smoothstep(.15, .62, mottle));
     color = mix(
       color,
       charBrown,
-      smoothstep(.4, .84, mottle * .5 + residue * .55)
+      smoothstep(.34, .8, mottle * .5 + residue * .55)
     );
-    color = mix(color, soot, smoothstep(.58, .95, residue) * .6);
+    color = mix(color, soot, smoothstep(.54, .92, residue) * .72);
     gl_FragColor = vec4(color, alpha);
   }
 `;

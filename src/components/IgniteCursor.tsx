@@ -124,16 +124,25 @@ const FRAGMENT_SHADER = /* glsl */ `
       crossFlow * 5.2 - broadFlow * 2.4
     ) * (.38 + .62 * warpRamp);
 
-    // Air resistance: a fast-moving flame bends over, the tip trailing the
-    // root by an amount that grows with height. This is a shear of the
-    // sampling domain, so the root stays pinned while the body streams
-    // behind the motion like a real flame carried through air.
-    float bendHeight = clamp(local.y - bodyOrigin.y + 8.0, 0.0, 96.0);
-    float bendStrength = (.3 + speed * .55);
-    warped.x += motion.x * bendHeight * bendStrength;
-    warped.y -= motion.y * bendHeight * bendStrength * .38;
+    // A carried flame leans over: its spine curves away from the motion,
+    // pivoting at the root, with the angle growing toward the tip. This is a
+    // height-progressive ROTATION of the sampling frame — the flame keeps
+    // its proportions and simply lies over, where a linear shear read as the
+    // same flame being stretched sideways.
+    float leanAngle = clamp(motion.x * (.55 + speed * .5), -1.05, 1.05);
+    float leanRamp = smoothstep(0.0, 70.0, local.y - bodyOrigin.y + 12.0);
+    float appliedLean = -leanAngle * leanRamp;
+    float leanSin = sin(appliedLean);
+    float leanCos = cos(appliedLean);
+    vec2 leanRel = warped - bodyOrigin;
+    warped = bodyOrigin + vec2(
+      leanRel.x * leanCos - leanRel.y * leanSin,
+      leanRel.x * leanSin + leanRel.y * leanCos
+    );
 
-    float lagLean = -motion.x * (5.0 + 11.0 * speed);
+    // Kept small: the height-progressive lean carries the main response and
+    // this residual offset only staggers the lobes slightly.
+    float lagLean = -motion.x * (2.5 + 5.0 * speed);
     float slowSway = sin(time * 1.83) * 2.9;
     float middleSway = sin(time * 2.57 + 1.4) * 4.1;
     float tipSway = sin(time * 3.31 + .3) * 5.6;
@@ -389,8 +398,11 @@ const FRAGMENT_SHADER = /* glsl */ `
       broadFlow * 8.0,
       crossFlow * 4.0
     );
-    smokeWarped.x += motion.x * bendHeight * bendStrength;
-    smokeWarped.y -= motion.y * bendHeight * bendStrength * .38;
+    vec2 smokeLeanRel = smokeWarped - bodyOrigin;
+    smokeWarped = bodyOrigin + vec2(
+      smokeLeanRel.x * leanCos - smokeLeanRel.y * leanSin,
+      smokeLeanRel.x * leanSin + smokeLeanRel.y * leanCos
+    );
     vec2 smokeA = upperCenter + vec2(
       sin(time * .79) * 4.0 - motion.x * 5.0,
       24.0

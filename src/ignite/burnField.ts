@@ -354,8 +354,11 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
       // Without this, every touched cell kept generating full heat until its
       // whole column was spent, so the entire stack burned down in lockstep
       // and any local re-ignition read as the whole page speeding up.
+      // The gate sits above any differential the stop-start pacing can build
+      // between neighbours inside the burned area — only a true step into
+      // fresh fuel counts.
       const frontierDrop = burnFrontierDropAt(field, x, y, burn);
-      const frontierOxygen = clamp((frontierDrop - 0.3) / 0.45, 0, 1);
+      const frontierOxygen = clamp((frontierDrop - 0.45) / 0.5, 0, 1);
       const freshSheet = clamp(1 - burn * 1.4, 0, 1);
       const activity = Math.max(frontierOxygen, freshSheet);
       const smolder = 0.1 + 0.9 * activity;
@@ -420,13 +423,28 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
     let burn = field.burn[index] ?? 0;
     const priorBurn = burn;
     const heat = field.heat[index] ?? 0;
+    // Real fronts stop and start: at any instant only part of the frontier
+    // is actively tearing while the rest sits, chars, and waits — a front
+    // whose every segment advances every tick reads as a wave gliding over
+    // the page however irregular its shape is. The pulse is a smooth
+    // deterministic function of place, grain, and accumulated fixed-step
+    // time, and it fades in after ignition so catch timing stays as tuned.
+    const cellGrain = field.grain[index] ?? 0.5;
+    const pulse = 0.5 + 0.5 * Math.sin(
+      (index % field.width) * 0.23 +
+        Math.floor(index / field.width) * 0.16 +
+        field.simTime * (1.05 + cellGrain * 0.7) +
+        cellGrain * 9.3,
+    );
+    const stopStart = 0.2 +
+      1.6 * smoothCurve(clamp((pulse - 0.3) / 0.4, 0, 1));
     if (
       capacity > 0 &&
       burn < capacity &&
       heat >= IGNITION_HEAT &&
       field.surfaceSeed[index] === 1
     ) {
-      const grain = field.grain[index] ?? 0.5;
+      const grain = cellGrain;
       const surface = field.surface[index] ?? 0;
       // Paper catches quickly; stack depth determines how long the whole
       // magazine survives, not how slowly the exposed fibres react. Once the
@@ -446,10 +464,15 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
       const narrowSpread = 0.88 + grain * 0.24;
       const wideSpread = 0.55 + grain * 0.95;
       const establishment = Math.min(1, burn * 2);
+      // Direct flame contact overrides a stall: a spot the cursor keeps
+      // feeding cannot pause, only unforced frontier segments breathe.
+      const steadyStopStart = stopStart +
+        (Math.max(1, stopStart) - stopStart) * flameContact;
       const rate = PAPER_BURN_RATE *
         (narrowSpread + (wideSpread - narrowSpread) * establishment) *
         (0.72 + heat * 0.58) *
-        (1 + exposure * (0.5 + flameContact * 0.75));
+        (1 + exposure * (0.5 + flameContact * 0.75)) *
+        (1 + (steadyStopStart - 1) * establishment);
       burn = Math.min(capacity, burn + rate * elapsed);
       field.burn[index] = burn;
       if (burn >= BURN_CATCH_DEPTH) field.caught = true;
@@ -459,14 +482,20 @@ export function stepBurnField(field: BurnField, dt = BURN_FIXED_STEP) {
       heat >= IGNITION_HEAT &&
       field.surfaceSeed[index] === 1
     ) {
-      const grain = field.grain[index] ?? 0.5;
+      const grain = cellGrain;
       const surface = field.surface[index] ?? 0;
       // Scorch reacts immediately, but topology opens only after coherent heat
       // and paper resistance have had time to shape an irregular connected
       // front. A fast cut merely reproduces the circular ignition brush.
+      const surfaceContact = clamp((heat - 0.9) / 0.45, 0, 1);
+      const surfaceStopStart = 0.5 +
+        1.0 * smoothCurve(clamp((pulse - 0.3) / 0.4, 0, 1));
+      const steadySurfaceStopStart = surfaceStopStart +
+        (Math.max(1, surfaceStopStart) - surfaceStopStart) * surfaceContact;
       const surfaceRate = SURFACE_PYROLYSIS_RATE *
         (0.4 + grain * 1.2) *
-        (0.7 + heat * 0.48);
+        (0.7 + heat * 0.48) *
+        (1 + (steadySurfaceStopStart - 1) * Math.min(1, surface * 2.2));
       field.surface[index] = Math.min(1, surface + surfaceRate * elapsed);
     }
     const consumed = Math.max(0, burn - priorBurn);
