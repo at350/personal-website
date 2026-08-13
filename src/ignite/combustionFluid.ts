@@ -36,60 +36,6 @@ export interface CombustionAdvance {
   steps: number;
 }
 
-export interface CombustionRootTargets {
-  /** Normalized atmospheric coordinates, two values per root. */
-  uv: Float32Array;
-  strength: Float32Array;
-  flow: Float32Array;
-  /** Unit tangent of the sampled hot-front arc, two values per root. */
-  tangent: Float32Array;
-}
-
-function burnFrontScore(burn: BurnField, index: number) {
-  const surface = burn.surface[index] ?? 0;
-  const heat = (burn.heat[index] ?? 0) / MAX_HEAT;
-  if (
-    (burn.capacity[index] ?? 0) <= 0 ||
-    (burn.burn[index] ?? 0) >= (burn.capacity[index] ?? 0) ||
-    heat <= .08
-  ) return 0;
-  const x = index % burn.width;
-  const y = Math.floor(index / burn.width);
-  if (x < 2 || x >= burn.width - 2 || y < 2 || y >= burn.height - 2) return 0;
-  const first = burnSurfaceAt(burn, x - 2, y);
-  let youngest = first;
-  let oldest = first;
-  const second = burnSurfaceAt(burn, x + 2, y);
-  youngest = Math.min(youngest, second);
-  oldest = Math.max(oldest, second);
-  const third = burnSurfaceAt(burn, x, y - 2);
-  youngest = Math.min(youngest, third);
-  oldest = Math.max(oldest, third);
-  const fourth = burnSurfaceAt(burn, x, y + 2);
-  youngest = Math.min(youngest, fourth);
-  oldest = Math.max(oldest, fourth);
-  const fifth = burnSurfaceAt(burn, x - 1, y - 1);
-  youngest = Math.min(youngest, fifth);
-  oldest = Math.max(oldest, fifth);
-  const sixth = burnSurfaceAt(burn, x + 1, y + 1);
-  youngest = Math.min(youngest, sixth);
-  oldest = Math.max(oldest, sixth);
-  const seventh = burnSurfaceAt(burn, x - 1, y + 1);
-  youngest = Math.min(youngest, seventh);
-  oldest = Math.max(oldest, seventh);
-  const eighth = burnSurfaceAt(burn, x + 1, y - 1);
-  youngest = Math.min(youngest, eighth);
-  oldest = Math.max(oldest, eighth);
-  const span = oldest - youngest;
-  // The exposed page opening begins around .335. Selecting this narrow band
-  // places visible gas on the black char rim instead of the hot grey interior.
-      const thresholdBand = 1 - smoothCurve((Math.abs(surface - .325) - .018) / .105);
-  const crossing = smoothCurve((span - .022) / .13);
-  return thresholdBand * (.42 + crossing * .58) *
-    smoothCurve((heat - .05) / .42) *
-    (.84 + (burn.grain[index] ?? .5) * .16);
-}
-
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -142,6 +88,23 @@ function burnSurfaceAt(burn: BurnField, x: number, y: number) {
   const safeX = clamp(x, 0, burn.width - 1);
   const safeY = clamp(y, 0, burn.height - 1);
   return burn.surface[safeY * burn.width + safeX] ?? 0;
+}
+
+function burnDepthAt(
+  burn: BurnField,
+  x: number,
+  y: number,
+  fallback: number,
+) {
+  const safeX = clamp(x, 0, burn.width - 1);
+  const safeY = clamp(y, 0, burn.height - 1);
+  const index = safeY * burn.width + safeX;
+  // Cells that never held paper (the empty half of a spread, past the page
+  // edge) are no depth cliff: comparing against their permanent zero kept
+  // spine and edge cells reading as an active frontier forever, which parked
+  // immortal flames on the left margin long after the fire had moved on.
+  if ((burn.capacity[index] ?? 0) <= 0) return fallback;
+  return burn.burn[index] ?? 0;
 }
 
 function swap(
@@ -252,22 +215,40 @@ function updateSources(fluid: CombustionFluid, burn: BurnField) {
       // Keep a low live floor so the connected reaction never collapses into
       // isolated graphic dots; stronger patches still form the taller tongues.
       const firstPatch = 0.5 + 0.5 * Math.sin(
-        burnX * 0.105 + burnY * 0.073 + grain * 5.9 + fluid.time * 0.64,
+        burnX * 0.17 + burnY * 0.121 + grain * 5.9 + fluid.time * 0.64,
       );
       const secondPatch = 0.5 + 0.5 * Math.sin(
-        burnX * -0.064 + burnY * 0.129 + grain * 3.7 - fluid.time * 0.43,
+        burnX * -0.11 + burnY * 0.2 + grain * 3.7 - fluid.time * 0.43,
       );
       const patch = Math.max(firstPatch, secondPatch * 0.94);
       const intermittent = smoothCurve((patch - 0.675) / 0.18);
-      source[fieldIndex(width, x, y)] = exposedFront * caught * notSpent * hot *
-        (0.74 + grain * 0.58) * intermittent;
+      const topSource = exposedFront * caught * notSpent * hot *
+        (0.86 + grain * 0.6) * intermittent;
+
+      // Once the top sheet is fully open the reaction continues on the
+      // leaves below. Their active boundary is where consumption leads into
+      // fresher fuel — invisible to the saturated top-sheet surface span.
+      // The drop is one-sided: uneven pacing between equally deep interior
+      // cells is not a frontier and must not light gas.
+      const depthLeft = burnDepthAt(burn, burnX - 2, burnY, consumed);
+      const depthRight = burnDepthAt(burn, burnX + 2, burnY, consumed);
+      const depthBelow = burnDepthAt(burn, burnX, burnY - 2, consumed);
+      const depthAbove = burnDepthAt(burn, burnX, burnY + 2, consumed);
+      const frontierDrop = consumed -
+        Math.min(depthLeft, depthRight, depthBelow, depthAbove);
+      const deepFront = smoothCurve((frontierDrop - 0.45) / 0.6);
+      const opened = smoothCurve((surface - 0.55) / 0.2);
+      const deepSource = deepFront * opened * hot *
+        (0.78 + grain * 0.5) * smoothCurve((patch - 0.5) / 0.3);
+
+      source[fieldIndex(width, x, y)] = Math.max(topSource, deepSource);
     }
   }
 }
 
 function injectSources(fluid: CombustionFluid, dt: number) {
-  const flameRetention = Math.exp(-40 * dt);
-  const heatRetention = Math.exp(-31 * dt);
+  const flameRetention = Math.exp(-54 * dt);
+  const heatRetention = Math.exp(-42 * dt);
   const smokeRetention = Math.exp(-0.34 * dt);
   for (let index = 0; index < fluid.source.length; index += 1) {
     const source = fluid.source[index] ?? 0;
@@ -539,130 +520,4 @@ export function writeCombustionTexture(
       clamp(fluid.source[index] ?? 0, 0, 1) * 255,
     );
   }
-}
-
-/**
- * Selects a small, well-separated set of flame roots from the live source.
- * This is fixed-storage non-maximum suppression: it performs no per-frame
- * allocation and never turns the entire burn boundary into visible fire.
- */
-export function writeCombustionRoots(
-  fluid: CombustionFluid,
-  targets: CombustionRootTargets,
-  maximumRoots = targets.strength.length,
-  burn?: BurnField,
-) {
-  const rootCount = Math.min(
-    maximumRoots,
-    targets.strength.length,
-    Math.floor(targets.uv.length / 2),
-    targets.flow.length,
-    Math.floor(targets.tangent.length / 2),
-  );
-  targets.uv.fill(-1);
-  targets.strength.fill(0);
-  targets.flow.fill(0);
-  targets.tangent.fill(0);
-  if (rootCount <= 0) return 0;
-
-  const minimumDistance = Math.max(3.5, Math.min(fluid.width, fluid.height) * .055);
-  const minimumDistanceSquared = minimumDistance * minimumDistance;
-  let written = 0;
-
-  for (let root = 0; root < rootCount; root += 1) {
-    let bestIndex = -1;
-    let bestScore = 0;
-    for (let y = 2; y < fluid.height - 2; y += 1) {
-      for (let x = 2; x < fluid.width - 2; x += 1) {
-        const index = fieldIndex(fluid.width, x, y);
-        const source = fluid.source[index] ?? 0;
-        const atmosphereU = (x + .5) / fluid.width;
-        const atmosphereV = (y + .5) / fluid.height;
-        const pageU = (atmosphereU - .5) * COMBUSTION_EXTENT_X + .5;
-        const pageV = (atmosphereV - .5) * COMBUSTION_EXTENT_Y + .5;
-        let frontScore = 0;
-        if (burn && pageU > 0 && pageU < 1 && pageV > 0 && pageV < 1) {
-          const burnX = clamp(Math.floor(pageU * burn.width), 0, burn.width - 1);
-          const burnY = clamp(Math.floor(pageV * burn.height), 0, burn.height - 1);
-          frontScore = burnFrontScore(burn, burnY * burn.width + burnX);
-        }
-        if (source <= .035 && frontScore <= .08) continue;
-        let separated = true;
-        for (let prior = 0; prior < written; prior += 1) {
-          const priorX = (targets.uv[prior * 2] ?? 0) * fluid.width - .5;
-          const priorY = (targets.uv[prior * 2 + 1] ?? 0) * fluid.height - .5;
-          const dx = x - priorX;
-          const dy = y - priorY;
-          if (dx * dx + dy * dy < minimumDistanceSquared) {
-            separated = false;
-            break;
-          }
-        }
-        if (!separated) continue;
-
-        const localPeak = source * .42 +
-          Math.max(
-            fluid.source[index - 1] ?? 0,
-            fluid.source[index + 1] ?? 0,
-            fluid.source[index - fluid.width] ?? 0,
-            fluid.source[index + fluid.width] ?? 0,
-          ) * .18 +
-          (fluid.temperature[index] ?? 0) * .13 +
-          frontScore * .58;
-        const materialBreakup = .88 + .12 * Math.sin(
-          x * .73 + y * .41 + fluid.time * 2.2,
-        );
-        let arcAffinity = 1;
-    // Roots 1–2 grow the first short source arc; root 3 may begin a second
-    // arc and root 4 extends it. Keeping adjacent samples near each other lets
-    // their density ribbons merge into a continuous combustion volume.
-        if (written > 0 && root !== 3) {
-          let nearestDistance = 1e5;
-          for (let prior = 0; prior < written; prior += 1) {
-            const priorX = (targets.uv[prior * 2] ?? 0) * fluid.width - .5;
-            const priorY = (targets.uv[prior * 2 + 1] ?? 0) * fluid.height - .5;
-            nearestDistance = Math.min(
-              nearestDistance,
-              Math.hypot(x - priorX, y - priorY),
-            );
-          }
-          const arcDistance = (nearestDistance - 6.5) / 4.5;
-          arcAffinity = .68 + .55 * Math.exp(-arcDistance * arcDistance);
-        }
-        const score = localPeak * materialBreakup * arcAffinity;
-        if (score > bestScore) {
-          bestScore = score;
-          bestIndex = index;
-        }
-      }
-    }
-    if (bestIndex < 0 || bestScore < .055) break;
-
-    const x = bestIndex % fluid.width;
-    const y = Math.floor(bestIndex / fluid.width);
-    const offset = written * 2;
-    targets.uv[offset] = (x + .5) / fluid.width;
-    targets.uv[offset + 1] = (y + .5) / fluid.height;
-    targets.strength[written] = smoothCurve((bestScore - .04) / .64);
-    targets.flow[written] = clamp(
-      (fluid.velocityX[bestIndex] ?? 0) / MAX_VELOCITY,
-      -1,
-      1,
-    );
-    const gradientX = (fluid.source[bestIndex + 1] ?? 0) -
-      (fluid.source[bestIndex - 1] ?? 0);
-    const gradientY = (fluid.source[bestIndex + fluid.width] ?? 0) -
-      (fluid.source[bestIndex - fluid.width] ?? 0);
-    const gradientLength = Math.hypot(gradientX, gradientY);
-    let tangentX = gradientLength > 1e-4 ? -gradientY / gradientLength : 1;
-    let tangentY = gradientLength > 1e-4 ? gradientX / gradientLength : 0;
-    if (tangentX < 0 || (Math.abs(tangentX) < 1e-4 && tangentY < 0)) {
-      tangentX *= -1;
-      tangentY *= -1;
-    }
-    targets.tangent[offset] = tangentX;
-    targets.tangent[offset + 1] = tangentY;
-    written += 1;
-  }
-  return written;
 }

@@ -24,11 +24,19 @@ import {
   IGNITE_PAGE_SEGMENTS_Y,
   IGNITE_TOTAL_LEAVES,
   createBurnPagePlan,
+  resolveBurnPageVisibility,
   resolvePaperCurl,
   resolvePreviousLayerExposure,
   resolveBurnLayerPhase,
   resolveUnderlayerDiscoloration,
+  shouldRefreshBurnTexture,
 } from "@/ignite/IgniteBook";
+import {
+  BURN_FIXED_STEP,
+  createBurnField,
+  igniteBurnField,
+  stepBurnField,
+} from "@/ignite/burnField";
 
 describe("ignite material conservation", () => {
   it("uses a bounded deterministic set of clustered settled ash", () => {
@@ -41,7 +49,10 @@ describe("ignite material conservation", () => {
     expect(first.sourceUv).toHaveLength(DEFAULT_SETTLED_ASH_COUNT * 2);
     expect(Array.from(first.sourceUv)).toEqual(Array.from(second.sourceUv));
     expect(Array.from(new Set(first.cluster)).length).toBeGreaterThanOrEqual(14);
-    expect(first.threshold.filter((gate) => gate < 0.08).length)
+    // Fragments trail the fine powder: none pop out at first perforation,
+    // yet a solid share has revealed by mid-consumption of the local stack.
+    expect(Math.min(...first.threshold)).toBeGreaterThanOrEqual(0.015);
+    expect(first.threshold.filter((gate) => gate < 0.2).length)
       .toBeGreaterThanOrEqual(DEFAULT_SETTLED_ASH_COUNT * 0.25);
     expect(Math.max(...first.scale)).toBeLessThanOrEqual(0.029);
 
@@ -215,7 +226,7 @@ describe("ignite material conservation", () => {
     expect(IGNITE_LAYER_GAP).toBeLessThanOrEqual(0.1);
     expect(IGNITE_PAGE_SEGMENTS_X).toBeGreaterThanOrEqual(80);
     expect(IGNITE_PAGE_SEGMENTS_Y).toBeGreaterThanOrEqual(100);
-    expect(source).toContain("ignite-progressive-paper-v6");
+    expect(source).toContain("ignite-progressive-paper-v8");
     expect(source).toContain("state.b * igniteMaxLayers");
     expect(source).toContain("physicalDepth - layerIndex");
     expect(source).toContain("igniteUpperHole");
@@ -236,7 +247,13 @@ describe("ignite material conservation", () => {
     expect(source).toContain("igniteCurlLift");
     expect(source).toContain("igniteFibreCorrugation");
     expect(source).toContain("igniteBoundaryDistanceTexels");
-    expect(source).toContain("igniteFoldNormal");
+    // The captured pages must render verbatim: scene lighting is replaced by
+    // a procedural fold response so intact paper never greys out under the
+    // stage lights while the curl lip still shades.
+    expect(source).toContain("igniteFoldShade");
+    expect(source).toContain(
+      "vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;",
+    );
     expect(source).toContain("igniteCharredUnderside");
     expect(source).toContain("IGNITE_PAGE_SEGMENTS_X");
     expect(source).toContain("smoothstep(.625, .71, igniteEmberMacro)");
@@ -250,5 +267,65 @@ describe("ignite material conservation", () => {
     expect(IGNITE_CURL_INSET_RATIO).toBeGreaterThanOrEqual(0.2);
     expect(IGNITE_CHAR_ZONE_MAX_TEXELS).toBeLessThanOrEqual(5);
     expect(source).not.toMatch(/fragmentCount=\{(?:420|620)\}/);
+  });
+
+  it("regenerates and uploads the burn texture only after state changes", () => {
+    // Idle render frames between fixed simulation steps must not refilter,
+    // upsample, or upload anything.
+    expect(shouldRefreshBurnTexture(0, false, false, false)).toBe(false);
+    // A fixed step ran, or the pointer injected fresh heat.
+    expect(shouldRefreshBurnTexture(1, false, false, false)).toBe(true);
+    expect(shouldRefreshBurnTexture(0, true, false, false)).toBe(true);
+    // Completion flushes exactly one terminal refresh, then stays silent.
+    expect(shouldRefreshBurnTexture(0, false, true, false)).toBe(true);
+    expect(shouldRefreshBurnTexture(0, false, true, true)).toBe(false);
+    expect(shouldRefreshBurnTexture(3, true, true, true)).toBe(false);
+  });
+
+  it("renders only leaves the fire can expose and skips consumed ones", () => {
+    // The exposed sheet renders until its half is fully consumed.
+    expect(resolveBurnPageVisibility(0, 0, 0)).toBe(true);
+    expect(resolveBurnPageVisibility(0, 3, 1.2)).toBe(false);
+    // A deep leaf stays skipped while combustion is still sheets above it.
+    expect(resolveBurnPageVisibility(3, 1.2, 0)).toBe(false);
+    expect(resolveBurnPageVisibility(3, 2.5, 0)).toBe(true);
+    // Fully burned-through leaves stop rendering entirely.
+    expect(resolveBurnPageVisibility(1, 5, 2.2)).toBe(false);
+    expect(resolveBurnPageVisibility(2, 5, 2.2)).toBe(true);
+  });
+
+  it("keeps deposit mass correlated with actually consumed paper", () => {
+    const field = createBurnField({
+      width: 48,
+      height: 32,
+      leftLayers: 2,
+      rightLayers: 2,
+      seed: 11,
+    });
+    const state = createResidueTextureState(64, 44);
+    const densitySum = () => {
+      let total = 0;
+      for (const value of state.density) total += value;
+      return total;
+    };
+
+    updateResidueTextureState(state, field);
+    expect(densitySum()).toBe(0);
+
+    igniteBurnField(field, 0.5, 0.5, 0.06, 1.2);
+    for (let frame = 0; frame < 60; frame += 1) {
+      stepBurnField(field, BURN_FIXED_STEP);
+    }
+    updateResidueTextureState(state, field);
+    const midSum = densitySum();
+    const midFuel = field.burnedFuel;
+    expect(midSum).toBeGreaterThan(0);
+
+    for (let frame = 0; frame < 120; frame += 1) {
+      stepBurnField(field, BURN_FIXED_STEP);
+    }
+    updateResidueTextureState(state, field);
+    expect(field.burnedFuel).toBeGreaterThan(midFuel);
+    expect(densitySum()).toBeGreaterThan(midSum);
   });
 });

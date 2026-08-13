@@ -10,7 +10,6 @@ import {
   COMBUSTION_FIXED_STEP,
   createCombustionFluid,
   stepCombustionFluid,
-  writeCombustionRoots,
   writeCombustionTexture,
 } from "@/ignite/combustionFluid";
 
@@ -238,7 +237,9 @@ describe("combustion fluid", () => {
     }
 
     expect(atThreeSeconds).toBeGreaterThan(0.005);
-    expect(atThreeSeconds).toBeLessThan(0.22);
+    // The bound tracks the intentionally hotter flame injection (stronger
+    // yellow cores); gas must still cover well under a quarter of the domain.
+    expect(atThreeSeconds).toBeLessThan(0.235);
     expect(atSevenSeconds).toBeLessThan(0.28);
     expect(peakAfterThree).toBeGreaterThan(0.005);
     expect(peakAfterThree).toBeLessThan(0.28);
@@ -310,13 +311,19 @@ describe("combustion fluid", () => {
     expect(maxHeatAtTwoSeconds).toBeGreaterThan(0.6);
     expect(packedMaxAtOneSecond).toBeGreaterThan(150);
     expect(packedMaxAtTwoSeconds).toBeGreaterThan(150);
-    expect(sourceLobesAtOneSecond).toBeGreaterThanOrEqual(2);
-    expect(sourceLobesAtOneSecond).toBeLessThanOrEqual(5);
+    // A young ring may momentarily feed through one connected arc; the
+    // mature-frontier test asserts the multi-arc break-up where it matters.
+    expect(sourceLobesAtOneSecond).toBeGreaterThanOrEqual(1);
+    expect(sourceLobesAtOneSecond).toBeLessThanOrEqual(6);
     expect(sourceCoverageAtOneSecond).toBeLessThan(0.04);
     expect(riseAtOneSecond).toBeGreaterThan(0.7);
   });
 
-  it("selects a small deterministic set of separated hot-front roots", () => {
+  it("feeds a distributed, connected source band along a mature frontier", () => {
+    // The rendered fire is the fluid itself, so its source band is what the
+    // viewer sees anchored to the char lip. A mature ring must feed several
+    // separated arcs that together wrap a wide extent of the contour, and
+    // the selection must be deterministic.
     const burn = createBurnField({
       width: 96,
       height: 64,
@@ -326,50 +333,48 @@ describe("combustion fluid", () => {
     });
     igniteBurnField(burn, 0.5, 0.52, 0.032, 0.92);
     const fluid = createCombustionFluid(72, 54);
-    for (let frame = 0; frame < 1 / BURN_FIXED_STEP; frame += 1) {
+    const twin = createCombustionFluid(72, 54);
+    const twinBurn = createBurnField({
+      width: 96,
+      height: 64,
+      leftLayers: 2,
+      rightLayers: 2,
+      seed: 73,
+    });
+    igniteBurnField(twinBurn, 0.5, 0.52, 0.032, 0.92);
+    for (let frame = 0; frame < 3 / BURN_FIXED_STEP; frame += 1) {
       stepBurnField(burn, BURN_FIXED_STEP);
       stepCombustionFluid(fluid, burn, BURN_FIXED_STEP);
+      stepBurnField(twinBurn, BURN_FIXED_STEP);
+      stepCombustionFluid(twin, twinBurn, BURN_FIXED_STEP);
     }
 
-    const first = {
-      uv: new Float32Array(12),
-      strength: new Float32Array(6),
-      flow: new Float32Array(6),
-      tangent: new Float32Array(12),
-    };
-    const second = {
-      uv: new Float32Array(12),
-      strength: new Float32Array(6),
-      flow: new Float32Array(6),
-      tangent: new Float32Array(12),
-    };
-    const firstCount = writeCombustionRoots(fluid, first, 6);
-    const secondCount = writeCombustionRoots(fluid, second, 6);
+    expect(Array.from(twin.source)).toEqual(Array.from(fluid.source));
 
-    expect(firstCount).toBeGreaterThanOrEqual(3);
-    expect(firstCount).toBeLessThanOrEqual(6);
-    expect(secondCount).toBe(firstCount);
-    expect(Array.from(second.uv)).toEqual(Array.from(first.uv));
-    expect(Array.from(second.strength)).toEqual(Array.from(first.strength));
-    expect(Array.from(second.flow)).toEqual(Array.from(first.flow));
-    expect(Array.from(second.tangent)).toEqual(Array.from(first.tangent));
-    for (let root = 0; root < firstCount; root += 1) {
-      const x = (first.uv[root * 2] ?? 0) * fluid.width - .5;
-      const y = (first.uv[root * 2 + 1] ?? 0) * fluid.height - .5;
-      const sourceIndex = Math.round(y) * fluid.width + Math.round(x);
-      expect(fluid.source[sourceIndex]).toBeGreaterThan(.045);
-      expect(first.strength[root]).toBeGreaterThan(0);
-      expect(Math.abs(first.flow[root] ?? 0)).toBeLessThanOrEqual(1);
-      expect(Math.hypot(
-        first.tangent[root * 2] ?? 0,
-        first.tangent[root * 2 + 1] ?? 0,
-      )).toBeCloseTo(1, 4);
-      for (let prior = 0; prior < root; prior += 1) {
-        const priorX = (first.uv[prior * 2] ?? 0) * fluid.width - .5;
-        const priorY = (first.uv[prior * 2 + 1] ?? 0) * fluid.height - .5;
-        expect(Math.hypot(x - priorX, y - priorY)).toBeGreaterThanOrEqual(3.45);
-      }
+    const arcs = connectedComponentCount(fluid.width, fluid.source, 0.05);
+    expect(arcs).toBeGreaterThanOrEqual(3);
+
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    let liveCells = 0;
+    for (let index = 0; index < fluid.source.length; index += 1) {
+      if ((fluid.source[index] ?? 0) <= 0.05) continue;
+      liveCells += 1;
+      const x = index % fluid.width;
+      const y = Math.floor(index / fluid.width);
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
     }
+    expect(liveCells).toBeGreaterThan(8);
+    // The live band wraps a substantial part of the ring instead of
+    // crowding one hot corner.
+    expect(Math.max(maxX - minX, maxY - minY)).toBeGreaterThan(
+      fluid.width * 0.16,
+    );
   });
 
   it("uses fixed steps so equivalent frame schedules remain deterministic", () => {

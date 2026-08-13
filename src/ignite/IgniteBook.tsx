@@ -15,7 +15,7 @@ import {
   burnProgress,
   createBurnField,
   igniteBurnField,
-  upsampleBurnTexture,
+  measureBurnDepthRange,
   writeBurnTexture,
   type BurnField,
 } from "./burnField";
@@ -28,8 +28,10 @@ export const IGNITE_LAYER_GAP = 0.06;
 const TABLE_Z = -IGNITE_TOTAL_LEAVES * IGNITE_LAYER_GAP - 2;
 const FIELD_W = 192;
 const FIELD_H = 128;
-const VISUAL_FIELD_W = FIELD_W * 2;
-const VISUAL_FIELD_H = FIELD_H * 2;
+// Distances handed to the char-band tuning are measured in display texels,
+// historically twice the simulation resolution. The GPU now reconstructs the
+// smooth field itself, so only this unit conversion survives.
+const DISPLAY_TEXELS_PER_SIM_TEXEL = 2;
 export const IGNITE_PAGE_SEGMENTS_X = 96;
 export const IGNITE_PAGE_SEGMENTS_Y = 128;
 export const IGNITE_MAX_CURL_RATIO = 0.052;
@@ -96,6 +98,37 @@ export function createBurnPagePlan(
     },
   );
   return { left, right };
+}
+
+/**
+ * Whether the CPU should refilter, upsample, and upload the burn texture this
+ * frame. The simulation advances at a fixed 30 Hz; regenerating the visual
+ * field on frames where nothing stepped only burned main-thread time. One
+ * final refresh after completion captures the terminal all-ash state.
+ */
+export function shouldRefreshBurnTexture(
+  steps: number,
+  touched: boolean,
+  complete: boolean,
+  finalRefreshDone: boolean,
+) {
+  if (complete) return !finalRefreshDone;
+  return steps > 0 || touched;
+}
+
+/**
+ * Whether one physical leaf needs rendering given the per-side consumed-depth
+ * extrema. A leaf is skipped while everything above it is still intact
+ * (nothing can expose it) and again once its whole half has burned through it.
+ */
+export function resolveBurnPageVisibility(
+  layer: number,
+  maxDepth: number,
+  minDepth: number,
+) {
+  const safeLayer = Math.max(0, Math.floor(layer));
+  if (safeLayer > 0 && maxDepth < safeLayer - 0.72) return false;
+  return minDepth < safeLayer + 0.999;
 }
 
 /** Mirrors the shader's page-indexed phase contract for focused tests. */
@@ -209,6 +242,66 @@ function useCachedPageTexture(key: string) {
   return getPageTexture(key);
 }
 
+/**
+ * Shadow-pass material that knows about the burn cut. The reading book's
+ * leaves cast the soft desk shadow; without an equivalent caster the shadow
+ * vanished the instant Ignite mounted. A plain depth material would bring it
+ * back as an eternal full rectangle, so this one discards consumed fragments
+ * — the shadow erodes together with the paper. The soft 4px-radius shadow
+ * cannot resolve the ragged procedural threshold, so a constant cut suffices.
+ */
+function useBurnDepthMaterial(
+  burnMap: THREE.DataTexture,
+  side: "left" | "right",
+  layer: number,
+  maxLayers: number,
+) {
+  const material = useMemo(() => {
+    const depth = new THREE.MeshDepthMaterial({
+      depthPacking: THREE.RGBADepthPacking,
+    });
+    depth.defines = { USE_UV: "" };
+    depth.customProgramCacheKey = () => "ignite-burn-depth-v1";
+    depth.onBeforeCompile = (shader) => {
+      shader.uniforms.igniteMap = { value: burnMap };
+      shader.uniforms.igniteLayer = { value: layer };
+      shader.uniforms.igniteMaxLayers = { value: maxLayers };
+      shader.uniforms.igniteUvOffset = { value: side === "left" ? 0 : 0.5 };
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "void main() {",
+          `uniform sampler2D igniteMap;
+          uniform float igniteLayer;
+          uniform float igniteMaxLayers;
+          uniform float igniteUvOffset;
+          void main() {`,
+        )
+        .replace(
+          "vec4 diffuseColor = vec4( 1.0 );",
+          `vec4 diffuseColor = vec4( 1.0 );
+          vec2 igniteShadowUv = vec2(vUv.x * .5 + igniteUvOffset, vUv.y);
+          vec4 igniteShadowState = texture2D(igniteMap, igniteShadowUv);
+          float igniteShadowCapacity = igniteShadowState.a * igniteMaxLayers;
+          if (igniteShadowCapacity < igniteLayer + .45) discard;
+          float igniteShadowLower = clamp(
+            igniteShadowState.b * igniteMaxLayers - igniteLayer,
+            0.0,
+            1.0
+          );
+          float igniteShadowPhase = mix(
+            igniteShadowLower,
+            igniteShadowState.r,
+            1.0 - step(.5, igniteLayer)
+          );
+          if (igniteShadowPhase > .42) discard;`,
+        );
+    };
+    return depth;
+  }, [burnMap, layer, maxLayers, side]);
+  useEffect(() => () => material.dispose(), [material]);
+  return material;
+}
+
 function useBurnPageMaterial(
   source: THREE.Texture | null,
   burnMap: THREE.DataTexture,
@@ -226,14 +319,17 @@ function useBurnPageMaterial(
       map: source,
       color: 0xffffff,
       side: THREE.DoubleSide,
-      toneMapped: false,
+      // The reading book runs the same captured pages through the default
+      // tone-mapping pipeline; matching it keeps the flatten transition
+      // seamless instead of shifting the paper's white point.
+      toneMapped: true,
       roughness: 0.92,
       metalness: 0,
       flatShading: false,
       alphaTest: 0.015,
       alphaToCoverage: true,
     });
-    next.customProgramCacheKey = () => "ignite-progressive-paper-v6";
+    next.customProgramCacheKey = () => "ignite-progressive-paper-v8";
     next.onBeforeCompile = (shader) => {
       shader.uniforms.igniteMap = { value: burnMap };
       shader.uniforms.igniteLayer = { value: layer };
@@ -241,7 +337,7 @@ function useBurnPageMaterial(
       shader.uniforms.igniteTime = { value: 0 };
       shader.uniforms.igniteUvOffset = { value: side === "left" ? 0 : 0.5 };
       shader.uniforms.igniteMapSize = {
-        value: new THREE.Vector2(VISUAL_FIELD_W, VISUAL_FIELD_H),
+        value: new THREE.Vector2(FIELD_W, FIELD_H),
       };
       shader.uniforms.ignitePageSize = { value: new THREE.Vector2(pw, ph) };
       shader.vertexShader = shader.vertexShader
@@ -262,8 +358,9 @@ function useBurnPageMaterial(
           varying float vIgniteCorrugation;
 
           vec4 igniteVertexState(vec2 burnUv) {
-            vec2 minimumUv = vec2(igniteUvOffset + .001, .001);
-            vec2 maximumUv = vec2(igniteUvOffset + .499, .999);
+            vec2 halfTexel = .5 / igniteMapSize;
+            vec2 minimumUv = vec2(igniteUvOffset, 0.0) + halfTexel;
+            vec2 maximumUv = vec2(igniteUvOffset + .5, 1.0) - halfTexel;
             return texture2D(igniteMap, clamp(burnUv, minimumUv, maximumUv));
           }
 
@@ -304,7 +401,7 @@ function useBurnPageMaterial(
             uv.y
           );
           vec2 igniteVertexTexel = 1.0 / igniteMapSize;
-          vec2 igniteCurlRadius = igniteVertexTexel * vec2(11.6, 9.4);
+          vec2 igniteCurlRadius = igniteVertexTexel * vec2(5.8, 4.7);
           float igniteCenterHole = igniteVertexHole(igniteVertexUv);
           float igniteHoleLeft = igniteVertexHole(
             igniteVertexUv - vec2(igniteCurlRadius.x, 0.0)
@@ -423,15 +520,45 @@ function useBurnPageMaterial(
           }
 
           vec4 igniteState(vec2 uv) {
-            vec2 minimumUv = vec2(igniteUvOffset + .001, .001);
-            vec2 maximumUv = vec2(igniteUvOffset + .499, .999);
-            // The CPU already expands the simulation field and the texture is
-            // linearly filtered. Sampling the continuous UV directly avoids
-            // reintroducing a visible cell cadence at close zoom.
+            vec2 halfTexel = .5 / igniteMapSize;
+            vec2 minimumUv = vec2(igniteUvOffset, 0.0) + halfTexel;
+            vec2 maximumUv = vec2(igniteUvOffset + .5, 1.0) - halfTexel;
             return texture2D(
               igniteMap,
               clamp(uv, minimumUv, maximumUv)
             );
+          }
+
+          vec4 igniteStateSmooth(vec2 uv) {
+            // Catmull-Rom reconstruction of the coarse simulation field.
+            // Plain bilinear leaves a gradient crease on every simulation
+            // texel, which the iso-cut renders as a stepped contour at close
+            // zoom; nine spine-clamped bilinear taps give a C1-smooth scalar
+            // field at screen resolution for the visible cut alone.
+            vec2 samplePos = uv * igniteMapSize - .5;
+            vec2 basePos = floor(samplePos);
+            vec2 f = samplePos - basePos;
+            vec2 w0 = f * (-.5 + f * (1.0 - .5 * f));
+            vec2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+            vec2 w2 = f * (.5 + f * (2.0 - 1.5 * f));
+            vec2 w3 = f * f * (-.5 + .5 * f);
+            vec2 w12 = w1 + w2;
+            vec2 offset12 = w2 / max(w12, vec2(1e-5));
+            vec2 invSize = 1.0 / igniteMapSize;
+            vec2 pos0 = (basePos - .5) * invSize;
+            vec2 pos12 = (basePos + .5 + offset12) * invSize;
+            vec2 pos3 = (basePos + 2.5) * invSize;
+            vec4 result =
+              igniteState(vec2(pos0.x, pos0.y)) * w0.x * w0.y +
+              igniteState(vec2(pos12.x, pos0.y)) * w12.x * w0.y +
+              igniteState(vec2(pos3.x, pos0.y)) * w3.x * w0.y +
+              igniteState(vec2(pos0.x, pos12.y)) * w0.x * w12.y +
+              igniteState(vec2(pos12.x, pos12.y)) * w12.x * w12.y +
+              igniteState(vec2(pos3.x, pos12.y)) * w3.x * w12.y +
+              igniteState(vec2(pos0.x, pos3.y)) * w0.x * w3.y +
+              igniteState(vec2(pos12.x, pos3.y)) * w12.x * w3.y +
+              igniteState(vec2(pos3.x, pos3.y)) * w3.x * w3.y;
+            return clamp(result, vec4(0.0), vec4(1.0));
           }
 
           float ignitePhaseForLayer(vec2 uv, float layerIndex) {
@@ -485,87 +612,49 @@ function useBurnPageMaterial(
             );
           }
 
-          float igniteLayerPhase(vec2 uv) {
-            return ignitePhaseForLayer(uv, igniteLayer);
-          }
-
-          float igniteLayerHole(vec2 uv) {
-            return igniteHoleForLayer(uv, igniteLayer);
-          }
-
-          float igniteNeighbourHole(vec2 uv, vec2 radius) {
-            vec2 texel = radius / igniteMapSize;
-            vec2 diagonal = texel * .70710678;
-            float threshold = igniteThresholdForLayer(uv, igniteLayer);
-            float signal = -1.0;
-            signal = max(signal, ignitePhaseForLayer(
-              uv + vec2(texel.x, 0.0), igniteLayer
-            ) - threshold);
-            signal = max(signal, ignitePhaseForLayer(
-              uv - vec2(texel.x, 0.0), igniteLayer
-            ) - threshold);
-            signal = max(signal, ignitePhaseForLayer(
-              uv + vec2(0.0, texel.y), igniteLayer
-            ) - threshold);
-            signal = max(signal, ignitePhaseForLayer(
-              uv - vec2(0.0, texel.y), igniteLayer
-            ) - threshold);
-            signal = max(signal, ignitePhaseForLayer(
-              uv + diagonal, igniteLayer
-            ) - threshold);
-            signal = max(signal, ignitePhaseForLayer(
-              uv - diagonal, igniteLayer
-            ) - threshold);
-            signal = max(signal, ignitePhaseForLayer(
-              uv + vec2(diagonal.x, -diagonal.y), igniteLayer
-            ) - threshold);
-            signal = max(signal, ignitePhaseForLayer(
-              uv + vec2(-diagonal.x, diagonal.y), igniteLayer
-            ) - threshold);
-            return igniteCoverageFromSignal(signal);
-          }
-
-          float igniteBoundaryDistanceTexels(vec2 uv) {
+          float igniteBoundaryDistanceTexels(vec2 uv, float centerSignal) {
             // A signed-distance approximation from the continuous burn field
-            // keeps all visible material zones on one smooth contour.
+            // keeps all visible material zones on one smooth contour. The
+            // slope comes from the smooth phase texture alone: the four
+            // neighbour taps skip the procedural threshold noise, whose
+            // high-frequency terms only jittered the estimate.
             vec2 texel = 1.0 / igniteMapSize;
-            float center = igniteCutSignalForLayer(uv, igniteLayer);
-            float left = igniteCutSignalForLayer(
+            float left = ignitePhaseForLayer(
               uv - vec2(texel.x, 0.0), igniteLayer
             );
-            float right = igniteCutSignalForLayer(
+            float right = ignitePhaseForLayer(
               uv + vec2(texel.x, 0.0), igniteLayer
             );
-            float down = igniteCutSignalForLayer(
+            float down = ignitePhaseForLayer(
               uv - vec2(0.0, texel.y), igniteLayer
             );
-            float up = igniteCutSignalForLayer(
+            float up = ignitePhaseForLayer(
               uv + vec2(0.0, texel.y), igniteLayer
             );
             float slopePerTexel = max(
               length(vec2(right - left, up - down)) * .5,
               .0045
             );
-            return -center / slopePerTexel;
+            // Distances feed char-band widths historically tuned in display
+            // texels at twice the simulation resolution.
+            return -centerSignal / slopePerTexel *
+              ${DISPLAY_TEXELS_PER_SIM_TEXEL.toFixed(1)};
           }`,
         )
         .replace(
-          "#include <normal_fragment_maps>",
-          `#include <normal_fragment_maps>
-          // The stock plane normal does not know about vertex curl. This
-          // gently turns the surface toward the torn opening so its lighting
-          // reads as a lifted, corrugated paper lip.
-          float igniteFoldNormalWeight = smoothstep(.08, .72, vIgniteCurl);
-          vec3 igniteFoldNormal = normalize(vec3(
-            vIgniteCurlDirection.x * (.5 + vIgniteCorrugation * .09),
-            vIgniteCurlDirection.y * (.5 - vIgniteCorrugation * .09),
-            .82
-          ));
-          normal = normalize(mix(
-            normal,
-            gl_FrontFacing ? igniteFoldNormal : -igniteFoldNormal,
-            igniteFoldNormalWeight * .58
-          ));`,
+          "vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;",
+          `// The captured pages are already lit artwork; the reading book
+          // reproduces them exactly rather than relighting them, and the
+          // burning stack must match or the whole magazine greys out the
+          // moment Ignite mounts. Scene lighting is replaced by a small
+          // procedural fold response so only the curling lip picks up
+          // directional shading and corrugation.
+          float igniteFoldShade = 1.0
+            - vIgniteCurl * .14
+            + dot(vIgniteCurlDirection, vec2(-.42, .58)) * vIgniteCurl * .3
+            + vIgniteCorrugation * vIgniteCurl * .12;
+          vec3 outgoingLight = diffuseColor.rgb *
+            clamp(igniteFoldShade, .55, 1.2);`,
         )
         .replace(
           "#include <map_fragment>",
@@ -574,13 +663,23 @@ function useBurnPageMaterial(
             vIgniteUv.x * .5 + igniteUvOffset,
             vIgniteUv.y
           );
-          vec4 igniteSample = igniteState(igniteUv);
+          vec4 igniteSample = igniteStateSmooth(igniteUv);
           float igniteCapacity = igniteSample.a * igniteMaxLayers;
           if (igniteCapacity < igniteLayer + .45) discard;
 
           float ignitePhysicalDepth = igniteSample.b * igniteMaxLayers;
-          float ignitePhase = igniteLayerPhase(igniteUv);
-          float igniteCutSignal = igniteCutSignalForLayer(
+          float igniteLowerPhase = clamp(
+            ignitePhysicalDepth - igniteLayer,
+            0.0,
+            1.0
+          );
+          float igniteExposedSheet = 1.0 - step(.5, igniteLayer);
+          float ignitePhase = mix(
+            igniteLowerPhase,
+            igniteSample.r,
+            igniteExposedSheet
+          );
+          float igniteCutSignal = ignitePhase - igniteThresholdForLayer(
             igniteUv,
             igniteLayer
           );
@@ -589,6 +688,43 @@ function useBurnPageMaterial(
           if (igniteHole > .999) discard;
 
           float igniteHeat = igniteSample.g;
+          float ignitePreviousLayer = max(0.0, igniteLayer - 1.0);
+          float igniteUpperHole = 0.0;
+          if (igniteLayer > .5) {
+            // The sheet above cuts on the same smooth state sample; only its
+            // threshold differs, so no extra texture reconstruction is spent.
+            float igniteUpperLower = clamp(
+              ignitePhysicalDepth - ignitePreviousLayer,
+              0.0,
+              1.0
+            );
+            float igniteUpperExposed = 1.0 - step(.5, ignitePreviousLayer);
+            float igniteUpperPhase = mix(
+              igniteUpperLower,
+              igniteSample.r,
+              igniteUpperExposed
+            );
+            igniteUpperHole = igniteCoverageFromSignal(
+              igniteUpperPhase - igniteThresholdForLayer(
+                igniteUv,
+                ignitePreviousLayer
+              )
+            );
+          }
+          float igniteEdgeDistance = max(
+            0.0,
+            igniteBoundaryDistanceTexels(igniteUv, igniteCutSignal)
+          );
+
+          // Fragments far from every char band, reveal, and curl keep their
+          // printed color untouched; skipping the procedural material work
+          // there roughly halves the per-pixel cost of an intact sheet.
+          if (
+            igniteEdgeDistance < 7.5 ||
+            igniteUpperHole > .0015 ||
+            ignitePhase > .12 ||
+            vIgniteCurl > .02
+          ) {
           float igniteBroad = igniteFbm(
             igniteUv * vec2(9.0, 6.0)
               + vec2(igniteLayer * 13.2, igniteLayer * 5.8)
@@ -605,17 +741,6 @@ function useBurnPageMaterial(
             igniteUv * vec2(3.7, 2.8)
               + vec2(igniteLayer * 7.9, igniteLayer * 11.3)
           );
-
-          // The perforated sheet immediately above exposes this page to hot
-          // gases before its own delayed cut begins. Multiplicative neutral
-          // mottling keeps the authored print and paper grain readable; sparse
-          // soot islands add depth without replacing it with an opaque slab.
-          float igniteLowerSheet = step(.5, igniteLayer);
-          float ignitePreviousLayer = max(0.0, igniteLayer - 1.0);
-          float igniteUpperHole = igniteLowerSheet * igniteHoleForLayer(
-            igniteUv,
-            ignitePreviousLayer
-          );
           float igniteExposureAge = clamp(
             ignitePhysicalDepth - ignitePreviousLayer,
             0.0,
@@ -627,11 +752,11 @@ function useBurnPageMaterial(
             igniteMacro * .68 + igniteBroad * .32
           );
           float igniteUnderTone = clamp(
-            mix(.94, .76, igniteUnderMottle)
-              - igniteExposureAge * .035
+            mix(.94, .72, igniteUnderMottle)
+              - igniteExposureAge * .05
               - igniteHeat * .018
               + (igniteFibre - .5) * .025,
-            .7,
+            .6,
             .96
           );
           float igniteUnderShade = igniteUpperHole
@@ -653,16 +778,12 @@ function useBurnPageMaterial(
           diffuseColor.rgb = mix(
             diffuseColor.rgb,
             igniteUnderSoot,
-            clamp(igniteUnderClump + igniteUnderFibre, 0.0, .24)
+            clamp(igniteUnderClump + igniteUnderFibre, 0.0, .34)
           );
 
           // Every sheet owns a different torn threshold, but only its intact
           // lip beside its own opening is marked. There are no displaced page
           // meshes or full-width bands, so successive sheets cannot form bowls.
-          float igniteEdgeDistance = max(
-            0.0,
-            igniteBoundaryDistanceTexels(igniteUv)
-          );
           float igniteIntactEdge = (1.0 - igniteHole)
             * (1.0 - smoothstep(.08, .42, igniteEdgeDistance));
           float igniteWidthVariation = smoothstep(
@@ -670,7 +791,7 @@ function useBurnPageMaterial(
             .72,
             igniteMacro * .82 + igniteBroad * .18
           );
-          float igniteCarbonWidth = mix(1.25, 2.05, igniteWidthVariation);
+          float igniteCarbonWidth = mix(1.7, 2.75, igniteWidthVariation);
           float igniteBrownWidth = igniteCarbonWidth
             + mix(.85, 1.55, igniteMid);
           float igniteTanWidth = min(
@@ -706,8 +827,8 @@ function useBurnPageMaterial(
             )
           );
           float igniteCharClump = smoothstep(
-            .34,
-            .68,
+            .26,
+            .6,
             igniteMacro * .74 + igniteBroad * .19 + igniteFibre * .07
           );
           float igniteCarbon = max(
@@ -734,12 +855,31 @@ function useBurnPageMaterial(
             vec3(.115, .047, .018),
             .48 + igniteMid * .22
           );
-          vec3 igniteCarbonBlack = vec3(.018, .014, .011);
-          vec3 igniteCarbonGrey = vec3(.105, .085, .067);
+          // Charred paper is never a flat void: it keeps mottled charcoal
+          // tones, a faint ghost of its printed ink, and a first dusting of
+          // grey ash. Wide charred regions must read as brittle material,
+          // not as a black page-shaped hole.
+          vec3 igniteCarbonBlack = vec3(.032, .027, .022);
+          vec3 igniteCarbonGrey = vec3(.135, .115, .095);
           vec3 igniteCarbonColor = mix(
             igniteCarbonBlack,
             igniteCarbonGrey,
-            smoothstep(.73, .91, igniteFibre + igniteMid * .08) * .34
+            smoothstep(.32, .82, igniteMid) * .8
+          );
+          igniteCarbonColor = mix(
+            igniteCarbonColor,
+            vec3(.115, .062, .03),
+            smoothstep(.58, .9, igniteBroad) * .45
+          );
+          igniteCarbonColor = mix(
+            igniteCarbonColor,
+            diffuseColor.rgb * .17,
+            smoothstep(.52, .86, igniteMacro) * .38
+          );
+          igniteCarbonColor = mix(
+            igniteCarbonColor,
+            vec3(.41, .39, .36),
+            smoothstep(.74, .95, igniteFibre) * .5
           );
           diffuseColor.rgb = mix(diffuseColor.rgb, igniteTanColor, igniteTan * .36);
           diffuseColor.rgb = mix(diffuseColor.rgb, igniteBrownColor, igniteBrown * .88);
@@ -782,13 +922,14 @@ function useBurnPageMaterial(
                 * (1.0 - igniteHole)
             )
             * igniteCurrentLayer
-            * smoothstep(.42, .82, igniteHeat)
+            * smoothstep(.36, .74, igniteHeat)
             * smoothstep(.625, .71, igniteEmberMacro)
             * smoothstep(.56, .72, igniteEmberNoise)
             * (.68 + smoothstep(.72, .9, igniteEmberNoise) * .3);
           // Added after the carbon mix so hot segments remain visibly
           // emissive on a white magazine without drawing a continuous outline.
-          diffuseColor.rgb += vec3(1.0, .085, .002) * igniteEmber * .92;`,
+          diffuseColor.rgb += vec3(1.0, .085, .002) * igniteEmber * .92;
+          }`,
         );
       shaderRef.current = shader;
     };
@@ -811,12 +952,18 @@ function BurnPage({
   pageSize,
   burnMap,
   maxLayers,
+  registerMesh,
 }: {
   entry: BurnPagePlanEntry;
   geometry: THREE.PlaneGeometry;
   pageSize: readonly [number, number];
   burnMap: THREE.DataTexture;
   maxLayers: number;
+  registerMesh: (
+    side: "left" | "right",
+    layer: number,
+    mesh: THREE.Mesh | null,
+  ) => void;
 }) {
   const [pw, ph] = pageSize;
   const source = useCachedPageTexture(entry.textureKey);
@@ -829,16 +976,25 @@ function BurnPage({
     pw,
     ph,
   );
+  const depthMaterial = useBurnDepthMaterial(
+    burnMap,
+    entry.side,
+    entry.layer,
+    maxLayers,
+  );
   return (
     <mesh
+      ref={(mesh) => registerMesh(entry.side, entry.layer, mesh)}
       geometry={geometry}
       material={material}
+      customDepthMaterial={depthMaterial}
       position={[
         entry.side === "left" ? -pw / 2 : pw / 2,
         0,
         -entry.layer * IGNITE_LAYER_GAP,
       ]}
       renderOrder={Math.max(1, 30 - entry.layer)}
+      castShadow
       receiveShadow
     />
   );
@@ -861,7 +1017,6 @@ function completeReducedMotionField(field: BurnField) {
 interface BurnSimulation {
   field: BurnField;
   bytes: Uint8Array;
-  visualBytes: Uint8Array;
   texture: THREE.DataTexture;
 }
 
@@ -879,19 +1034,13 @@ function makeBurnSimulation(
   });
   const bytes = new Uint8Array(FIELD_W * FIELD_H * 4);
   writeBurnTexture(field, bytes);
-  const visualBytes = new Uint8Array(VISUAL_FIELD_W * VISUAL_FIELD_H * 4);
-  upsampleBurnTexture(
+  // The GPU reconstructs the smooth display field itself, so the upload is
+  // the raw simulation grid: a quarter of the bytes of the old CPU-expanded
+  // texture, refreshed only when a fixed step actually ran.
+  const texture = new THREE.DataTexture(
     bytes,
     FIELD_W,
     FIELD_H,
-    visualBytes,
-    VISUAL_FIELD_W,
-    VISUAL_FIELD_H,
-  );
-  const texture = new THREE.DataTexture(
-    visualBytes,
-    VISUAL_FIELD_W,
-    VISUAL_FIELD_H,
     THREE.RGBAFormat,
     THREE.UnsignedByteType,
   );
@@ -902,7 +1051,7 @@ function makeBurnSimulation(
   texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.generateMipmaps = false;
   texture.needsUpdate = true;
-  return { field, bytes, visualBytes, texture };
+  return { field, bytes, texture };
 }
 
 export function IgniteBook({
@@ -939,6 +1088,17 @@ export function IgniteBook({
   const reportedIgnition = useRef(false);
   const reportedComplete = useRef(false);
   const reportedProgress = useRef(0);
+  const finalTextureRefreshDone = useRef(false);
+  const pageMeshes = useRef(new Map<string, THREE.Mesh>());
+  const registerMesh = useMemo(
+    () =>
+      (side: "left" | "right", layer: number, mesh: THREE.Mesh | null) => {
+        const key = `${side}:${layer}`;
+        if (mesh) pageMeshes.current.set(key, mesh);
+        else pageMeshes.current.delete(key);
+      },
+    [],
+  );
 
   useEffect(
     () => () => {
@@ -954,13 +1114,13 @@ export function IgniteBook({
   useFrame((_, rawDt) => {
     const field = simulation.field;
 
+    let touchedThisFrame = false;
     if (pointer.inside && !field.complete) {
       const prior = previousPointer.current;
       const travel = prior.inside
         ? Math.hypot(pointer.u - prior.u, pointer.v - prior.v)
         : 0;
       const samples = Math.min(10, Math.max(1, Math.ceil(travel / 0.018)));
-      let touched = false;
       for (let sample = 1; sample <= samples; sample += 1) {
         const mix = sample / samples;
         const u = prior.inside
@@ -969,16 +1129,16 @@ export function IgniteBook({
         const v = prior.inside
           ? prior.v + (pointer.v - prior.v) * mix
           : pointer.v;
-        touched =
+        touchedThisFrame =
           igniteBurnField(
             field,
             u,
             v,
             pointer.pressed ? 0.052 : 0.032,
             pointer.pressed ? 1.32 : 0.92,
-          ) || touched;
+          ) || touchedThisFrame;
       }
-      if (touched && reducedMotion) completeReducedMotionField(field);
+      if (touchedThisFrame && reducedMotion) completeReducedMotionField(field);
     }
     previousPointer.current = {
       u: pointer.u,
@@ -986,9 +1146,11 @@ export function IgniteBook({
       inside: pointer.inside,
     };
 
+    let steps = 0;
     if (field.ignited && !field.complete && !reducedMotion) {
       const advanced = advanceBurnField(field, rawDt, accumulator.current);
       accumulator.current = advanced.accumulator;
+      steps = advanced.steps;
     }
 
     if (field.caught && !reportedIgnition.current) {
@@ -996,18 +1158,31 @@ export function IgniteBook({
       onIgnition?.();
     }
 
-    if (field.ignited) {
+    if (
+      field.ignited &&
+      shouldRefreshBurnTexture(
+        steps,
+        touchedThisFrame,
+        field.complete,
+        finalTextureRefreshDone.current,
+      )
+    ) {
+      if (field.complete) finalTextureRefreshDone.current = true;
       writeBurnTexture(field, simulation.bytes);
-      upsampleBurnTexture(
-        simulation.bytes,
-        FIELD_W,
-        FIELD_H,
-        simulation.visualBytes,
-        VISUAL_FIELD_W,
-        VISUAL_FIELD_H,
-      );
       // eslint-disable-next-line react-hooks/immutability -- R3F owns this upload flag.
       simulation.texture.needsUpdate = true;
+
+      // Reuse the same 30 Hz cadence to skip meshes the fire cannot reach yet
+      // and leaves it has entirely consumed.
+      const range = measureBurnDepthRange(field);
+      for (const [key, mesh] of pageMeshes.current) {
+        const [side, layerText] = key.split(":");
+        const layer = Number(layerText);
+        const maxDepth = side === "left" ? range.leftMax : range.rightMax;
+        const minDepth = side === "left" ? range.leftMin : range.rightMin;
+        // eslint-disable-next-line react-hooks/immutability -- R3F owns mesh flags.
+        mesh.visible = resolveBurnPageVisibility(layer, maxDepth, minDepth);
+      }
     }
 
     const progress = burnProgress(field);
@@ -1036,6 +1211,7 @@ export function IgniteBook({
           pageSize={pageSize}
           burnMap={simulation.texture}
           maxLayers={simulation.field.maxLayers}
+          registerMesh={registerMesh}
         />
       ))}
       {!reducedMotion ? (

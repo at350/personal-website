@@ -7,15 +7,8 @@ import {
   COMBUSTION_EXTENT_X,
   COMBUSTION_EXTENT_Y,
   createCombustionFluid,
-  writeCombustionRoots,
   writeCombustionTexture,
-  type CombustionRootTargets,
 } from "./combustionFluid";
-import {
-  advanceFlameEnvelope,
-  flameClusterProfile,
-  type FlameClusterProfile,
-} from "./flameRibbonState";
 
 interface IgniteAtmosphereProps {
   field: BurnField;
@@ -26,7 +19,6 @@ interface IgniteAtmosphereProps {
 
 const FLUID_WIDTH = 144;
 const FLUID_HEIGHT = 108;
-const FLAME_ROOTS = 3;
 
 const atmosphereVertex = /* glsl */ `
   varying vec2 vFieldPosition;
@@ -62,25 +54,21 @@ const smokeFragment = /* glsl */ `
 `;
 
 /**
- * The visible flame is a continuous scalar field, not a collection of flame
- * silhouettes. Each hot-front root contributes a thin, turbulent density
- * ribbon and the advected combustion texture bends and dissolves those ribbons
- * as they rise. Density is shaded monotonically, so there is no outline or
- * glow band that can read as an emoji/decal on the paper.
+ * The visible fire is the combustion fluid itself, not a set of drawn flame
+ * shapes. Advected flame density (already injected along the live frontier
+ * and carried upward by real buoyancy) is amplified, striated by rising
+ * noise, and colored by temperature; the instantaneous source band anchors a
+ * white-hot contact line on the char lip. Because no tracked object exists
+ * between the simulation and the pixels, fire appears exactly where paper
+ * burns, churns with the gas, and dies in place — nothing can glide, pop, or
+ * reveal a sprite boundary.
  */
 const flameFieldFragment = /* glsl */ `
   precision highp float;
 
-  #define FLAME_ROOT_COUNT 3
-
   uniform float uTime;
   uniform sampler2D uFluid;
   uniform vec2 uTexel;
-  // xy = local page position, z = intensity, w = horizontal fluid flow.
-  uniform vec4 uRoots[FLAME_ROOT_COUNT];
-  // x = source-arc span, y = rise, z = phase, w = branch bias.
-  uniform vec4 uProfiles[FLAME_ROOT_COUNT];
-  uniform vec2 uTangents[FLAME_ROOT_COUNT];
 
   varying vec2 vFieldPosition;
   varying vec2 vFluidUv;
@@ -102,24 +90,6 @@ const flameFieldFragment = /* glsl */ `
     );
   }
 
-  float orientedGaussian(
-    vec2 point,
-    vec2 centre,
-    vec2 tangent,
-    vec2 radius
-  ) {
-    vec2 normal = vec2(-tangent.y, tangent.x);
-    vec2 delta = point - centre;
-    vec2 local = vec2(dot(delta, tangent), dot(delta, normal)) /
-      max(radius, vec2(.5));
-    return exp(-dot(local, local) * 2.25);
-  }
-
-  float boundedUnion(float accumulated, float contribution) {
-    float bounded = clamp(contribution, 0.0, 1.0);
-    return accumulated + bounded - accumulated * bounded;
-  }
-
   vec4 filteredFluid(vec2 uv) {
     vec2 safeUv = clamp(uv, vec2(.003), vec2(.997));
     vec4 centre = texture2D(uFluid, safeUv) * .40;
@@ -136,137 +106,65 @@ const flameFieldFragment = /* glsl */ `
 
   void main() {
     vec4 fluid = filteredFluid(vFluidUv);
-    float ribbonDensity = 0.0;
-    float coreDensity = 0.0;
-    float sourceDensity = 0.0;
-    float rootReach = 0.0;
+    if (fluid.r + fluid.g + fluid.a < .012) discard;
 
-    for (int rootIndex = 0; rootIndex < FLAME_ROOT_COUNT; rootIndex++) {
-      vec4 rootData = uRoots[rootIndex];
-      float intensity = rootData.z;
-      if (intensity < .006) continue;
+    float t = uTime;
+    vec2 p = vFieldPosition;
 
-      vec4 profile = uProfiles[rootIndex];
-      float arcWidth = profile.x;
-      float rise = profile.y;
-      float phase = profile.z;
-      float branchBias = profile.w;
-      vec2 root = rootData.xy;
-      vec2 rootDelta = vFieldPosition - root;
-      vec2 tangent = normalize(uTangents[rootIndex] + vec2(1e-5, 0.0));
-      float time = uTime * (1.0 + float(rootIndex) * .073) + phase;
+    // Two rising striation fields at different speeds carve the gas into
+    // vertical tongues; a slower field flickers whole regions a few times a
+    // second the way combustion actually breathes.
+    float streakA = noise21(vec2(p.x * .048, p.y * .055 - t * 2.5));
+    float streakB = noise21(vec2(p.x * .095 + 13.7, p.y * .07 - t * 4.2));
+    float flicker = .6 + .4 * noise21(vec2(t * 3.2, p.x * .014));
 
-      // A short Gaussian source lies exactly along the sampled cut tangent.
-      // It is intentionally dim: the readable volume begins as the gas rises,
-      // not as a glowing stripe laid over the paper.
-      float source = orientedGaussian(
-        vFieldPosition,
-        root + vec2(0.0, 1.2),
-        tangent,
-        vec2(arcWidth * .19, 2.35)
-      ) * intensity;
-      sourceDensity = boundedUnion(sourceDensity, source);
+    // Licking: refetch the fluid slightly below through a noise-warped
+    // offset, so density is dragged upward into irregular tips that stretch
+    // and tear with the striation instead of ending at the plume boundary.
+    vec2 lick = vec2(
+      (streakA - .5) * .017 + (streakB - .5) * .008,
+      -.011 - streakB * .015
+    );
+    float carried = texture2D(
+      uFluid,
+      clamp(vFluidUv + lick, vec2(.003), vec2(.997))
+    ).r;
+    float carriedFar = texture2D(
+      uFluid,
+      clamp(vFluidUv + lick * 2.2, vec2(.003), vec2(.997))
+    ).r;
 
-      float y = max(rootDelta.y, 0.0);
-      float level = clamp(y / rise, 0.0, 1.0);
-      float verticalGate = smoothstep(-1.5, 2.8, rootDelta.y) *
-        (1.0 - smoothstep(.76, 1.03, level));
-      float slowSway = sin(time * .73 + level * 5.4 + branchBias * 4.0);
-      float fastSway = sin(time * 1.81 - level * 8.7 + phase * .37);
-      float centreX = slowSway * arcWidth * (.028 + level * .105);
-      centreX += fastSway * arcWidth * (.01 + level * .042);
-      centreX += rootData.w * rise * level * .11;
-      centreX += branchBias * arcWidth * level * .12;
+    float flameDensity = max(fluid.r, max(carried * .9, carriedFar * .72));
+    flameDensity *= (.5 + streakA * .5) * (.55 + streakB * .45) * flicker;
 
-      float widthPulse = .92 + .08 * sin(time * 2.1 + level * 12.0 + phase);
-      float halfWidth = arcWidth * mix(.32, .075, pow(level, .72)) * widthPulse;
-      float lateral = (rootDelta.x - centreX) / max(halfWidth, .75);
-      float ribbon = exp(-lateral * lateral * 1.05) * verticalGate;
+    // The instantaneous reaction band hugs the char lip: a narrow, hot,
+    // anchored contact line under the buoyant body.
+    float foot = smoothstep(.05, .45, fluid.a);
+    float heat = max(smoothstep(.09, .62, fluid.g) * .85, foot);
 
-      // Coherent low-frequency erosion travels upward with the gas. It changes
-      // the ribbon's density without cutting it into separate round sprites.
-      float materialNoise = noise21(vec2(
-        (rootDelta.x - centreX) * .07 + phase,
-        level * 6.2 - time * 1.05
-      ));
-      float broadBillow = noise21(vec2(
-        (rootDelta.x - centreX) * .032 + phase * .37,
-        level * 3.1 - time * .62
-      ));
-      float billow = .62 + materialNoise * .22 + broadBillow * .16;
-      billow *= .88 + .12 * sin(level * 17.0 - time * 2.25 + phase);
-      // The physical fluid decides where the analytic support is luminous.
-      // This removes the last solid triangular fill while keeping a coherent
-      // sub-pixel spine during the fluid's first few frames after ignition.
-      float localFluid = texture2D(uFluid, clamp(vFluidUv, vec2(.003), vec2(.997))).r;
-      float fluidModulation = mix(.2, 1.0, smoothstep(.045, .34, localFluid));
-      ribbon *= billow * fluidModulation * intensity;
+    float body = smoothstep(.07, .33, flameDensity);
+    float core = smoothstep(.2, .58, flameDensity) * heat;
+    float whiteCore = smoothstep(.46, .82, heat) *
+      smoothstep(.13, .38, flameDensity);
+    whiteCore = max(whiteCore, foot * smoothstep(.05, .2, flameDensity + fluid.a));
 
-      float neckWave = .5 + .5 * sin(level * 11.5 - time * 1.7 + phase);
-      float neck = smoothstep(.12, .82, neckWave + broadBillow * .2);
-      ribbon *= mix(.78, 1.0, neck * smoothstep(.20, .62, level));
+    float alpha = body * mix(
+      .05,
+      .8,
+      smoothstep(.1, .48, flameDensity + heat * .3)
+    );
+    alpha += whiteCore * .18;
+    if (alpha < .008) discard;
 
-      // A narrow upper shear layer occasionally peels away from the main
-      // tongue. It remains connected through the shared lower ribbon.
-      float forkGate = smoothstep(.48, .68, level) *
-        (1.0 - smoothstep(.84, .98, level));
-      float forkSide = mix(-1.0, 1.0, step(.5, hash21(vec2(phase, 8.3))));
-      float forkCentre = centreX + forkSide * halfWidth *
-        (.5 + .14 * sin(time * 1.17 + level * 6.0));
-      float forkLateral = (rootDelta.x - forkCentre) /
-        max(halfWidth * .52, .6);
-      float fork = exp(-forkLateral * forkLateral * 1.85) * forkGate;
-      fork *= (.36 + .22 * sin(time * 1.31 + phase)) * intensity;
-
-      float plume = boundedUnion(ribbon, max(fork, 0.0));
-      ribbonDensity = boundedUnion(ribbonDensity, plume);
-
-      float coreWidth = max(halfWidth * mix(.66, .38, level), .65);
-      float coreLateral = (rootDelta.x - centreX * .58) / coreWidth;
-      float core = exp(-coreLateral * coreLateral * 2.15);
-      core *= verticalGate * (1.0 - smoothstep(.45, .78, level));
-      coreDensity = boundedUnion(coreDensity, core * intensity);
-
-      float reach = (1.0 - smoothstep(
-        arcWidth * .52,
-        arcWidth * 1.12 + rise * level * .18,
-        abs(rootDelta.x - centreX)
-      )) * verticalGate * smoothstep(.01, .18, intensity);
-      rootReach = boundedUnion(rootReach, reach);
-    }
-
-    // The simulation supplies real advection and vorticity. Restricting it to
-    // the root reach prevents a diffuse orange veil from following the whole
-    // burn contour, while its texture still breaks the analytic ribbon apart.
-    float advected = smoothstep(.075, .57, fluid.r) * rootReach;
-    float advectedHeat = smoothstep(.10, .70, fluid.g) * rootReach;
-    float density = boundedUnion(ribbonDensity * .96, advected * .42);
-    density = boundedUnion(density, sourceDensity * .28);
-    float heat = boundedUnion(coreDensity, advectedHeat * .78);
-
-    float aa = max(fwidth(density) * 1.35, .0045);
-    float envelope = smoothstep(.14 - aa, .22 + aa, density);
-    float body = smoothstep(.16, .42, density);
-    float hot = smoothstep(.13, .48, heat) * smoothstep(.13, .29, density);
-    float whiteCore = smoothstep(.52, .86, heat) *
-      smoothstep(.30, .60, density);
-
-    // Alpha grows continuously toward the centre. There is no brighter or
-    // more opaque perimeter, hence no neon outline around each tongue.
-    float alpha = envelope * mix(.004, .61, body);
-    alpha += hot * .21 + whiteCore * .12;
-    if (alpha < .006) discard;
-
-    vec3 ember = vec3(.36, .018, .001);
-    vec3 orange = vec3(1.0, .22, .006);
-    vec3 yellow = vec3(1.0, .72, .045);
-    vec3 whiteHot = vec3(1.0, .975, .74);
-    vec3 color = mix(ember, orange, smoothstep(.14, .38, density));
-    color = mix(color, yellow, hot * .92);
-    color = mix(color, whiteHot, whiteCore * .88);
-    // Premultiplication prevents the low-alpha ember envelope from being
-    // interpreted by the compositor as a flat translucent red decal.
-    float finalAlpha = clamp(alpha, 0.0, .82);
+    vec3 ember = vec3(.42, .03, .002);
+    vec3 orange = vec3(1.0, .26, .01);
+    vec3 yellow = vec3(1.0, .74, .05);
+    vec3 whiteHot = vec3(1.0, .97, .78);
+    vec3 color = mix(ember, orange, smoothstep(.08, .3, flameDensity));
+    color = mix(color, yellow, core);
+    color = mix(color, whiteHot, whiteCore);
+    // Premultiplied so the dim envelope can never read as a flat decal.
+    float finalAlpha = clamp(alpha, 0.0, .9);
     gl_FragColor = vec4(color * finalAlpha, finalAlpha);
   }
 `;
@@ -275,23 +173,6 @@ interface AtmosphereSimulation {
   fluid: ReturnType<typeof createCombustionFluid>;
   bytes: Uint8Array;
   texture: THREE.DataTexture;
-}
-
-interface FlameFieldSystem {
-  geometry: THREE.PlaneGeometry;
-  material: THREE.ShaderMaterial;
-  candidates: CombustionRootTargets;
-  candidateCount: number;
-  currentUv: Float32Array;
-  currentIntensity: Float32Array;
-  currentFlow: Float32Array;
-  currentTangent: Float32Array;
-  candidateUsed: Uint8Array;
-  slotCandidate: Int8Array;
-  rootUniforms: THREE.Vector4[];
-  profileUniforms: THREE.Vector4[];
-  tangentUniforms: THREE.Vector2[];
-  profiles: FlameClusterProfile[];
 }
 
 function makeAtmosphereSimulation(
@@ -338,43 +219,12 @@ function makeSmokeMaterial(texture: THREE.DataTexture) {
   });
 }
 
-function makeFlameFieldSystem(
-  pw: number,
-  ph: number,
-  fluidTexture: THREE.DataTexture,
-): FlameFieldSystem {
-  const rootUniforms = Array.from(
-    { length: FLAME_ROOTS },
-    () => new THREE.Vector4(-100000, -100000, 0, 0),
-  );
-  const profiles = Array.from(
-    { length: FLAME_ROOTS },
-    (_, index) => flameClusterProfile(index),
-  );
-  const profileUniforms = profiles.map((profile) => new THREE.Vector4(
-    profile.arcWidth,
-    profile.rise,
-    profile.phase,
-    profile.branchBias,
-  ));
-  const tangentUniforms = Array.from(
-    { length: FLAME_ROOTS },
-    () => new THREE.Vector2(1, 0),
-  );
-  const geometry = new THREE.PlaneGeometry(
-    pw * 2 * COMBUSTION_EXTENT_X,
-    ph * COMBUSTION_EXTENT_Y,
-    1,
-    1,
-  );
-  const material = new THREE.ShaderMaterial({
+function makeFlameMaterial(texture: THREE.DataTexture) {
+  return new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
-      uFluid: { value: fluidTexture },
+      uFluid: { value: texture },
       uTexel: { value: new THREE.Vector2(1 / FLUID_WIDTH, 1 / FLUID_HEIGHT) },
-      uRoots: { value: rootUniforms },
-      uProfiles: { value: profileUniforms },
-      uTangents: { value: tangentUniforms },
     },
     vertexShader: atmosphereVertex,
     fragmentShader: flameFieldFragment,
@@ -386,174 +236,6 @@ function makeFlameFieldSystem(
     side: THREE.DoubleSide,
     toneMapped: false,
   });
-  return {
-    geometry,
-    material,
-    candidates: {
-      uv: new Float32Array(FLAME_ROOTS * 2),
-      strength: new Float32Array(FLAME_ROOTS),
-      flow: new Float32Array(FLAME_ROOTS),
-      tangent: new Float32Array(FLAME_ROOTS * 2),
-    },
-    candidateCount: 0,
-    currentUv: new Float32Array(FLAME_ROOTS * 2),
-    currentIntensity: new Float32Array(FLAME_ROOTS),
-    currentFlow: new Float32Array(FLAME_ROOTS),
-    currentTangent: new Float32Array(FLAME_ROOTS * 2),
-    candidateUsed: new Uint8Array(FLAME_ROOTS),
-    slotCandidate: new Int8Array(FLAME_ROOTS),
-    rootUniforms,
-    profileUniforms,
-    tangentUniforms,
-    profiles,
-  };
-}
-
-function assignFlameCandidates(
-  system: FlameFieldSystem,
-  fluid: ReturnType<typeof createCombustionFluid>,
-  burn: BurnField,
-) {
-  system.candidateCount = writeCombustionRoots(
-    fluid,
-    system.candidates,
-    FLAME_ROOTS,
-    burn,
-  );
-  system.candidateUsed.fill(0);
-  system.slotCandidate.fill(-1);
-
-  const maximumTrackingDistanceSquared = 18 * 18;
-  for (let slot = 0; slot < FLAME_ROOTS; slot += 1) {
-    if ((system.currentIntensity[slot] ?? 0) < .012) continue;
-    const offset = slot * 2;
-    const currentX = (system.currentUv[offset] ?? .5) * fluid.width;
-    const currentY = (system.currentUv[offset + 1] ?? .5) * fluid.height;
-    let nearest = -1;
-    let nearestDistanceSquared = maximumTrackingDistanceSquared;
-    for (let candidate = 0; candidate < system.candidateCount; candidate += 1) {
-      if ((system.candidateUsed[candidate] ?? 0) === 1) continue;
-      const candidateOffset = candidate * 2;
-      const dx = (system.candidates.uv[candidateOffset] ?? .5) * fluid.width -
-        currentX;
-      const dy = (system.candidates.uv[candidateOffset + 1] ?? .5) *
-        fluid.height - currentY;
-      const distanceSquared = dx * dx + dy * dy;
-      if (distanceSquared < nearestDistanceSquared) {
-        nearest = candidate;
-        nearestDistanceSquared = distanceSquared;
-      }
-    }
-    if (nearest < 0) continue;
-    system.slotCandidate[slot] = nearest;
-    system.candidateUsed[nearest] = 1;
-  }
-
-  for (let candidate = 0; candidate < system.candidateCount; candidate += 1) {
-    if ((system.candidateUsed[candidate] ?? 0) === 1) continue;
-    let availableSlot = -1;
-    let weakest = .012;
-    for (let slot = 0; slot < FLAME_ROOTS; slot += 1) {
-      if ((system.slotCandidate[slot] ?? -1) >= 0) continue;
-      const intensity = system.currentIntensity[slot] ?? 0;
-      if (intensity < weakest) {
-        weakest = intensity;
-        availableSlot = slot;
-      }
-    }
-    if (availableSlot < 0) continue;
-    system.slotCandidate[availableSlot] = candidate;
-    system.candidateUsed[candidate] = 1;
-  }
-}
-
-function updateFlameField(
-  system: FlameFieldSystem,
-  fluid: ReturnType<typeof createCombustionFluid>,
-  burn: BurnField,
-  pw: number,
-  ph: number,
-) {
-  assignFlameCandidates(system, fluid, burn);
-  const worldCellX = pw * 2 * COMBUSTION_EXTENT_X / fluid.width;
-  const worldCellY = ph * COMBUSTION_EXTENT_Y / fluid.height;
-
-  for (let index = 0; index < FLAME_ROOTS; index += 1) {
-    const offset = index * 2;
-    const candidate = system.slotCandidate[index] ?? -1;
-    const incoming = candidate >= 0
-      ? system.candidates.strength[candidate] ?? 0
-      : 0;
-    if (incoming > 0) {
-      const candidateOffset = candidate * 2;
-      const targetU = system.candidates.uv[candidateOffset] ?? .5;
-      const targetV = system.candidates.uv[candidateOffset + 1] ?? .5;
-      const targetTangentX = system.candidates.tangent[candidateOffset] ?? 1;
-      const targetTangentY = system.candidates.tangent[candidateOffset + 1] ?? 0;
-      if ((system.currentIntensity[index] ?? 0) < .015) {
-        system.currentUv[offset] = targetU;
-        system.currentUv[offset + 1] = targetV;
-        system.currentTangent[offset] = targetTangentX;
-        system.currentTangent[offset + 1] = targetTangentY;
-      } else {
-        system.currentUv[offset] += (targetU - system.currentUv[offset]!) * .34;
-        system.currentUv[offset + 1] +=
-          (targetV - system.currentUv[offset + 1]!) * .34;
-        system.currentTangent[offset] +=
-          (targetTangentX - system.currentTangent[offset]!) * .24;
-        system.currentTangent[offset + 1] +=
-          (targetTangentY - system.currentTangent[offset + 1]!) * .24;
-      }
-      system.currentIntensity[index] = advanceFlameEnvelope(
-        system.currentIntensity[index] ?? 0,
-        incoming,
-      );
-      system.currentFlow[index] +=
-        ((system.candidates.flow[candidate] ?? 0) - system.currentFlow[index]!) *
-        .28;
-    } else {
-      system.currentIntensity[index] = advanceFlameEnvelope(
-        system.currentIntensity[index] ?? 0,
-        0,
-      );
-      system.currentFlow[index] *= .86;
-    }
-
-    const intensity = system.currentIntensity[index] ?? 0;
-    const rootUniform = system.rootUniforms[index]!;
-    if (intensity < .008) {
-      rootUniform.set(-100000, -100000, 0, 0);
-      continue;
-    }
-
-    const u = system.currentUv[offset] ?? .5;
-    const v = system.currentUv[offset + 1] ?? .5;
-    rootUniform.set(
-      (u - .5) * pw * 2 * COMBUSTION_EXTENT_X,
-      (v - .5) * ph * COMBUSTION_EXTENT_Y,
-      intensity,
-      system.currentFlow[index] ?? 0,
-    );
-
-    // The root UV is written from the exact selected fluid cell centre, so
-    // page cut sampling and flame placement share one coordinate transform.
-
-    const rawTangentX = (system.currentTangent[offset] ?? 1) * worldCellX;
-    const rawTangentY = (system.currentTangent[offset + 1] ?? 0) * worldCellY;
-    const tangentLength = Math.hypot(rawTangentX, rawTangentY) || 1;
-    system.tangentUniforms[index]!.set(
-      rawTangentX / tangentLength,
-      rawTangentY / tangentLength,
-    );
-
-    const profile = system.profiles[index]!;
-    system.profileUniforms[index]!.set(
-      profile.arcWidth * (.84 + intensity * .16),
-      profile.rise * (.74 + intensity * .26),
-      profile.phase,
-      profile.branchBias,
-    );
-  }
 }
 
 export function IgniteAtmosphere({
@@ -563,8 +245,8 @@ export function IgniteAtmosphere({
   reducedMotion,
 }: IgniteAtmosphereProps) {
   const accumulator = useRef(0);
+  const completeSince = useRef<number | null>(null);
   const simulationRef = useRef<AtmosphereSimulation | null>(null);
-  const flameSystemRef = useRef<FlameFieldSystem | null>(null);
   const simulation = useMemo(
     () => makeAtmosphereSimulation(field.width, field.height),
     [field],
@@ -573,33 +255,41 @@ export function IgniteAtmosphere({
     () => makeSmokeMaterial(simulation.texture),
     [simulation],
   );
-  const flameSystem = useMemo(
-    () => makeFlameFieldSystem(pw, ph, simulation.texture),
-    [ph, pw, simulation.texture],
+  const flameMaterial = useMemo(
+    () => makeFlameMaterial(simulation.texture),
+    [simulation],
   );
 
   useEffect(() => {
     simulationRef.current = simulation;
-    flameSystemRef.current = flameSystem;
     accumulator.current = 0;
     return () => {
       if (simulationRef.current === simulation) simulationRef.current = null;
-      if (flameSystemRef.current === flameSystem) flameSystemRef.current = null;
       smokeMaterial.dispose();
-      flameSystem.geometry.dispose();
-      flameSystem.material.dispose();
+      flameMaterial.dispose();
       simulation.texture.dispose();
     };
-  }, [flameSystem, simulation, smokeMaterial]);
+  }, [flameMaterial, simulation, smokeMaterial]);
 
+  // R3F render loops are intentionally imperative; React never reads the
+  // uniform values mutated here.
+  // eslint-disable-next-line react-hooks/immutability
   useFrame(({ clock }, rawDelta) => {
-    const activeFlameSystem = flameSystemRef.current;
-    if (activeFlameSystem) {
-      activeFlameSystem.material.uniforms.uTime.value = clock.elapsedTime;
-    }
+    // eslint-disable-next-line react-hooks/immutability -- R3F owns uniforms.
+    flameMaterial.uniforms.uTime!.value = clock.elapsedTime;
     if (reducedMotion || !field.ignited) return;
+    // Residual smoke needs a few seconds to disperse after the last paper is
+    // consumed; once it has, the fluid holds nothing visible and stepping it
+    // every frame would only heat the main thread at the terminal ash state.
+    if (field.complete) {
+      if (completeSince.current === null) {
+        completeSince.current = clock.elapsedTime;
+      } else if (clock.elapsedTime - completeSince.current > 7) {
+        return;
+      }
+    }
     const activeSimulation = simulationRef.current;
-    if (!activeSimulation || !activeFlameSystem) return;
+    if (!activeSimulation) return;
     const advanced = advanceCombustionFluid(
       activeSimulation.fluid,
       field,
@@ -610,7 +300,6 @@ export function IgniteAtmosphere({
     if (advanced.steps === 0) return;
     writeCombustionTexture(activeSimulation.fluid, activeSimulation.bytes);
     activeSimulation.texture.needsUpdate = true;
-    updateFlameField(activeFlameSystem, activeSimulation.fluid, field, pw, ph);
   });
 
   return (
@@ -632,11 +321,19 @@ export function IgniteAtmosphere({
       </mesh>
       <mesh
         position={[0, 0, 21]}
-        geometry={flameSystem.geometry}
-        material={flameSystem.material}
         renderOrder={42}
         frustumCulled={false}
-      />
+        material={flameMaterial}
+      >
+        <planeGeometry
+          args={[
+            pw * 2 * COMBUSTION_EXTENT_X,
+            ph * COMBUSTION_EXTENT_Y,
+            1,
+            1,
+          ]}
+        />
+      </mesh>
     </group>
   );
 }

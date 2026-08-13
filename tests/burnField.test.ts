@@ -5,10 +5,11 @@ import {
   burnProgress,
   createBurnField,
   igniteBurnField,
+  measureBurnDepthRange,
   sampleResidueCell,
+  sampleSmoothBurnSurface,
   stepBurnField,
   writeBurnTexture,
-  upsampleBurnTexture,
 } from "@/ignite/burnField";
 
 function run(field: ReturnType<typeof createBurnField>, frames: number) {
@@ -124,12 +125,18 @@ describe("burn field", () => {
     });
 
     const surfacePeaks = fields.map((field) => Math.max(...field.surface));
-    expect(Math.min(...surfacePeaks)).toBeGreaterThan(0.45);
-    expect(Math.max(...surfacePeaks)).toBeLessThan(0.72);
+    // The stop-start pacing lets an instantaneous peak surge or stall around
+    // the old steady value; what this test protects is that the peaks are
+    // IDENTICAL across stack depths, asserted below.
+    expect(Math.min(...surfacePeaks)).toBeGreaterThan(0.4);
+    expect(Math.max(...surfacePeaks)).toBeLessThan(0.95);
     expect(Math.max(...surfacePeaks) - Math.min(...surfacePeaks)).toBeLessThan(
       0.001,
     );
-    expect(Math.max(...fields[2]!.burn)).toBeLessThan(0.6);
+    // A stop-start surge can push the hottest core cell somewhat deeper by
+    // this horizon; the total consumed fraction below is the real guard that
+    // stack fuel burns gradually.
+    expect(Math.max(...fields[2]!.burn)).toBeLessThan(0.9);
     expect(burnProgress(fields[2]!)).toBeLessThan(0.04);
   });
 
@@ -286,7 +293,52 @@ describe("burn field", () => {
 
     expect(field.complete).toBe(true);
     expect(progressBeforeCompletion).toBeGreaterThan(0.9999);
-    expect(maximumCellDelta).toBeLessThan(0.016);
+    // Exposed sheets under direct flame contact consume up to ~2.25x the
+    // base rate, and a stop-start surge can briefly double that. Even the
+    // combined peak eats about 6% of one layer per fixed step — a full
+    // sheet still needs over half a second, nowhere near a visible snap.
+    expect(maximumCellDelta).toBeLessThan(0.08);
+  });
+
+  it("re-ignites locally where the flame touches instead of accelerating the sheet", () => {
+    const field = createBurnField({
+      width: 96,
+      height: 64,
+      leftLayers: 2,
+      rightLayers: 2,
+      seed: 73,
+    });
+    igniteBurnField(field, 0.3, 0.5, 0.032, 0.92);
+    run(field, 90);
+
+    const cellIndex = (u: number, v: number) =>
+      Math.round(v * (field.height - 1)) * field.width +
+      Math.round(u * (field.width - 1));
+    // First second of holding: the fresh spot catches while the passed-over
+    // interior's residual glow is still dying out.
+    for (let frame = 0; frame < 36; frame += 1) {
+      igniteBurnField(field, 0.7, 0.5, 0.032, 0.92);
+      stepBurnField(field, BURN_FIXED_STEP);
+    }
+    // Second second: the interior has cooled below ignition; only real fires
+    // — the touched spot and live frontiers — keep consuming.
+    const before = field.burn.slice();
+    for (let frame = 0; frame < 36; frame += 1) {
+      igniteBurnField(field, 0.7, 0.5, 0.032, 0.92);
+      stepBurnField(field, BURN_FIXED_STEP);
+    }
+    const growthAt = (u: number, v: number) =>
+      (field.burn[cellIndex(u, v)] ?? 0) - (before[cellIndex(u, v)] ?? 0);
+
+    const touched = growthAt(0.7, 0.5);
+    const oldInterior = growthAt(0.3, 0.5);
+    const farQuiet = growthAt(0.92, 0.08);
+    // The touched spot burns as its own local fire...
+    expect(touched).toBeGreaterThan(0.12);
+    // ...while the previously burned interior has smouldered out...
+    expect(touched).toBeGreaterThan(oldInterior * 3);
+    // ...and paper away from both fires stays cold.
+    expect(farQuiet).toBeLessThan(0.02);
   });
 
   it("produces identical state through fixed-step accumulation", () => {
@@ -426,7 +478,11 @@ describe("burn field", () => {
     }
   });
 
-  it("packs an edge-preserving surface mask for sub-pixel reconstruction", () => {
+  it("packs a smooth monotone surface ramp for contour reconstruction", () => {
+    // The renderer reconstructs a sub-texel iso-contour from this channel.
+    // A raw cell step (the old edge-preserving pack) pinned that contour to
+    // simulation cell boundaries, which showed as a grid-stepped burn edge;
+    // the contract now is a smooth monotone ramp across the material front.
     const field = createBurnField({
       width: 6,
       height: 4,
@@ -443,33 +499,133 @@ describe("burn field", () => {
     writeBurnTexture(field, bytes);
 
     const row = 2;
-    const intactBoundary = bytes[(row * field.width + 2) * 4] ?? 255;
-    const openBoundary = bytes[(row * field.width + 3) * 4] ?? 0;
-    expect(intactBoundary).toBeLessThan(32);
-    expect(openBoundary).toBeGreaterThan(223);
+    const ramp = [1, 2, 3, 4].map(
+      (x) => bytes[(row * field.width + x) * 4] ?? 0,
+    );
+    // Monotone from intact to consumed with no residual hard step.
+    expect(ramp[0]).toBe(0);
+    expect(ramp[3]).toBe(255);
+    expect(ramp[1]!).toBeGreaterThan(32);
+    expect(ramp[1]!).toBeLessThan(128);
+    expect(ramp[2]!).toBeGreaterThan(128);
+    expect(ramp[2]!).toBeLessThan(224);
+    for (let step = 1; step < ramp.length; step += 1) {
+      expect(ramp[step]!).toBeGreaterThanOrEqual(ramp[step - 1]!);
+      expect(ramp[step]! - ramp[step - 1]!).toBeLessThanOrEqual(128);
+    }
   });
 
-  it("upsamples the visual mask smoothly without crossing the magazine spine", () => {
-    const source = new Uint8Array(4 * 2 * 4);
-    for (let y = 0; y < 2; y += 1) {
-      for (let x = 0; x < 4; x += 1) {
-        const offset = (y * 4 + x) * 4;
-        source[offset] = x < 2 ? x * 180 : 240;
-        source[offset + 3] = x < 2 ? 64 : 255;
+  it("reconstructs the smooth mask without crossing the magazine spine", () => {
+    const source = new Uint8Array(8 * 4 * 4);
+    for (let y = 0; y < 4; y += 1) {
+      for (let x = 0; x < 8; x += 1) {
+        const offset = (y * 8 + x) * 4;
+        source[offset] = x < 4 ? x * 60 : 240;
       }
     }
-    const target = new Uint8Array(8 * 4 * 4);
-    upsampleBurnTexture(source, 4, 2, target, 8, 4);
 
-    const leftValues = [0, 1, 2, 3].map((x) => target[(2 * 8 + x) * 4]);
-    expect(leftValues[0]).toBeLessThan(leftValues[2] ?? 0);
-    expect(leftValues[1]).toBeGreaterThan(0);
-    expect(leftValues[2]).toBeLessThan(180);
-    // The right side remains its own constant stack instead of borrowing the
-    // left edge's lower values across x=.5.
-    for (let x = 4; x < 8; x += 1) {
-      expect(target[(2 * 8 + x) * 4]).toBe(240);
-      expect(target[(2 * 8 + x) * 4 + 3]).toBe(255);
+    // The left half ramps upward smoothly.
+    const leftLow = sampleSmoothBurnSurface(source, 8, 4, 0.1, 0.5);
+    const leftHigh = sampleSmoothBurnSurface(source, 8, 4, 0.42, 0.5);
+    expect(leftLow).toBeLessThan(leftHigh);
+    expect(leftHigh).toBeLessThan(1);
+    // The right side remains its own constant plateau instead of borrowing
+    // the left edge's lower values across x=.5, even directly at the seam.
+    for (const u of [0.501, 0.55, 0.75, 0.99]) {
+      expect(sampleSmoothBurnSurface(source, 8, 4, u, 0.5)).toBeCloseTo(
+        240 / 255,
+        5,
+      );
     }
+  });
+
+  it("reconstructs a diagonal contour without simulation-cell stair steps", () => {
+    // A diagonal material front is the worst case for grid-locked masks:
+    // nearest or bilinear reconstruction leaves one visible plateau per
+    // simulation texel. The packed ramp plus Catmull-Rom upsampling must
+    // instead give iso-contour crossings that advance by a bounded, roughly
+    // even amount from row to row.
+    const width = 16;
+    const height = 16;
+    const field = createBurnField({
+      width,
+      height,
+      leftLayers: 2,
+      rightLayers: 2,
+      seed: 4,
+    });
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        // Left half only, diagonal front at 45 degrees.
+        if (x < Math.min(7, y * 0.5 + 1)) {
+          field.surface[y * width + x] = 1;
+        }
+      }
+    }
+    const bytes = new Uint8Array(width * height * 4);
+    writeBurnTexture(field, bytes);
+
+    // Scan the reconstructed field the way the fragment shader does: at a
+    // resolution four times the simulation grid, find the 0.5 iso-crossing
+    // per display row.
+    const scale = 4;
+    const crossings: number[] = [];
+    for (let row = 4; row < height * scale - 4; row += 1) {
+      const v = (row + 0.5) / (height * scale);
+      let crossing = -1;
+      for (let column = width * scale / 2 - 1; column > 0; column -= 1) {
+        const u = (column + 0.5) / (width * scale);
+        const value = sampleSmoothBurnSurface(bytes, width, height, u, v);
+        if (value >= 0.5) {
+          const next = sampleSmoothBurnSurface(
+            bytes,
+            width,
+            height,
+            (column + 1.5) / (width * scale),
+            v,
+          );
+          const mix = next === value ? 0 : (0.5 - value) / (next - value);
+          crossing = column + mix;
+          break;
+        }
+      }
+      if (crossing >= 1) crossings.push(crossing);
+    }
+
+    expect(crossings.length).toBeGreaterThan(30);
+    let maximumStep = 0;
+    for (let row = 1; row < crossings.length; row += 1) {
+      maximumStep = Math.max(
+        maximumStep,
+        Math.abs(crossings[row]! - crossings[row - 1]!),
+      );
+    }
+    // One simulation texel spans four display rows; a stair-stepped mask
+    // jumps by two or more display texels at once. The reconstructed contour
+    // must creep, never jump.
+    expect(maximumStep).toBeLessThanOrEqual(1.55);
+    const totalDrift = Math.abs(
+      crossings[crossings.length - 1]! - crossings[0]!,
+    );
+    expect(totalDrift).toBeGreaterThan(6);
+  });
+
+  it("reports per-side consumed-depth extrema for page culling", () => {
+    const field = createBurnField({
+      width: 8,
+      height: 4,
+      leftLayers: 3,
+      rightLayers: 5,
+      seed: 6,
+    });
+    field.burn.fill(0);
+    field.burn[1] = 1.5;
+    field.burn[6] = 0.75;
+
+    const range = measureBurnDepthRange(field);
+    expect(range.leftMax).toBeCloseTo(1.5, 5);
+    expect(range.leftMin).toBe(0);
+    expect(range.rightMax).toBeCloseTo(0.75, 5);
+    expect(range.rightMin).toBe(0);
   });
 });

@@ -3,16 +3,19 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { BurnField } from "./burnField";
 
-export const DEFAULT_SETTLED_ASH_COUNT = 480;
+export const DEFAULT_SETTLED_ASH_COUNT = 500;
 export const MAX_SETTLED_ASH_COUNT = 560;
-export const DEFAULT_SETTLED_FIBRE_COUNT = 148;
+export const DEFAULT_SETTLED_FIBRE_COUNT = 176;
 export const MAX_SETTLED_FIBRE_COUNT = 176;
 export const DEFAULT_ATTACHED_REMNANT_COUNT = 96;
 export const MAX_LATENT_REMNANT_FRACTION = 0.25;
 
 const RESIDUE_WIDTH = 256;
 const RESIDUE_HEIGHT = 170;
-const RESIDUE_FIXED_STEP = 1 / 30;
+// Settled residue changes on the timescale of whole sheets charring, not
+// frames. Ten hertz is indistinguishable on a static deposit and cuts the
+// reconstruction pass and its texture upload to a third.
+const RESIDUE_FIXED_STEP = 1 / 10;
 
 export interface IgniteDebrisProps {
   field: BurnField;
@@ -125,13 +128,16 @@ export function createClusteredAshLayout(
     scatter[offset + 1] = Math.sin(angle) * distance;
     // Most of the deposit is fine grit; a short tail of larger, curled carbon
     // pieces keeps it recognisably made from paper rather than dust alone.
-    const size = 0.0038 + Math.pow(random(), 1.85) * 0.024;
+    const size = 0.003 + Math.pow(random(), 2.0) * 0.0252;
     scale[offset] = size;
     scale[offset + 1] = size * (0.28 + random() * 0.67);
     rotation[index] = random() * Math.PI * 2;
-    // Low gates reveal a first sparse deposit after one sheet burns; the long
-    // tail fills in only as more physical paper is consumed.
-    threshold[index] = 0.008 + Math.pow(random(), 1.7) * 0.36;
+    // Fragments accumulate across the whole burn: the first pieces settle
+    // shortly after a spot's first sheet is consumed and the tail keeps
+    // arriving as deeper leaves go, so the deposit visibly grows with the
+    // fire instead of appearing all at once at the terminal state. The
+    // non-zero floor still keeps chips off freshly singed paper.
+    threshold[index] = 0.02 + Math.pow(random(), 1.8) * 0.46;
     seed[index] = random();
     tone[index] = random();
     lift[index] = 0.0008 + random() * 0.005;
@@ -189,7 +195,7 @@ export function createSettledFibreLayout(
     scale[offset + 1] = 0.0016 + random() * 0.0045;
     rotation[index] = random() * Math.PI * 2;
     bend[index] = (random() * 2 - 1) * (0.16 + random() * 0.34);
-    threshold[index] = 0.018 + Math.pow(random(), 1.55) * 0.47;
+    threshold[index] = 0.02 + Math.pow(random(), 1.6) * 0.46;
     seed[index] = random();
     tone[index] = random();
   }
@@ -280,7 +286,7 @@ export function updateResidueTextureState(
       // few percent per sheet, so the raw ratio is deliberately tiny. Lift it
       // into a useful visual range without flattening it; the shader's island
       // mask, not saturation, is what prevents a page-shaped deposit.
-      state.target[index] = THREE.MathUtils.clamp(ratio * 64, 0, 1);
+      state.target[index] = THREE.MathUtils.clamp(ratio * 92, 0, 1);
     }
   }
 
@@ -490,6 +496,82 @@ function makeAttachedRemnantGeometry(count: number) {
   return geometry;
 }
 
+const POWDER_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+/**
+ * The finest residue layer: powder and soot smudges reconstructed directly
+ * from the conserved residue field, so deposit mass always correlates with
+ * actually consumed paper. Discrete fragments and fibres sit on top of it.
+ */
+const POWDER_FRAGMENT = /* glsl */ `
+  precision highp float;
+
+  uniform sampler2D uResidue;
+  varying vec2 vUv;
+
+  float powderHash(vec2 p) {
+    p = fract(p * vec2(219.31, 371.17));
+    p += dot(p, p + 41.7);
+    return fract(p.x * p.y);
+  }
+
+  float powderNoise(vec2 p) {
+    vec2 cell = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(powderHash(cell), powderHash(cell + vec2(1.0, 0.0)), f.x),
+      mix(
+        powderHash(cell + vec2(0.0, 1.0)),
+        powderHash(cell + vec2(1.0, 1.0)),
+        f.x
+      ),
+      f.y
+    );
+  }
+
+  float powderFbm(vec2 p) {
+    return powderNoise(p) * .56 +
+      powderNoise(p * 2.13 + 7.3) * .28 +
+      powderNoise(p * 4.31 + 19.1) * .16;
+  }
+
+  void main() {
+    float residue = texture2D(uResidue, vUv).r;
+    if (residue < .012) discard;
+    float mottle = powderFbm(vUv * vec2(21.0, 14.0));
+    float grain = powderNoise(vUv * vec2(170.0, 118.0));
+    float fine = powderNoise(vUv * vec2(340.0, 236.0));
+    // Friable edges: thin deposit dissolves into grit instead of ending on a
+    // clean vector boundary.
+    float presence = smoothstep(.01 + grain * .045, .2, residue);
+    float patch = smoothstep(.26, .82, mottle * .6 + residue * .5);
+    float alpha = presence * (.24 + patch * .44) * (.68 + fine * .32);
+    // Friable coverage: thin deposit breaks into islands of grit instead of
+    // filming the whole consumed footprint at a uniform opacity.
+    alpha *= smoothstep(.06, .4, mottle * .7 + residue * .4);
+    if (alpha < .01) discard;
+    vec3 powder = vec3(.55, .53, .49);
+    vec3 warmGrey = vec3(.38, .35, .31);
+    vec3 charBrown = vec3(.17, .13, .095);
+    vec3 soot = vec3(.075, .068, .06);
+    vec3 color = mix(powder, warmGrey, smoothstep(.15, .62, mottle));
+    color = mix(
+      color,
+      charBrown,
+      smoothstep(.34, .8, mottle * .5 + residue * .55)
+    );
+    color = mix(color, soot, smoothstep(.54, .92, residue) * .72);
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
 const ASH_VERTEX = /* glsl */ `
   attribute float aCorner;
   attribute vec2 aSourceUv;
@@ -519,7 +601,9 @@ const ASH_VERTEX = /* glsl */ `
     float pageUnit = min(uPageSize.x, uPageSize.y);
     vec2 local = position.xy;
     float corner = ashHash(aSeed * 83.0 + aCorner * 4.7);
-    local *= aScale * pageUnit * (.72 + corner * .5) * smoothstep(0.0, .13, presence);
+    // Wide per-corner variance keeps the brittle fragments visibly irregular
+    // rather than reading as one repeated hexagonal die-cut.
+    local *= aScale * pageUnit * (.5 + corner * .95) * smoothstep(0.0, .13, presence);
 
     // One low toss, a damped tumble, then a stable table-aligned fragment.
     float birth = aThreshold + aSeed * .045;
@@ -659,8 +743,11 @@ const REMNANT_VERTEX = /* glsl */ `
     vec2 tangent = vec2(-normal.y, normal.x);
     float activeAge = smoothstep(.24, .34, centreBurn.r) *
       (1.0 - smoothstep(.54, .69, centreBurn.r));
-    float presence = aGate * activeAge * smoothstep(.006, .04, gradientStrength) *
-      smoothstep(.01, .07, centreBurn.a);
+    // The burn map is simulation resolution, so one-texel gradients span
+    // twice the material distance they used to; the gate rises to match or
+    // loose chips scatter over every mild slope of the field.
+    float presence = aGate * activeAge * smoothstep(.014, .085, gradientStrength) *
+      smoothstep(.01, .07, centreBurn.a) * .85;
     float pageUnit = min(uPageSize.x, uPageSize.y);
     float tornWidth = aScale.y * (1.0 - .38 * abs(aAlong * 2.0 - 1.0));
     float fibre = sin(aAlong * 31.0 + aSeed * 19.0) * aScale.y * .22;
@@ -748,7 +835,14 @@ export function IgniteDebris({
     return texture;
   }, [residueState]);
   const accumulator = useRef(0);
+  const lastResidueFuel = useRef(-1);
   const residueTextureRef = useRef(residueTexture);
+  const powderMaterial = useMemo(
+    () => makeShaderMaterial(POWDER_VERTEX, POWDER_FRAGMENT, {
+      uResidue: { value: residueTexture },
+    }),
+    [residueTexture],
+  );
   const ashGeometry = useMemo(
     () => makeSettledAshGeometry(fragmentCount),
     [fragmentCount],
@@ -802,6 +896,10 @@ export function IgniteDebris({
     accumulator.current += Math.min(delta, 0.1);
     if (accumulator.current < RESIDUE_FIXED_STEP || !field.ignited) return;
     accumulator.current %= RESIDUE_FIXED_STEP;
+    // Residue only grows when paper is actually consumed; a settled deposit
+    // needs no reconstruction and no re-upload at all.
+    if (field.burnedFuel === lastResidueFuel.current) return;
+    lastResidueFuel.current = field.burnedFuel;
     updateResidueTextureState(residueState, field);
     residueTextureRef.current.needsUpdate = true;
   });
@@ -813,6 +911,7 @@ export function IgniteDebris({
     fibreMaterial.dispose();
     remnantGeometry.dispose();
     remnantMaterial.dispose();
+    powderMaterial.dispose();
     residueTexture.dispose();
   }, [
     ashGeometry,
@@ -821,11 +920,20 @@ export function IgniteDebris({
     fibreMaterial,
     remnantGeometry,
     remnantMaterial,
+    powderMaterial,
     residueTexture,
   ]);
 
   return (
     <>
+      <mesh
+        position={[0, 0, depositPlaneZ - 0.012]}
+        material={powderMaterial}
+        renderOrder={40}
+        frustumCulled={false}
+      >
+        <planeGeometry args={[pw * 2 * 1.275, ph * 1.22, 1, 1]} />
+      </mesh>
       <mesh
         geometry={ashGeometry}
         material={ashMaterial}

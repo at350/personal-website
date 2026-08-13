@@ -124,64 +124,121 @@ const FRAGMENT_SHADER = /* glsl */ `
       crossFlow * 5.2 - broadFlow * 2.4
     ) * (.38 + .62 * warpRamp);
 
-    float lagLean = -motion.x * (4.0 + 9.0 * speed);
-    float slowSway = sin(time * 1.83) * 2.4;
-    float middleSway = sin(time * 2.57 + 1.4) * 3.4;
-    float tipSway = sin(time * 3.31 + .3) * 4.8;
+    // A carried flame leans over: its spine curves away from the motion,
+    // pivoting at the root, with the angle growing toward the tip. This is a
+    // height-progressive ROTATION of the sampling frame — the flame keeps
+    // its proportions and simply lies over, where a linear shear read as the
+    // same flame being stretched sideways.
+    float leanAngle = clamp(motion.x * (.55 + speed * .5), -1.05, 1.05);
+    float leanRamp = smoothstep(0.0, 70.0, local.y - bodyOrigin.y + 12.0);
+    float appliedLean = -leanAngle * leanRamp;
+    float leanSin = sin(appliedLean);
+    float leanCos = cos(appliedLean);
+    vec2 leanRel = warped - bodyOrigin;
+    warped = bodyOrigin + vec2(
+      leanRel.x * leanCos - leanRel.y * leanSin,
+      leanRel.x * leanSin + leanRel.y * leanCos
+    );
+
+    // Kept small: the height-progressive lean carries the main response and
+    // this residual offset only staggers the lobes slightly.
+    float lagLean = -motion.x * (2.5 + 5.0 * speed);
+    float slowSway = sin(time * 1.83) * 2.9;
+    float middleSway = sin(time * 2.57 + 1.4) * 4.1;
+    float tipSway = sin(time * 3.31 + .3) * 5.6;
     float forkSide = mix(
       -1.0,
       1.0,
       smoothstep(-.32, .32, sin(time * .51 + 2.1))
     );
 
-    // A flame is modeled as a scalar density carried by several overlapping
-    // buoyant pockets. Similar lower and middle widths produce a rounded,
-    // breathing plume instead of the straight sides of a geometric cone.
+    // Two counter-rotating vortices roll up the flanks of the plume. They
+    // warp the sampling domain only, so the body billows and folds over
+    // instead of gaining any extra drawn outline.
+    vec2 vortexA = bodyOrigin + vec2(
+      sin(time * 1.31) * 8.0 - 10.0,
+      30.0 + sin(time * .77) * 7.0
+    );
+    vec2 vortexB = bodyOrigin + vec2(
+      sin(time * 1.09 + 2.1) * 8.0 + 10.0,
+      50.0 + sin(time * .91 + .8) * 8.0
+    );
+    vec2 vortexDeltaA = warped - vortexA;
+    vec2 vortexDeltaB = warped - vortexB;
+    float swirlA = exp(-dot(vortexDeltaA, vortexDeltaA) / 780.0);
+    float swirlB = exp(-dot(vortexDeltaB, vortexDeltaB) / 980.0);
+    warped += vec2(-vortexDeltaA.y, vortexDeltaA.x) * swirlA *
+      (.15 + .05 * sin(time * 2.3));
+    warped += vec2(vortexDeltaB.y, -vortexDeltaB.x) * swirlB *
+      (.13 + .05 * sin(time * 1.9 + 1.2));
+
+    // A torch burns fuel-rich: the base is broad, the middle stays wide and
+    // turbulent, and only the last third narrows. Occasional shed pockets
+    // leave through the crown as the feed pulses.
+    float crownGate = .6 + .4 * flameNoise(vec2(time * 1.7, 11.1));
+    vec2 baseCenter = bodyOrigin + vec2(
+      slowSway * .6 - 1.6,
+      8.0 * stretch
+    );
     vec2 lowerCenter = bodyOrigin + vec2(
-      slowSway - 2.8,
-      13.0 * stretch
+      slowSway - 2.6,
+      22.0 * stretch
     );
     vec2 bellyCenter = bodyOrigin + vec2(
-      middleSway + 2.4 + lagLean * .22,
-      31.0 * stretch
+      middleSway + 2.6 + lagLean * .3,
+      40.0 * stretch
     );
     vec2 crownCenter = bodyOrigin + vec2(
-      tipSway + lagLean * .52,
-      49.0 * stretch
-    );
-    vec2 upperCenter = bodyOrigin + vec2(
-      middleSway * .6 + tipSway * .55 + lagLean * .82,
-      65.0 * stretch
-    );
-    vec2 forkCenter = bodyOrigin + vec2(
-      forkSide * (9.0 + speed * 4.0) + slowSway + lagLean * .66,
+      tipSway + lagLean * .72,
       58.0 * stretch
     );
+    vec2 upperCenter = bodyOrigin + vec2(
+      middleSway * .6 + tipSway * .6 + lagLean * 1.1,
+      74.0 * stretch
+    );
+    vec2 forkCenter = bodyOrigin + vec2(
+      forkSide * (11.0 + speed * 5.0) + slowSway + lagLean * .8,
+      52.0 * stretch
+    );
+    vec2 secondForkCenter = bodyOrigin + vec2(
+      -forkSide * (8.0 + speed * 4.0) + middleSway + lagLean * .95,
+      66.0 * stretch
+    );
 
+    float base = flameBlob(
+      warped,
+      baseCenter,
+      vec2(24.0 * compression, 14.5 * stretch)
+    );
     float lower = flameBlob(
       warped,
       lowerCenter,
-      vec2(19.5 * compression, 17.5 * stretch)
+      vec2(26.0 * compression, 19.0 * stretch)
     );
     float belly = flameBlob(
       warped,
       bellyCenter,
-      vec2(21.0 * compression, 20.5 * stretch)
+      vec2(23.5 * compression, 21.0 * stretch)
     );
     float crown = flameBlob(
       warped,
       crownCenter,
-      vec2(15.8 * compression, 18.5 * stretch)
+      vec2(17.5 * compression, 19.0 * stretch)
     );
     float upper = flameBlob(
       warped,
       upperCenter,
-      vec2(9.4 * compression, 15.5 * stretch)
+      vec2(12.0 * compression, 16.0 * stretch)
     );
     float fork = flameBlob(
       warped,
       forkCenter,
-      vec2(6.4 * compression, 11.5 * stretch)
+      vec2(8.0 * compression, 12.5 * stretch)
+    );
+    float secondFork = flameBlob(
+      warped,
+      secondForkCenter,
+      vec2(6.5 * compression, 10.5 * stretch)
     );
 
     float coarseTexture = flameFbm(vec2(
@@ -193,17 +250,19 @@ const FRAGMENT_SHADER = /* glsl */ `
       warped.y * .074 - time * 1.66
     ));
     float densityTexture = clamp(
-      .58 + coarseTexture * .50 + (fineTexture - .5) * .22,
-      .47,
-      1.19
+      .52 + coarseTexture * .58 + (fineTexture - .5) * .30,
+      .40,
+      1.24
     );
 
     float plumeDensity = (
-      lower * .78 +
-      belly * .86 +
-      crown * .72 +
-      upper * .52 +
-      fork * .34
+      base * .68 +
+      lower * .8 +
+      belly * .84 +
+      crown * .7 * (.75 + .25 * crownGate) +
+      upper * .5 * crownGate +
+      fork * .36 +
+      secondFork * .26 * crownGate
     ) * densityTexture;
 
     // Residual hot gas fills the old body side of the motion path. Its radius
@@ -261,27 +320,37 @@ const FRAGMENT_SHADER = /* glsl */ `
     float envelope = smoothstep(.115, .285, density);
     float depth = smoothstep(.25, .82, density);
 
+    // The hot core flickers: combustion is never steady in a fuel-rich fire,
+    // so the white centre brightens and dims a few times a second while the
+    // orange body persists.
+    float hotFlicker = .74 + .26 * flameNoise(vec2(time * 2.9, 3.7));
+    float hotBase = flameBlob(
+      warped,
+      baseCenter + vec2(-.6, 1.5),
+      vec2(11.0 * compression, 10.0 * stretch)
+    );
     float hotLower = flameBlob(
       warped,
       lowerCenter + vec2(-1.0, 1.0),
-      vec2(8.1 * compression, 12.2 * stretch)
+      vec2(10.5 * compression, 14.0 * stretch)
     );
     float hotBelly = flameBlob(
       warped,
       bellyCenter + vec2(-1.5, -1.0),
-      vec2(8.4 * compression, 14.8 * stretch)
+      vec2(9.5 * compression, 15.5 * stretch)
     );
     float hotCrown = flameBlob(
       warped,
       crownCenter,
-      vec2(4.3 * compression, 8.4 * stretch)
+      vec2(5.0 * compression, 9.0 * stretch)
     );
     float heat = clamp(
       (
-        hotLower * .76 +
-        hotBelly * .63 +
-        hotCrown * .30
-      ) * rootPlane + contact * .14,
+        hotBase * .5 +
+        hotLower * .78 +
+        hotBelly * .64 +
+        hotCrown * .32
+      ) * rootPlane * hotFlicker + contact * .14,
       0.0,
       1.0
     );
@@ -328,6 +397,11 @@ const FRAGMENT_SHADER = /* glsl */ `
     vec2 smokeWarped = local + vec2(
       broadFlow * 8.0,
       crossFlow * 4.0
+    );
+    vec2 smokeLeanRel = smokeWarped - bodyOrigin;
+    smokeWarped = bodyOrigin + vec2(
+      smokeLeanRel.x * leanCos - smokeLeanRel.y * leanSin,
+      smokeLeanRel.x * leanSin + smokeLeanRel.y * leanCos
     );
     vec2 smokeA = upperCenter + vec2(
       sin(time * .79) * 4.0 - motion.x * 5.0,
@@ -404,12 +478,18 @@ export function IgniteCursor() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    // Screenshot-driven QA needs the drawing buffer to survive compositing
+    // and rendering to continue in a headless pane that always reports
+    // document.hidden; real visitors keep the cheaper discarding swap and the
+    // battery-saving hidden-tab pause.
+    const qaMode = typeof window !== "undefined" &&
+      /[?&]igniteqa\b/.test(window.location.search);
     const context = canvas?.getContext("webgl", {
       alpha: true,
       antialias: false,
       depth: false,
       premultipliedAlpha: true,
-      preserveDrawingBuffer: false,
+      preserveDrawingBuffer: qaMode,
       stencil: false,
     });
     if (!canvas || !context) return;
@@ -487,7 +567,10 @@ export function IgniteCursor() {
     let dpr = 1;
 
     const resize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // Soft gas needs no retina sampling; capping the ratio at 1.5 cuts the
+      // full-screen flame pass fill cost by around forty percent on 2x
+      // displays with no visible difference in the blurred density field.
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
       canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
       canvas.style.width = `${window.innerWidth}px`;
@@ -527,8 +610,8 @@ export function IgniteCursor() {
       let bodyOffsetX = plumeBody.x - cursorX;
       let bodyOffsetY = cursorY - plumeBody.y;
       const bodyOffsetLength = Math.hypot(bodyOffsetX, bodyOffsetY);
-      if (bodyOffsetLength > 22) {
-        const scale = 22 / bodyOffsetLength;
+      if (bodyOffsetLength > 30) {
+        const scale = 30 / bodyOffsetLength;
         bodyOffsetX *= scale;
         bodyOffsetY *= scale;
       }
@@ -585,7 +668,7 @@ export function IgniteCursor() {
 
     const frame = (now: number) => {
       frameId = 0;
-      if (document.hidden) return;
+      if (document.hidden && !qaMode) return;
 
       const delta = Math.min(
         previousFrameTime ? (now - previousFrameTime) / 1000 : 1 / 60,
@@ -617,7 +700,7 @@ export function IgniteCursor() {
     };
 
     const wake = () => {
-      if (frameId || document.hidden) return;
+      if (frameId || (document.hidden && !qaMode)) return;
       previousFrameTime = 0;
       frameId = window.requestAnimationFrame(frame);
     };
@@ -703,7 +786,7 @@ export function IgniteCursor() {
     };
 
     const onVisibilityChange = () => {
-      if (document.hidden) {
+      if (document.hidden && !qaMode) {
         if (frameId) window.cancelAnimationFrame(frameId);
         frameId = 0;
       } else if (visible) {
