@@ -496,82 +496,6 @@ function makeAttachedRemnantGeometry(count: number) {
   return geometry;
 }
 
-const POWDER_VERTEX = /* glsl */ `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-/**
- * The finest residue layer: powder and soot smudges reconstructed directly
- * from the conserved residue field, so deposit mass always correlates with
- * actually consumed paper. Discrete fragments and fibres sit on top of it.
- */
-const POWDER_FRAGMENT = /* glsl */ `
-  precision highp float;
-
-  uniform sampler2D uResidue;
-  varying vec2 vUv;
-
-  float powderHash(vec2 p) {
-    p = fract(p * vec2(219.31, 371.17));
-    p += dot(p, p + 41.7);
-    return fract(p.x * p.y);
-  }
-
-  float powderNoise(vec2 p) {
-    vec2 cell = floor(p);
-    vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(
-      mix(powderHash(cell), powderHash(cell + vec2(1.0, 0.0)), f.x),
-      mix(
-        powderHash(cell + vec2(0.0, 1.0)),
-        powderHash(cell + vec2(1.0, 1.0)),
-        f.x
-      ),
-      f.y
-    );
-  }
-
-  float powderFbm(vec2 p) {
-    return powderNoise(p) * .56 +
-      powderNoise(p * 2.13 + 7.3) * .28 +
-      powderNoise(p * 4.31 + 19.1) * .16;
-  }
-
-  void main() {
-    float residue = texture2D(uResidue, vUv).r;
-    if (residue < .012) discard;
-    float mottle = powderFbm(vUv * vec2(21.0, 14.0));
-    float grain = powderNoise(vUv * vec2(170.0, 118.0));
-    float fine = powderNoise(vUv * vec2(340.0, 236.0));
-    // Friable edges: thin deposit dissolves into grit instead of ending on a
-    // clean vector boundary.
-    float presence = smoothstep(.01 + grain * .045, .2, residue);
-    float patchMask = smoothstep(.26, .82, mottle * .6 + residue * .5);
-    float alpha = presence * (.24 + patchMask * .44) * (.68 + fine * .32);
-    // Friable coverage: thin deposit breaks into islands of grit instead of
-    // filming the whole consumed footprint at a uniform opacity.
-    alpha *= smoothstep(.06, .4, mottle * .7 + residue * .4);
-    if (alpha < .01) discard;
-    vec3 powder = vec3(.55, .53, .49);
-    vec3 warmGrey = vec3(.38, .35, .31);
-    vec3 charBrown = vec3(.17, .13, .095);
-    vec3 soot = vec3(.075, .068, .06);
-    vec3 color = mix(powder, warmGrey, smoothstep(.15, .62, mottle));
-    color = mix(
-      color,
-      charBrown,
-      smoothstep(.34, .8, mottle * .5 + residue * .55)
-    );
-    color = mix(color, soot, smoothstep(.54, .92, residue) * .72);
-    gl_FragColor = vec4(color, alpha);
-  }
-`;
-
 const ASH_VERTEX = /* glsl */ `
   attribute float aCorner;
   attribute vec2 aSourceUv;
@@ -837,12 +761,6 @@ export function IgniteDebris({
   const accumulator = useRef(0);
   const lastResidueFuel = useRef(-1);
   const residueTextureRef = useRef(residueTexture);
-  const powderMaterial = useMemo(
-    () => makeShaderMaterial(POWDER_VERTEX, POWDER_FRAGMENT, {
-      uResidue: { value: residueTexture },
-    }),
-    [residueTexture],
-  );
   const ashGeometry = useMemo(
     () => makeSettledAshGeometry(fragmentCount),
     [fragmentCount],
@@ -911,7 +829,6 @@ export function IgniteDebris({
     fibreMaterial.dispose();
     remnantGeometry.dispose();
     remnantMaterial.dispose();
-    powderMaterial.dispose();
     residueTexture.dispose();
   }, [
     ashGeometry,
@@ -920,20 +837,11 @@ export function IgniteDebris({
     fibreMaterial,
     remnantGeometry,
     remnantMaterial,
-    powderMaterial,
     residueTexture,
   ]);
 
   return (
     <>
-      <mesh
-        position={[0, 0, depositPlaneZ - 0.012]}
-        material={powderMaterial}
-        renderOrder={40}
-        frustumCulled={false}
-      >
-        <planeGeometry args={[pw * 2 * 1.275, ph * 1.22, 1, 1]} />
-      </mesh>
       <mesh
         geometry={ashGeometry}
         material={ashMaterial}
