@@ -551,8 +551,8 @@ const POWDER_FRAGMENT = /* glsl */ `
     // Friable edges: thin deposit dissolves into grit instead of ending on a
     // clean vector boundary.
     float presence = smoothstep(.01 + grain * .045, .2, residue);
-    float patch = smoothstep(.26, .82, mottle * .6 + residue * .5);
-    float alpha = presence * (.24 + patch * .44) * (.68 + fine * .32);
+    float patchMask = smoothstep(.26, .82, mottle * .6 + residue * .5);
+    float alpha = presence * (.24 + patchMask * .44) * (.68 + fine * .32);
     // Friable coverage: thin deposit breaks into islands of grit instead of
     // filming the whole consumed footprint at a uniform opacity.
     alpha *= smoothstep(.06, .4, mottle * .7 + residue * .4);
