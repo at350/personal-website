@@ -4,7 +4,12 @@ import { MemoryRouter } from "react-router";
 
 const mocks = vi.hoisted(() => {
   const splitRevert = vi.fn();
-  const splitText = vi.fn(function SplitTextMock() {
+  const splitText = vi.fn(function SplitTextMock(
+    _target?: unknown,
+    _options?: Record<string, unknown>,
+  ) {
+    void _target;
+    void _options;
     return { chars: ["A"], revert: splitRevert };
   });
   const kill = vi.fn();
@@ -57,14 +62,18 @@ describe("cover motion parity", () => {
   });
 
   it("restores reader-mode masthead markup when its entrance finishes", () => {
-    const { unmount } = render(
+    const { container, unmount } = render(
       <MemoryRouter>
         <Cover face="recto" mode="reader" />
       </MemoryRouter>,
     );
 
     expect(mocks.splitText).toHaveBeenCalledOnce();
+    expect(mocks.splitText.mock.calls[0]?.[1]).toMatchObject({
+      ignore: ".editorial-terminal",
+    });
     expect(mocks.from).toHaveBeenCalledTimes(2);
+    expect(container.querySelectorAll("[data-editorial-terminal]")).toHaveLength(1);
     const mastheadOptions = mocks.from.mock.calls[0]?.[1] as
       | { clearProps?: string; onComplete?: () => void }
       | undefined;
@@ -72,6 +81,7 @@ describe("cover motion parity", () => {
 
     mastheadOptions?.onComplete?.();
     expect(mocks.splitRevert).toHaveBeenCalledOnce();
+    expect(container.querySelectorAll("[data-editorial-terminal]")).toHaveLength(1);
 
     unmount();
     expect(mocks.splitRevert).toHaveBeenCalledOnce();

@@ -1,0 +1,16 @@
+/* One optical specification for the issue-tab terminal at every scale.
+   `cap` keys the asset to Tanker's visible cap height, not its em box. */
+.editorial-terminal {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 0.32em;
+  width: 0.44cap;
+  height: 0.145em;
+  height: 0.2cap;
+  margin-inline-start: 0.11em;
+  margin-inline-start: 0.15cap;
+  vertical-align: baseline;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}

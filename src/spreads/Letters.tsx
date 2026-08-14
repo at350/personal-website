@@ -16,7 +16,7 @@ const COLOPHON_ENTRIES: ReadonlyArray<{ term: string; desc: ReactNode }> = [
   },
   {
     term: "Paper",
-    desc: <>White #FFFFFF. Ink #0E0E0C. One red: #E8351A.</>,
+    desc: <>White #FFFFFF. Ink #0E0E0C. One red: #D7261E.</>,
   },
   {
     term: "Press",

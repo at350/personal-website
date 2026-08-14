@@ -5,6 +5,7 @@ import { SplitText } from "gsap/SplitText";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
 import { withBasePath } from "@/lib/basePath";
 import { Barcode } from "@/components/furniture/Barcode";
+import { EditorialTerminal } from "@/components/brand/EditorialTerminal";
 import { motionOK } from "@/lib/motion";
 import "@/styles/spreads/cover.css";
 
@@ -16,8 +17,8 @@ const COVER_LINES = [
   { page: "12", text: "the annotated resume", href: "/resume" },
 ] as const;
 
-/* The masthead is the artwork: the name in Tanker, full measure, with the
-   counter of the final A printed red — the mark the rest of the site reuses. */
+/* The masthead is the artwork: the name in Tanker, full measure, signed with
+   the same editorial terminal the rest of the site reuses. */
 export function Cover({ face, mode }: SpreadFaceProps) {
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -27,7 +28,10 @@ export function Cover({ face, mode }: SpreadFaceProps) {
     // raster handoff to match.
     if (mode === "book" || !motionOK() || !rootRef.current) return;
     const lines = rootRef.current.querySelectorAll(".cover2__word");
-    const split = new SplitText(lines, { type: "chars" });
+    const split = new SplitText(lines, {
+      type: "chars",
+      ignore: ".editorial-terminal",
+    });
     let splitReverted = false;
     const revertSplit = () => {
       if (splitReverted) return;
@@ -75,7 +79,7 @@ export function Cover({ face, mode }: SpreadFaceProps) {
         </span>
         <span className="cover2__word-mask">
           <span className="cover2__word">
-            T<span className="cover2__a">A</span>I
+            TAI<EditorialTerminal />
           </span>
         </span>
       </h1>
@@ -114,7 +118,7 @@ export function BackCover({ face, mode }: SpreadFaceProps) {
   return (
     <div className="back2">
       <p className="back2__mark" aria-hidden>
-        T<span className="back2__a">A</span>I
+        TAI<EditorialTerminal />
       </p>
       <p className="back2__issue mono-label">NO. 01 / 2026</p>
       <div className="back2__barcode">
