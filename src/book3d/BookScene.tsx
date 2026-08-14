@@ -348,14 +348,31 @@ function Stack({
   const geo = useMemo(() => new THREE.BoxGeometry(pw, ph, 1), [pw, ph]);
   const rimGeo = useMemo(() => new THREE.EdgesGeometry(geo, 24), [geo]);
 
-  useFrame((_, dt) => {
+  const shownCount = useRef(0);
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 1 / 30);
     const m = mesh.current;
     if (!m) return;
     const thickness = Math.max(count * LEAF_THICKNESS, 0.001);
     const targetScale = thickness;
-    m.scale.z = THREE.MathUtils.damp(m.scale.z, targetScale, 12, dt);
+    if (shownCount.current === 0 && count > 0) {
+      // A boundary flip reveals a stack that was hidden at near-zero
+      // thickness. Landing on that degenerate box while it grows is the gray
+      // flash on the freshly revealed page — the page must arrive at full
+      // thickness, already in its resting state. The damp below remains for
+      // thickness changes while the stack is on screen.
+      m.scale.z = targetScale;
+    } else {
+      m.scale.z = THREE.MathUtils.damp(m.scale.z, targetScale, 12, dt);
+    }
+    shownCount.current = count;
     m.position.z = -m.scale.z / 2;
     m.position.x = side === "left" ? -pw / 2 : pw / 2;
+    // The moving-paper accent must never leak onto a resting stack: whatever
+    // this material's shared program rendered last frame, a stack face is
+    // canonical pixels, always.
+    setPaperMaterialActivity(topMat, 0);
     const outline = rim.current;
     if (outline) {
       outline.position.copy(m.position);

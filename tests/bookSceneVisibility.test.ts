@@ -23,6 +23,19 @@ describe("BookScene stack visibility handoff", () => {
   });
 });
 
+describe("BookScene stack reveal", () => {
+  it("arrives at full thickness the frame a hidden stack is revealed", () => {
+    // A boundary flip reveals a stack that sat hidden at near-zero scale.
+    // Landing on that degenerate, still-growing box is the brief gray flash
+    // on the freshly revealed page: the reveal must snap to the resting
+    // state, with the damp reserved for on-screen thickness changes.
+    expect(stackSource).toMatch(
+      /shownCount\.current === 0 && count > 0[\s\S]*?m\.scale\.z = targetScale;/,
+    );
+    expect(stackSource).toContain("setPaperMaterialActivity(topMat, 0)");
+  });
+});
+
 describe("BookScene scene graph derives from committed state", () => {
   // The motion object is a mutable mirror written by an effect AFTER each
   // commit. A render that reads it can catch it mid-update: the leaf unmounts
