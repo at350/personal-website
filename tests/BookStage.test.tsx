@@ -138,9 +138,16 @@ describe("BookStage page-turn input", () => {
       screen.getByRole<HTMLButtonElement>("button", { name: "Contents" })
         .disabled,
     ).toBe(true);
-    expect(screen.getAllByRole("status")[0]?.textContent).toContain(
+    expect(screen.getByRole("status").textContent).toContain(
       "Flattening the paper",
     );
+    expect(
+      screen.getByRole("progressbar", { name: "Ignite progress" }).getAttribute(
+        "aria-valuenow",
+      ),
+    ).toBe("0");
+    expect(screen.queryByText("Ignite / armed")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
   });
 
   it("keeps the cover foil pointer live while the chassis pose is locked", () => {
