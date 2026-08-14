@@ -8,6 +8,18 @@
   pointer-events: none;
 }
 
+/* Canvas UI Blaze fire, behind the magazine: the fire sits at z 0 and the
+   ignite stage rises to z 1 with a transparent background, so the burning
+   book (WebGL canvas) occludes the fire while it reads through everywhere
+   the scene leaves unpainted. A negative z-index would not work — the body
+   background paints over it. */
+.ignite-blaze {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
 html.ignite-hides-cursor .bstage,
 html.ignite-hides-cursor .bstage canvas,
 html.ignite-hides-cursor .bstage__spread {
@@ -31,7 +43,10 @@ html.ignite-active .cursor-orb {
 }
 
 .bstage.bstage--ignite {
-  background: var(--void);
+  /* Transparent, and lifted above the fixed .ignite-blaze (z 0) so the fire
+     reads through from behind while the body keeps painting --void under it. */
+  background: transparent;
+  z-index: 1;
   touch-action: none;
 }
 
@@ -153,7 +168,8 @@ html.ignite-active .cursor-orb {
 }
 
 @media print {
-  .ignite-cursor {
+  .ignite-cursor,
+  .ignite-blaze {
     display: none;
   }
 }
