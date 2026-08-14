@@ -994,6 +994,16 @@ export function BookStage({
       : "END";
 
   const shift = restingShift;
+  const igniteConsumed = Math.max(1, Math.round(igniteProgress * 100));
+  const igniteStatus = !igniteReady
+    ? "Flattening the paper…"
+    : igniteComplete
+      ? "Only ash remains."
+      : igniteStarted
+        ? igniteProgress < 0.01
+          ? "The paper has caught. The flame is spreading."
+          : `${igniteConsumed}% consumed`
+        : "Move the flame across the paper. Hold to burn deeper.";
 
   return (
     <div
@@ -1048,29 +1058,28 @@ export function BookStage({
         <aside
           className={`ignite-hud${igniteStarted ? " is-burning" : ""}${igniteComplete ? " is-complete" : ""}`}
         >
-          <span className="ignite-hud__eyebrow mono-label">Ignite / armed</span>
-          <p className="ignite-hud__message" role="status" aria-live="polite">
-            {!igniteReady
-              ? "Flattening the paper…"
-              : igniteComplete
-                ? "Only ash remains."
-                : igniteStarted
-                  ? igniteProgress < 0.01
-                    ? "The paper has caught. The flame is spreading."
-                    : `${Math.max(1, Math.round(igniteProgress * 100))}% consumed`
-                  : "Move the flame across the paper. Hold to burn deeper."}
+          <div className="ignite-hud__surface" aria-hidden="true" />
+          <p className="visually-hidden" role="status" aria-live="polite">
+            {igniteStatus}
           </p>
-          <span className="ignite-hud__track" aria-hidden="true">
+          <span
+            className="ignite-hud__track"
+            role="progressbar"
+            aria-label="Ignite progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(igniteProgress * 100)}
+          >
             <span style={{ transform: `scaleX(${igniteProgress})` }} />
           </span>
           {igniteComplete ? (
-            <button
-              type="button"
-              className="ignite-hud__reset mono-label"
-              onClick={resetIgnite}
-            >
-              restore issue
+            <button type="button" className="ignite-hud__reset" onClick={resetIgnite}>
+              Restore
             </button>
+          ) : igniteStarted ? (
+            <span className="ignite-hud__percent" aria-hidden="true">
+              {igniteConsumed}%
+            </span>
           ) : null}
         </aside>
       ) : null}

@@ -49,23 +49,79 @@ html.ignite-active .cursor-orb {
 
 .ignite-hud {
   position: absolute;
-  right: max(clamp(18px, 3vw, 42px), calc(env(safe-area-inset-right) + 12px));
-  bottom: max(clamp(18px, 3vh, 34px), calc(env(safe-area-inset-bottom) + 12px));
+  right: max(clamp(14px, 2.1vw, 30px), calc(env(safe-area-inset-right) + 8px));
+  bottom: max(clamp(14px, 2.1vw, 30px), calc(env(safe-area-inset-bottom) + 8px));
   z-index: 115;
-  display: grid;
-  width: min(300px, calc(100vw - 92px));
-  gap: 8px;
-  padding: 13px 15px 14px;
-  border: 1px solid rgba(14, 14, 12, 0.12);
-  border-radius: 12px;
-  background: rgba(250, 249, 246, 0.78);
-  box-shadow:
-    0 12px 32px rgba(14, 14, 12, 0.1),
-    inset 0 1px rgba(255, 255, 255, 0.72);
-  color: rgba(14, 14, 12, 0.86);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  isolation: isolate;
+  width: 180px;
+  height: 58px;
+  gap: 10px;
+  padding: 0 16px;
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
   animation: ignite-hud-in 420ms var(--ease-settle) both;
+}
+
+.ignite-hud__surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.72) 0%,
+      rgba(246, 247, 246, 0.52) 45%,
+      rgba(225, 228, 226, 0.4) 100%
+    ),
+    rgba(246, 247, 246, 0.42);
+  box-shadow:
+    0 18px 38px rgba(14, 14, 12, 0.13),
+    0 4px 11px rgba(14, 14, 12, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 1px 0 0 rgba(255, 255, 255, 0.48),
+    inset -1px 0 0 rgba(14, 14, 12, 0.07),
+    inset 0 -1px 0 rgba(14, 14, 12, 0.14);
+  -webkit-backdrop-filter: blur(18px) saturate(170%) brightness(1.05);
+  backdrop-filter: blur(18px) saturate(170%) brightness(1.05);
+  pointer-events: none;
+}
+
+.ignite-hud__surface::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background:
+    radial-gradient(
+      ellipse 130% 18% at 28% 22%,
+      rgba(255, 255, 255, 0.9) 0,
+      rgba(255, 255, 255, 0.32) 18%,
+      transparent 58%
+    ),
+    linear-gradient(
+      105deg,
+      rgba(255, 255, 255, 0.48),
+      transparent 22%,
+      transparent 70%,
+      rgba(255, 255, 255, 0.2)
+    );
+  opacity: 0.68;
+  mix-blend-mode: screen;
+}
+
+.ignite-hud__surface::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  border-radius: inherit;
+  box-shadow:
+    inset 7px 0 13px rgba(255, 255, 255, 0.18),
+    inset -6px 0 12px rgba(14, 14, 12, 0.04);
+  pointer-events: none;
 }
 
 @keyframes ignite-hud-in {
@@ -79,68 +135,82 @@ html.ignite-active .cursor-orb {
   }
 }
 
-.ignite-hud__eyebrow {
-  color: #d44315;
-  font-size: 9px;
-  letter-spacing: 0.18em;
-}
-
-.ignite-hud__message {
-  min-height: 1.35em;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 .ignite-hud__track {
+  position: relative;
+  z-index: 1;
   display: block;
-  width: 100%;
-  height: 1px;
+  flex: 1 1 auto;
+  height: 3px;
   overflow: hidden;
-  background: rgba(14, 14, 12, 0.14);
+  border-radius: 999px;
+  background: rgba(14, 14, 12, 0.12);
 }
 
 .ignite-hud__track > span {
   display: block;
   width: 100%;
   height: 100%;
-  background: #dc4518;
+  background: var(--red);
   transform-origin: left center;
   transition: transform 220ms linear;
 }
 
+.ignite-hud__percent,
 .ignite-hud__reset {
-  justify-self: start;
-  margin-top: 3px;
-  padding: 6px 9px;
-  border: 1px solid rgba(14, 14, 12, 0.22);
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  color: rgba(14, 14, 12, 0.76);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-feature-settings: "lnum" 1;
+  letter-spacing: 0.09em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.ignite-hud__reset {
+  margin-right: -6px;
+  padding: 6px 8px;
   border-radius: 999px;
-  color: rgba(14, 14, 12, 0.82);
-  font-size: 9px;
+  outline-offset: -3px;
   transition:
-    color 150ms ease,
-    background-color 150ms ease;
+    color 170ms ease,
+    background-color 170ms ease,
+    box-shadow 170ms ease;
 }
 
 .ignite-hud__reset:hover,
 .ignite-hud__reset:focus-visible {
-  background: rgba(14, 14, 12, 0.88);
-  color: #fffaf1;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64),
+    0 2px 8px rgba(14, 14, 12, 0.06);
 }
 
-.ignite-hud.is-burning:not(.is-complete) .ignite-hud__eyebrow {
-  color: #b93612;
+.ignite-hud__reset:focus-visible {
+  outline-color: rgba(215, 38, 30, 0.78);
 }
 
-.ignite-hud.is-complete .ignite-hud__track {
-  background: rgba(14, 14, 12, 0.22);
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .ignite-hud__surface {
+    background: rgba(246, 247, 246, 0.94);
+  }
+}
+
+@media (prefers-contrast: more) {
+  .ignite-hud__surface {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(14, 14, 12, 0.3);
+  }
 }
 
 @media (max-width: 700px) {
   .ignite-hud {
-    right: 12px;
-    bottom: 12px;
-    width: min(270px, calc(100vw - 84px));
+    right: max(10px, calc(env(safe-area-inset-right) + 6px));
+    bottom: max(10px, calc(env(safe-area-inset-bottom) + 6px));
+    width: min(180px, calc(100vw - 84px));
   }
 }
 
@@ -149,6 +219,26 @@ html.ignite-active .cursor-orb {
   .ignite-hud__track > span {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .ignite-hud__surface {
+    background: Canvas;
+    border: 2px solid CanvasText;
+  }
+
+  .ignite-hud__track {
+    background: CanvasText;
+  }
+
+  .ignite-hud__track > span {
+    background: Highlight;
+  }
+
+  .ignite-hud__percent,
+  .ignite-hud__reset {
+    color: CanvasText;
   }
 }
 
