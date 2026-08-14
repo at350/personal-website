@@ -35,6 +35,7 @@ import { RunningHead } from "@/components/furniture/RunningHead";
 import { GridOverlay } from "@/components/furniture/GridOverlay";
 import type { ExperienceMode } from "@/components/ExperienceDock";
 import type { IgnitePointerState } from "@/ignite/types";
+import { EditorialTerminal } from "@/components/brand/EditorialTerminal";
 import "@/styles/book-stage.css";
 
 const TOTAL = SPREADS.length;
@@ -59,7 +60,9 @@ function EntryLoader({ progress }: { progress: TextureProgress }) {
   const ratio = progress.total === 0 ? 0 : progress.completed / progress.total;
   return (
     <div className="entry-loader" role="status" aria-live="polite">
-      <p className="entry-loader__name">ALAN TAI</p>
+      <p className="entry-loader__name">
+        ALAN TAI<EditorialTerminal />
+      </p>
       <div className="entry-loader__track" aria-hidden>
         <span style={{ transform: `scaleX(${ratio})` }} />
       </div>

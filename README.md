@@ -76,5 +76,5 @@ Studio Co.). All licenses permit self-hosted web embedding; files live in
 
 ## Paper
 
-White `#FFFFFF`. Ink `#0E0E0C`. One red: `#E8351A`. Hairlines at 14% ink.
+White `#FFFFFF`. Ink `#0E0E0C`. One red: `#D7261E`. Hairlines at 14% ink.
 No gradients. The book's lighting does the shading.

@@ -43,6 +43,7 @@
 
 .cover2__word {
   display: block;
+  white-space: nowrap;
 }
 
 /* The cover concept is a real paper construction, cropped like a plate rather
@@ -64,26 +65,6 @@
   object-fit: cover;
   object-position: 53% 63%;
   filter: contrast(1.12) brightness(1.045);
-}
-
-/* The mark: the A whose counter prints red. */
-.cover2__a,
-.back2__a {
-  position: relative;
-  display: inline-block;
-}
-
-.cover2__a::after,
-.back2__a::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 30%;
-  width: 0.2em;
-  height: 0.2em;
-  transform: translateX(-50%);
-  background: var(--red);
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
 .cover2__rule {
@@ -178,6 +159,7 @@
   font-size: 16cqw;
   line-height: 1;
   color: var(--ink);
+  white-space: nowrap;
 }
 
 .back2__issue {
