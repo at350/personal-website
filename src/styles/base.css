@@ -102,14 +102,13 @@ ol {
   left: 0;
   right: 0;
   z-index: 200;
-  padding: 0.6em 1.25em;
-  padding-top: calc(0.6em + env(safe-area-inset-top));
-  background: var(--red);
-  color: var(--paper);
-  font-family: var(--font-mono);
-  font-size: var(--text-meta);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  padding: 10px 16px;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  color: var(--ink-3);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-style: italic;
   text-align: center;
   line-height: 1.4;
+  pointer-events: none;
 }

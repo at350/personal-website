@@ -132,7 +132,7 @@ export default function App() {
   return (
     <BrowserRouter basename={routerBasename()}>
       <div className="wip-banner" role="status">
-        This site is currently a work in progress.
+        Work in progress.
       </div>
       <Meta />
       <Routes>
