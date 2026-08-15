@@ -30,6 +30,12 @@ const POWDER_PLANE_SEGMENTS_X = 200;
 const POWDER_PLANE_SEGMENTS_Y = 136;
 /** Mirrors IgniteBook's leaf spacing; passed in rather than imported back. */
 const DEFAULT_LAYER_GAP = 0.06;
+/**
+ * How many leaves' worth of ash the bed's surface still shows. Each fall
+ * covers about 72% of the one under it, so by the fifth the oldest is under
+ * a percent and dropping it out of the window is invisible.
+ */
+const POWDER_FALL_DEPTH = 5;
 // Settled residue changes on the timescale of whole sheets charring, not
 // frames. Ten hertz is indistinguishable on a static deposit and cuts the
 // reconstruction pass and its texture upload to a third.
@@ -643,12 +649,14 @@ const POWDER_VERTEX = /* glsl */ `
  * reconstructed from the conserved residue field, so deposit mass always
  * correlates with actually consumed paper.
  *
- * The deposit is built as sediment, not as one texture faded up by opacity.
- * Each depth band lays down its own pattern at its own scale over the ones
- * below, so a spot that has lost three sheets and a spot that has lost
- * fifteen carry visibly different material — the previous shader evaluated a
- * single fixed function of uv, which is why a deepening burn looked like one
- * unchanging grey image phasing in and out behind the paper.
+ * The deposit is composited fall by fall. Every sheet that burns through
+ * drops its own patch of ash, keyed to that leaf's index, over whatever the
+ * sheets before it left; each fall then buries the ones under it, so the
+ * visible surface turns over as the fire descends. Keying the pattern to the
+ * page's uv instead — however carefully it was banded by depth — meant every
+ * newly opened leaf restated the same picture one step further down, which
+ * reads as the same ash appearing over and over rather than as a pile
+ * growing.
  */
 const POWDER_FRAGMENT = /* glsl */ `
   precision highp float;
@@ -657,6 +665,7 @@ const POWDER_FRAGMENT = /* glsl */ `
   uniform vec2 uDepositAspect;
   varying vec2 vUv;
   varying float vLayers;
+  ${DEPOSIT_REST_GLSL}
 
   float powderHash(vec2 p) {
     p = fract(p * vec2(219.31, 371.17));
@@ -688,6 +697,14 @@ const POWDER_FRAGMENT = /* glsl */ `
   /** Ridged noise: the long fissures a deep bed opens as it settles. */
   float powderRidge(vec2 p) {
     return 1.0 - abs(powderFbm(p) * 2.0 - 1.0);
+  }
+
+  /** Where the ash off one particular leaf lands. Its index is its identity. */
+  vec2 powderFallSeed(float index) {
+    return vec2(
+      fract(sin(index * 12.9898 + 4.1) * 43758.5453),
+      fract(sin(index * 78.2331 - 7.7) * 43758.5453)
+    ) * 137.0;
   }
 
   /**
@@ -734,25 +751,38 @@ const POWDER_FRAGMENT = /* glsl */ `
       powderNoise(p * 17.3 - 11.9),
       powderNoise(p * 17.3 + 44.3)
     ) - .5) * .38;
+    vec2 sampleUv = vUv + warp * .05;
     // How much of the local stack has burned away under this point.
-    float mass = texture2D(uResidue, vUv + warp * .05).r;
+    float mass = texture2D(uResidue, sampleUv).r;
     if (mass < .004) discard;
 
-    // Sediment. Each band only exists once the burn has reached its depth,
-    // and lands at its own scale and offset, so the bed gains structure as
-    // the fire eats down instead of restating one pattern more opaquely.
-    float first = clamp(mass / .2, 0.0, 1.0);
-    float second = clamp((mass - .17) / .24, 0.0, 1.0);
-    float third = clamp((mass - .4) / .27, 0.0, 1.0);
-    float fourth = clamp((mass - .66) / .3, 0.0, 1.0);
-    float bed = powderFbm(p * 4.3 + 4.7) * first;
-    bed = max(bed, powderFbm(p * 11.1 - 21.3) * second * .94);
-    bed = max(bed, powderFbm(p * 26.7 + 48.1) * third * .88);
-    bed = max(bed, powderFbm(p * 61.3 - 63.7) * fourth * .8);
-    // Stacking bands under max() narrows their spread, and a deep bed would
-    // settle into one flat mid value. Restretching keeps drifts and hollows
-    // legible at every depth.
-    bed = smoothstep(.22, .88, bed);
+    // Sediment, one fall per leaf. A sheet's ash arrives as combustion works
+    // through it and is buried by every sheet that goes after it, so what
+    // shows is the last few falls and the surface turns over as the fire
+    // descends. Each fall's index picks its own offset and grain, which is
+    // what makes the newly opened leaf carry different ash from the one that
+    // just went rather than a repeat of it.
+    float layers = depositConsumedLayers(sampleUv);
+    float newest = floor(layers);
+    float bed = powderFbm(p * 6.3 + 11.0);
+    for (int fall = ${POWDER_FALL_DEPTH - 1}; fall >= 0; fall -= 1) {
+      float index = newest - float(fall);
+      if (index < 0.0) continue;
+      // A fall lands late in its leaf's consumption and settles quickly. The
+      // shoulders matter: ramping it linearly across the whole leaf leaves
+      // the surface permanently mid-dissolve, which under a fire moving
+      // several leaves a second reads as boiling rather than as deposition.
+      float arrival = smoothstep(.22, .9, clamp(layers - index, 0.0, 1.0));
+      float grain = mix(5.9, 31.0, fract(index * .61803398875 + .21));
+      bed = mix(
+        bed,
+        powderFbm(p * grain + powderFallSeed(index)),
+        arrival * .62
+      );
+    }
+    // Compositing narrows the spread; restretching keeps drifts and hollows
+    // legible however many falls have landed.
+    bed = smoothstep(.24, .84, bed);
     // Where the ash has piled, independent of how consolidated it is. Held
     // apart from the banded bed because it keeps full contrast even once
     // every band is present, and it is what shades the deep deposit.
