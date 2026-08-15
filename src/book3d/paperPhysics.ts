@@ -8,6 +8,25 @@ export interface PaperStepOptions {
   velocity: number;
 }
 
+export interface DriftSheetOptions {
+  dt: number;
+  /** Uniform ambient acceleration on every vertex, px/s². */
+  windX: number;
+  windY: number;
+  windZ: number;
+  /** Radial current origin in the same space as the guide vertices. */
+  puffX: number;
+  puffY: number;
+  puffZ: number;
+  /** Acceleration at the current's center; 0 disables the radial term. */
+  puffStrength: number;
+  puffRadius: number;
+  /** Exponential rate pulling unpinned vertices toward the carrier guide. */
+  followRate: number;
+  /** Per-frame Verlet damping base, like SETTLE_DAMPING. */
+  damping: number;
+}
+
 interface Constraint {
   a: number;
   b: number;
@@ -202,6 +221,84 @@ export class PaperSheet {
       for (const constraint of this.structuralConstraints) this.solveConstraint(constraint);
       this.pinSpine(target);
       this.restOnStack();
+    }
+
+    let travel = 0;
+    for (let index = 0; index < this.positions.length; index += 1) {
+      const point = this.positions[index]!;
+      const previous = this.previous[index]!;
+      travel += Math.hypot(
+        point.x - previous.x,
+        point.y - previous.y,
+        point.z - previous.z,
+      );
+    }
+    const meanSpeed = travel / this.positions.length / dt;
+    this.energy += (meanSpeed / this.width - this.energy) * Math.min(1, dt * 14);
+
+    return this.positions;
+  }
+
+  /**
+   * The weightless regime for Drift mode. The guide is a rigid transform of
+   * the flat sheet (the leaf's floating carrier), so the curvature
+   * constraints pull toward flatness while wind and the pointer's current
+   * bend the free area against the pinned spine column. There is no stack
+   * floor and no turn-guide tether here: the sheet hangs in open air.
+   */
+  stepDrift(
+    target: readonly LeafVertex[],
+    options: DriftSheetOptions,
+  ): LeafVertex[] {
+    if (!this.initialized) this.reset(target);
+    const dt = Math.min(1 / 30, Math.max(1 / 240, options.dt));
+    const frameScale = dt * 60;
+    const damping = Math.pow(options.damping, frameScale);
+    const follow = 1 - Math.exp(-options.followRate * dt);
+    const dtSquared = dt * dt;
+    const radius = Math.max(1, options.puffRadius);
+
+    for (let index = 0; index < this.positions.length; index += 1) {
+      const point = this.positions[index]!;
+      const old = copyVertex(point);
+      const previous = this.previous[index]!;
+      const guide = target[index]!;
+
+      let accelX = options.windX;
+      let accelY = options.windY;
+      let accelZ = options.windZ;
+      if (options.puffStrength !== 0) {
+        const dx = point.x - options.puffX;
+        const dy = point.y - options.puffY;
+        const dz = point.z - options.puffZ;
+        const distance = Math.hypot(dx, dy, dz);
+        if (distance > 1e-3) {
+          const falloff =
+            (options.puffStrength *
+              Math.exp(-(distance * distance) / (radius * radius))) /
+            distance;
+          accelX += dx * falloff;
+          accelY += dy * falloff;
+          accelZ += dz * falloff;
+        }
+      }
+
+      point.x += (point.x - previous.x) * damping + accelX * dtSquared;
+      point.y += (point.y - previous.y) * damping + accelY * dtSquared;
+      point.z += (point.z - previous.z) * damping + accelZ * dtSquared;
+      point.x += (guide.x - point.x) * follow;
+      point.y += (guide.y - point.y) * follow;
+      point.z += (guide.z - point.z) * follow;
+      this.previous[index] = old;
+    }
+
+    for (let iteration = 0; iteration < SOLVER_ITERATIONS; iteration += 1) {
+      for (const constraint of this.shapeConstraints) this.solveConstraint(constraint);
+      for (const constraint of this.structuralConstraints) this.solveConstraint(constraint);
+      for (const constraint of this.curvatureConstraints) {
+        this.solveCurvatureConstraint(constraint, target);
+      }
+      this.pinSpine(target);
     }
 
     let travel = 0;

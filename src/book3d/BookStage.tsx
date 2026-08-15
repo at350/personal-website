@@ -35,8 +35,10 @@ import { RunningHead } from "@/components/furniture/RunningHead";
 import { GridOverlay } from "@/components/furniture/GridOverlay";
 import type { ExperienceMode } from "@/components/ExperienceDock";
 import type { IgnitePointerState } from "@/ignite/types";
+import type { DriftPointerState } from "@/drift/types";
 import { EditorialTerminal } from "@/components/brand/EditorialTerminal";
 import "@/styles/book-stage.css";
+import "@/styles/drift.css";
 
 const TOTAL = SPREADS.length;
 type ArrowDirection = -1 | 1;
@@ -128,12 +130,18 @@ interface BookStageProps {
   targetSpread: number;
   onSpreadSettled?: (index: number) => void;
   experienceMode?: ExperienceMode;
+  /** Lets in-stage affordances (Escape, the drift Collect button) hand the
+      mode back to the dock's owner. */
+  onExperienceModeChange?: (mode: ExperienceMode) => void;
 }
+
+type DriftStage = "idle" | "flattening" | "adrift" | "landing";
 
 export function BookStage({
   targetSpread,
   onSpreadSettled,
   experienceMode = "read",
+  onExperienceModeChange,
 }: BookStageProps) {
   const [state, dispatch] = useReducer(
     (s: ReturnType<typeof initialEngineState>, e: EngineEvent) => reduce(s, e, TOTAL),
@@ -169,6 +177,36 @@ export function BookStage({
     }),
     [],
   );
+  /* Drift never engages under reduced motion: the dock disables the entry,
+     and this guard covers a mode arriving by other means. */
+  const driftRequested = experienceMode === "drift" && !prefersReducedMotion;
+  const [driftStage, setDriftStage] = useState<DriftStage>("idle");
+  const driftStageRef = useRef<DriftStage>("idle");
+  const driftRequestedRef = useRef(driftRequested);
+  useEffect(() => {
+    driftStageRef.current = driftStage;
+  }, [driftStage]);
+  useEffect(() => {
+    driftRequestedRef.current = driftRequested;
+  }, [driftRequested]);
+  const driftAdvanceRef = useRef(false);
+  const [driftFloating, setDriftFloating] = useState(false);
+  const [driftRevision, bumpDriftRevision] = useReducer(
+    (revision: number) => revision + 1,
+    0,
+  );
+  const driftPointer = useMemo<DriftPointerState>(
+    () => ({
+      x: 0,
+      y: 0,
+      inside: false,
+      pressed: false,
+      pointerType: "mouse",
+    }),
+    [],
+  );
+  const driftLocked = driftRequested || driftStage !== "idle";
+  const modeLocked = igniteActive || driftLocked;
   const textureRefreshesPending = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -253,6 +291,92 @@ export function BookStage({
     });
   }, [igniteActive, ignitePointer, motion]);
 
+  /* Drift entry and exit. Entering flattens the book first (the same ready
+     latch ignite uses); leaving an active drift glides the leaves home
+     through the landing stage instead of cutting to the resting book. */
+  const wasDriftRequested = useRef(false);
+  useEffect(() => {
+    if (driftRequested === wasDriftRequested.current) return;
+    wasDriftRequested.current = driftRequested;
+    driftPointer.inside = false;
+    driftPointer.pressed = false;
+    if (driftRequested) motion.poseTarget = 1;
+    queueMicrotask(() => {
+      if (wasDriftRequested.current !== driftRequested) return;
+      if (driftRequested) {
+        setDriftFloating(false);
+        setTocOpen(false);
+        // Re-entry during a landing must let the glide finish; the landed
+        // callback re-launches with a fresh field.
+        if (driftStageRef.current !== "landing") {
+          driftAdvanceRef.current = false;
+          bumpDriftRevision();
+          setDriftStage("flattening");
+        }
+      } else {
+        setDriftStage((stage) =>
+          stage === "adrift"
+            ? "landing"
+            : stage === "flattening"
+              ? "idle"
+              : stage,
+        );
+      }
+    });
+  }, [driftPointer, driftRequested, motion]);
+
+  /* Watchdog: the stage machine must never hold a floating or flattening
+     book whose mode is no longer drift, however the mismatch arose (a raced
+     frame, a hot-reload replay). Orphaned leaves glide home; an orphaned
+     flatten simply unlocks. */
+  useEffect(() => {
+    if (driftRequested) return;
+    if (driftStage !== "adrift" && driftStage !== "flattening") return;
+    queueMicrotask(() => {
+      if (driftRequestedRef.current) return;
+      if (driftStageRef.current === "adrift") setDriftStage("landing");
+      else if (driftStageRef.current === "flattening") setDriftStage("idle");
+    });
+  }, [driftRequested, driftStage]);
+
+  /* A drift request under reduced motion can never engage (driftRequested
+     stays false), so hand the mode straight back — otherwise the dock would
+     show Drift selected over a stage that is actually reading. */
+  useEffect(() => {
+    if (experienceMode === "drift" && prefersReducedMotion) {
+      onExperienceModeChange?.("read");
+    }
+  }, [experienceMode, onExperienceModeChange, prefersReducedMotion]);
+
+  /* The Collect button unmounts with the HUD when the pile lands; if it held
+     focus, keyboard flow would drop to <body>. Hand it to the folio. */
+  const previousDriftStage = useRef<DriftStage>("idle");
+  useEffect(() => {
+    const was = previousDriftStage.current;
+    previousDriftStage.current = driftStage;
+    if (driftStage !== "idle" || was !== "landing") return;
+    if (document.activeElement === document.body) {
+      stageRef.current
+        ?.querySelector<HTMLButtonElement>(".bstage__folio")
+        ?.focus();
+    }
+  }, [driftStage]);
+
+  const onDriftLoosened = useCallback(() => {
+    setDriftFloating(true);
+  }, []);
+  const onDriftLanded = useCallback(() => {
+    setDriftFloating(false);
+    if (wasDriftRequested.current) {
+      // The user re-chose Drift while the pile was still gliding home.
+      driftAdvanceRef.current = false;
+      bumpDriftRevision();
+      setDriftStage("flattening");
+    } else {
+      setDriftStage("idle");
+    }
+  }, []);
+
   const busy =
     state.sheet !== null ||
     state.dragging ||
@@ -265,7 +389,7 @@ export function BookStage({
   }, [state.riffle, state.sheet]);
   const launchTurn = useCallback(
     (to: number) => {
-      if (igniteActive) return false;
+      if (modeLocked) return false;
       if (launchingTurn.current) return false;
       if (!isSpreadTextureFresh(currentSpread)) return false;
       launchingTurn.current = true;
@@ -279,7 +403,7 @@ export function BookStage({
       dispatch({ type: "TURN", to });
       return true;
     },
-    [currentSpread, igniteActive, motion],
+    [currentSpread, modeLocked, motion],
   );
   const onTextureProgress = useCallback((progress: TextureProgress) => {
     setTextureProgress(progress);
@@ -326,7 +450,7 @@ export function BookStage({
       motion.coverVertices = null;
     }
     motion.poseTarget =
-      igniteActive
+      modeLocked
         ? state.sheet !== null || state.dragging || state.riffle !== null
           ? motion.turnPose
           : 1
@@ -337,7 +461,7 @@ export function BookStage({
           : hoverRef.current
             ? 1
             : 0;
-  }, [dispatch, igniteActive, motion, pw, state, touchOnly]);
+  }, [dispatch, modeLocked, motion, pw, state, touchOnly]);
 
   // The overlay only appears once the landed mesh reaches its new resting
   // center. During a cover turn, BookScene moves that center with the sheet.
@@ -431,6 +555,65 @@ export function BookStage({
     };
   }, [igniteActive, ignitePointer, updateIgnitePointer]);
 
+  // The drift pointer channel: viewport-centered CSS px, +y up, shared by
+  // reference with the scene like ignite's.
+  const updateDriftPointer = useCallback(
+    (event: globalThis.PointerEvent) => {
+      driftPointer.x = event.clientX - window.innerWidth / 2;
+      driftPointer.y = window.innerHeight / 2 - event.clientY;
+      driftPointer.pointerType = event.pointerType || "mouse";
+      const target = event.target instanceof Element ? event.target : null;
+      const overChrome = Boolean(
+        target?.closest(".experience-dock, .drift-hud, .bstage__nav"),
+      );
+      driftPointer.inside = driftStageRef.current === "adrift" && !overChrome;
+    },
+    [driftPointer],
+  );
+
+  useEffect(() => {
+    if (driftStage !== "adrift") {
+      driftPointer.inside = false;
+      driftPointer.pressed = false;
+      return;
+    }
+    const onMove = (event: globalThis.PointerEvent) => {
+      updateDriftPointer(event);
+    };
+    const onDown = (event: globalThis.PointerEvent) => {
+      updateDriftPointer(event);
+      driftPointer.pressed = event.button === 0 && driftPointer.inside;
+    };
+    const release = (event: globalThis.PointerEvent) => {
+      driftPointer.pressed = false;
+      // A lifted finger takes its air current with it; only a mouse cursor
+      // keeps blowing from where it rests.
+      if (event.pointerType === "touch") driftPointer.inside = false;
+    };
+    const park = () => {
+      driftPointer.inside = false;
+      driftPointer.pressed = false;
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) park();
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerdown", onDown, { passive: true });
+    window.addEventListener("pointerup", release, { passive: true });
+    window.addEventListener("pointercancel", park, { passive: true });
+    window.addEventListener("blur", park);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", park);
+      window.removeEventListener("blur", park);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      park();
+    };
+  }, [driftPointer, driftStage, updateDriftPointer]);
+
   // Texture prefetch around the action.
   useEffect(() => {
     prefetchAround(state.current);
@@ -494,15 +677,15 @@ export function BookStage({
   const reportedSpread = useRef<number | null>(null);
   const pendingTarget = useRef<number | null>(null);
   useEffect(() => {
-    if (!igniteActive) return;
+    if (!modeLocked) return;
     pendingTarget.current = null;
     tapQueue.current = [];
     heldArrowKeys.current = { left: false, right: false, active: null };
-  }, [igniteActive]);
+  }, [modeLocked]);
   useEffect(() => {
     if (prevTarget.current === targetSpread) return;
     prevTarget.current = targetSpread;
-    if (igniteActive) {
+    if (modeLocked) {
       pendingTarget.current = null;
       return;
     }
@@ -521,15 +704,15 @@ export function BookStage({
     }
     pendingTarget.current = null;
     if (to !== currentSpread && !launchTurn(to)) pendingTarget.current = to;
-  }, [busy, currentSpread, igniteActive, launchTurn, targetSpread]);
+  }, [busy, currentSpread, modeLocked, launchTurn, targetSpread]);
 
   useEffect(() => {
-    if (igniteActive) return;
+    if (modeLocked) return;
     if (busy || pendingTarget.current === null) return;
     const to = pendingTarget.current;
     if (to === currentSpread) pendingTarget.current = null;
     else if (launchTurn(to)) pendingTarget.current = null;
-  }, [busy, currentSpread, igniteActive, launchTurn]);
+  }, [busy, currentSpread, modeLocked, launchTurn]);
 
   // One drag engine for edge zones (instant) and the page surface (threshold).
   const beginDrag = useCallback(
@@ -539,7 +722,7 @@ export function BookStage({
       startY: number,
       pointerId: number,
     ) => {
-      if (igniteActive) return;
+      if (modeLocked) return;
       if (busy) return;
       if (motion.dragging) return;
       if (motion.leaf !== null && motion.target !== null) return;
@@ -605,19 +788,19 @@ export function BookStage({
       window.addEventListener("pointerup", up);
       window.addEventListener("pointercancel", up);
     },
-    [busy, igniteActive, motion, ph, pw],
+    [busy, modeLocked, motion, ph, pw],
   );
 
   const onEdgeDown = useCallback(
     (edge: "fore" | "back") => (e: React.PointerEvent) => {
       e.preventDefault();
-      if (igniteActive) return;
+      if (modeLocked) return;
       if (busy) return;
       const { clientX, clientY, pointerId } = e;
       if (!isSpreadTextureFresh(currentSpread)) return;
       beginDrag(edge, clientX, clientY, pointerId);
     },
-    [beginDrag, busy, currentSpread, igniteActive],
+    [beginDrag, busy, currentSpread, modeLocked],
   );
 
   // Grab anywhere on or near the book — posed mesh and live DOM alike: a
@@ -627,7 +810,7 @@ export function BookStage({
   // interactive. Never selects text.
   const onSurfaceDown = useCallback(
     (e: React.PointerEvent) => {
-      if (igniteActive) return;
+      if (modeLocked) return;
       if (!texturesReady) return;
       if (busy) return;
       if (e.button !== 0) return;
@@ -690,7 +873,7 @@ export function BookStage({
     [
       beginDrag,
       busy,
-      igniteActive,
+      modeLocked,
       motion,
       pointerFrame,
       state,
@@ -705,10 +888,10 @@ export function BookStage({
     if (motion.leaf !== null || motion.dragging || state.riffle !== null) {
       return motion.turnPose;
     }
-    if (igniteActive) return 1;
+    if (modeLocked) return 1;
     if (touchOnly) return 1;
     return hoverRef.current ? 1 : 0;
-  }, [igniteActive, motion, state.riffle, touchOnly]);
+  }, [modeLocked, motion, state.riffle, touchOnly]);
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -749,7 +932,7 @@ export function BookStage({
     motion.onPose = (_pose: number, handoff: number) => {
       const el = overlayRef.current;
       if (!el) return;
-      if (igniteActive) {
+      if (igniteActive && driftStageRef.current === "idle") {
         if (
           !igniteReadyRef.current &&
           !busy &&
@@ -765,6 +948,31 @@ export function BookStage({
           return;
         }
       }
+      // Drift's ready latch: the leaves may only come loose once the book is
+      // flat and the WebGL twin matches the DOM it replaces. The request is
+      // read through a ref so a frame racing a mode flip can never float a
+      // book whose mode already left drift.
+      if (
+        driftRequestedRef.current &&
+        driftStageRef.current === "flattening" &&
+        !driftAdvanceRef.current &&
+        !busy &&
+        handoff > 0.985
+      ) {
+        driftAdvanceRef.current = true;
+        setDriftStage("adrift");
+      }
+      if (
+        driftStageRef.current === "adrift" ||
+        driftStageRef.current === "landing"
+      ) {
+        // Textures only while any leaf is off the pile; the overlay returns
+        // through the normal handoff path after landing.
+        el.style.opacity = "0";
+        el.style.visibility = "hidden";
+        el.style.pointerEvents = "none";
+        return;
+      }
       el.style.opacity = String(handoff);
       el.style.visibility = handoff < 0.02 ? "hidden" : "visible";
       el.style.pointerEvents = handoff > 0.98 ? "auto" : "none";
@@ -772,12 +980,12 @@ export function BookStage({
     return () => {
       motion.onPose = null;
     };
-  }, [busy, igniteActive, motion]);
+  }, [busy, driftRequested, igniteActive, motion]);
 
   // Deliberate absolute jumps (TOC, Home/End) keep their latest destination.
   const goAbsolute = useCallback(
     (to: number) => {
-      if (igniteActive) return;
+      if (modeLocked) return;
       if (!texturesReady) return;
       const clamped = Math.min(Math.max(to, 0), TOTAL - 1);
       if (busy) pendingTarget.current = clamped;
@@ -788,7 +996,7 @@ export function BookStage({
         }
       }
     },
-    [busy, currentSpread, igniteActive, launchTurn, texturesReady],
+    [busy, currentSpread, modeLocked, launchTurn, texturesReady],
   );
 
   // Held arrows advance one page at a time. Button activations use the finite
@@ -796,7 +1004,7 @@ export function BookStage({
   const goAdjacent = useCallback(
     (offset: ArrowDirection) => {
       if (
-        igniteActive ||
+        modeLocked ||
         !texturesReady ||
         busy ||
         launchingTurn.current ||
@@ -808,12 +1016,12 @@ export function BookStage({
       const to = Math.min(Math.max(currentSpread + offset, 0), TOTAL - 1);
       return to !== currentSpread && launchTurn(to);
     },
-    [busy, currentSpread, igniteActive, launchTurn, texturesReady],
+    [busy, currentSpread, modeLocked, launchTurn, texturesReady],
   );
 
   const enqueueAdjacent = useCallback(
     (offset: ArrowDirection) => {
-      if (igniteActive) return;
+      if (modeLocked) return;
       if (!texturesReady) return;
       const to = Math.min(Math.max(currentSpread + offset, 0), TOTAL - 1);
       if (
@@ -828,7 +1036,7 @@ export function BookStage({
       tapQueue.current.push(offset);
       wakeTapDrain();
     },
-    [busy, currentSpread, igniteActive, texturesReady],
+    [busy, currentSpread, modeLocked, texturesReady],
   );
 
   const onRiffleComplete = useCallback(() => {
@@ -843,6 +1051,20 @@ export function BookStage({
       if (e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target instanceof Element ? e.target : null;
+      // Escape lands the drift from any focus short of an editing context —
+      // the hand that just clicked the dock is exactly the one pressing it,
+      // so the interactive-element guard below must not swallow this key.
+      // (A landing already in progress just rides.)
+      if (
+        e.key === "Escape" &&
+        driftRequested &&
+        !t?.closest("input, textarea, select, [contenteditable='true']")
+      ) {
+        setTocOpen(false);
+        onExperienceModeChange?.("read");
+        e.preventDefault();
+        return;
+      }
       if (
         t?.closest(
           "button, a, input, textarea, select, [contenteditable='true'], [role='toolbar']",
@@ -850,7 +1072,7 @@ export function BookStage({
       ) {
         return;
       }
-      if (igniteActive) {
+      if (modeLocked) {
         if (
           ["ArrowRight", "ArrowLeft", "Home", "End", "g"].includes(e.key)
         ) {
@@ -918,14 +1140,21 @@ export function BookStage({
       window.removeEventListener("blur", clearHeldArrows);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [goAbsolute, goAdjacent, igniteActive, texturesReady]);
+  }, [
+    driftRequested,
+    goAbsolute,
+    goAdjacent,
+    modeLocked,
+    onExperienceModeChange,
+    texturesReady,
+  ]);
 
   // Every completed button activation is one relative turn intent. Drain at
   // most one valid entry per resting boundary so rapid taps remain distinct,
   // ordered page flips instead of collapsing into a jump. Impossible entries
   // at a physical boundary are discarded without blocking later input.
   useEffect(() => {
-    if (igniteActive) return;
+    if (modeLocked) return;
     if (busy || launchingTurn.current || pendingTarget.current !== null) return;
     while (tapQueue.current.length > 0) {
       const offset = tapQueue.current[0]!;
@@ -937,13 +1166,13 @@ export function BookStage({
       if (launchTurn(to)) tapQueue.current.shift();
       return;
     }
-  }, [busy, currentSpread, igniteActive, launchTurn, tapRevision]);
+  }, [busy, currentSpread, modeLocked, launchTurn, tapRevision]);
 
   // A held arrow advances once at each resting boundary. Deliberate absolute
   // navigation and finite button taps win first, and the synchronous launch
   // latch prevents the route effect from publishing an intermediate spread.
   useEffect(() => {
-    if (igniteActive) return;
+    if (modeLocked) return;
     const direction = heldArrowKeys.current.active;
     if (
       busy ||
@@ -955,7 +1184,7 @@ export function BookStage({
       return;
     }
     goAdjacent(direction);
-  }, [busy, goAdjacent, heldDirection, igniteActive, tapRevision]);
+  }, [busy, goAdjacent, heldDirection, modeLocked, tapRevision]);
 
   useEffect(() => {
     if (
@@ -1007,10 +1236,24 @@ export function BookStage({
           ? "The paper has caught. The flame is spreading."
           : `${igniteConsumed}% consumed`
         : "Move the flame across the paper. Hold to burn deeper.";
+  const driftStatus =
+    driftStage === "flattening"
+      ? "Opening the spread…"
+      : driftStage === "landing"
+        ? "Re-collating the issue…"
+        : driftFloating
+          ? "Adrift. Stir the air, drag a leaf, click for a gust. Escape lands the book."
+          : "Gravity letting go…";
+  const driftLabel =
+    driftStage === "flattening"
+      ? "Loosening"
+      : driftStage === "landing"
+        ? "Re-collating"
+        : "Adrift";
 
   return (
     <div
-      className={`bstage${igniteActive ? " bstage--ignite" : ""}${igniteReady ? " bstage--ignite-ready" : ""}`}
+      className={`bstage${igniteActive ? " bstage--ignite" : ""}${igniteReady ? " bstage--ignite-ready" : ""}${driftLocked ? " bstage--drift" : ""}${driftStage === "adrift" || driftStage === "landing" ? " bstage--drift-ready" : ""}`}
       ref={stageRef}
       data-experience={experienceMode}
       // Native image dragging wins before the surface gesture reaches its
@@ -1052,12 +1295,48 @@ export function BookStage({
                     }
                   : undefined
               }
+              drift={
+                driftStage === "adrift" || driftStage === "landing"
+                  ? {
+                      active: true,
+                      revision: driftRevision,
+                      pointer: driftPointer,
+                      shift: restingShift,
+                      landing: driftStage === "landing",
+                      onLoosened: onDriftLoosened,
+                      onLanded: onDriftLanded,
+                    }
+                  : undefined
+              }
             />
           </Suspense>
         </Canvas>
       ) : null}
 
-      {igniteActive ? (
+      {driftLocked ? (
+        <aside
+          className={`drift-hud${driftStage === "adrift" ? " is-adrift" : ""}${driftStage === "landing" ? " is-landing" : ""}`}
+        >
+          <div className="drift-hud__surface" aria-hidden="true" />
+          <p className="visually-hidden" role="status" aria-live="polite">
+            {driftStatus}
+          </p>
+          <span className="drift-hud__label" aria-hidden="true">
+            {driftLabel}
+          </span>
+          {driftStage === "adrift" && onExperienceModeChange ? (
+            <button
+              type="button"
+              className="drift-hud__collect"
+              onClick={() => onExperienceModeChange("read")}
+            >
+              Collect
+            </button>
+          ) : null}
+        </aside>
+      ) : null}
+
+      {igniteActive && !driftLocked ? (
         <aside
           className={`ignite-hud${igniteStarted ? " is-burning" : ""}${igniteComplete ? " is-complete" : ""}`}
         >
@@ -1129,7 +1408,7 @@ export function BookStage({
         <button
           className="bstage__arrow mono-label"
           onClick={() => enqueueAdjacent(-1)}
-          disabled={!texturesReady || igniteActive}
+          disabled={!texturesReady || modeLocked}
           aria-disabled={!busy && currentSpread === 0}
           aria-label="Previous spread"
         >
@@ -1139,7 +1418,7 @@ export function BookStage({
           className="bstage__folio mono-label"
           aria-expanded={tocOpen}
           aria-label="Contents"
-          disabled={igniteActive}
+          disabled={modeLocked}
           onClick={() => setTocOpen((v) => !v)}
         >
           {folioLine}
@@ -1147,7 +1426,7 @@ export function BookStage({
         <button
           className="bstage__arrow mono-label"
           onClick={() => enqueueAdjacent(1)}
-          disabled={!texturesReady || igniteActive}
+          disabled={!texturesReady || modeLocked}
           aria-disabled={!busy && currentSpread === TOTAL - 1}
           aria-label="Next spread"
         >

@@ -1,7 +1,7 @@
 /* The physical book: page stacks with real thickness, a bending leaf,
    one key light, honest shadows. World units are CSS pixels. */
 
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 import { useFrame, useLoader, useThree } from "@react-three/fiber";
@@ -25,9 +25,13 @@ import {
 } from "./bookProjection";
 import {
   fadeSettlingActivity,
-  injectPaperActivity,
   paperGleamActivity,
 } from "./paperMaterial";
+import {
+  setPaperMaterialActivity,
+  usePageMaterial,
+  usePaperBumpTexture,
+} from "./usePageMaterial";
 import {
   SETTLE_HOLD_MAX,
   SETTLE_PROGRESS_TOLERANCE,
@@ -45,7 +49,7 @@ import {
   createCoverHologramMaterial,
   updateCoverHologramMaterial,
 } from "./coverHologramMaterial";
-import { getPageTexture, onTexturesChanged, pageKey } from "./pageTextures";
+import { pageKey } from "./pageTextures";
 import { SPREADS } from "@/magazine/folio";
 import {
   RIFFLE_VISIBLE_MAX,
@@ -57,6 +61,8 @@ import {
 } from "@/magazine/riffle";
 import { IgniteBook } from "@/ignite/IgniteBook";
 import type { IgnitePointerState } from "@/ignite/types";
+import { DriftBook } from "@/drift/DriftBook";
+import type { DriftPointerState } from "@/drift/types";
 
 export const CAM_FOV = 22;
 
@@ -158,97 +164,6 @@ function edgeTexture(): THREE.CanvasTexture {
   t.repeat.y = 10;
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
-}
-
-function usePaperBumpTexture() {
-  return useMemo(() => {
-    const texture = new THREE.TextureLoader().load(
-      withBasePath("/images/editorial/paper-fiber.webp"),
-    );
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(5, 7);
-    texture.colorSpace = THREE.NoColorSpace;
-    texture.anisotropy = 4;
-    return texture;
-  }, []);
-}
-
-function usePageMaterial(
-  key: string | null,
-  mirror = false,
-  paperBump?: THREE.Texture,
-) {
-  const mat = useMemo(() => {
-    const m = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
-      roughness: 0.46,
-      metalness: 0,
-      bumpMap: paperBump,
-      bumpScale: 0.08,
-      sheen: 0.32,
-      sheenColor: new THREE.Color(0xffffff),
-      sheenRoughness: 0.42,
-      clearcoat: 0.55,
-      clearcoatRoughness: 0.16,
-      specularIntensity: 0.75,
-      ior: 1.45,
-    });
-    m.userData.paperActivity = 0;
-    // The captured texture already contains the persistent page sheen. Gate
-    // every physical term to motion so stacks and turn endpoints reproduce
-    // those same pixels, while a bending leaf gains only a restrained accent.
-    m.onBeforeCompile = (shader) => {
-      shader.uniforms.paperActivity = {
-        value: Number(m.userData.paperActivity ?? 0),
-      };
-      m.userData.paperShader = shader;
-      shader.fragmentShader = injectPaperActivity(shader.fragmentShader);
-    };
-    m.customProgramCacheKey = () => "editorial-paper-lighting-v6";
-    return m;
-  }, [paperBump]);
-  // Track the applied SOURCE texture, not the key: a refreshed capture keeps
-  // the key but swaps the texture object, and the material must follow.
-  const applied = useRef<THREE.Texture | null>(null);
-  useLayoutEffect(() => {
-    const apply = () => {
-      const texture = key ? getPageTexture(key) : null;
-      if (texture && applied.current !== texture) {
-        if (mirror && mat.map) mat.map.dispose();
-        const t = mirror ? texture.clone() : texture;
-        if (mirror) {
-          t.wrapS = THREE.RepeatWrapping;
-          t.repeat.x = -1;
-          t.offset.x = 1;
-        }
-        mat.map = t;
-        mat.needsUpdate = true;
-        applied.current = texture;
-      } else if (!texture && applied.current !== null) {
-        if (mirror && mat.map) mat.map.dispose();
-        mat.map = null;
-        mat.needsUpdate = true;
-        applied.current = null;
-      }
-    };
-    // A turn hides the live DOM in the same commit that selects this leaf.
-    // Attach its cached page (including the baked-in gutter) before paint so
-    // there is never a blank first WebGL frame at drag/flip start.
-    apply();
-    return onTexturesChanged(apply);
-  }, [key, mat, mirror]);
-  return mat;
-}
-
-function setPaperMaterialActivity(material: THREE.Material, activity: number) {
-  material.userData.paperActivity = activity;
-  const shader = material.userData.paperShader as
-    | { uniforms: { paperActivity?: { value: number } } }
-    | undefined;
-  if (shader?.uniforms.paperActivity) {
-    shader.uniforms.paperActivity.value = activity;
-  }
 }
 
 /** One authored UV mask, shared by the tilted stack and bending cover leaf. */
@@ -817,6 +732,16 @@ interface BookSceneProps {
     onProgress?: (progress: number) => void;
     onComplete?: () => void;
   };
+  drift?: {
+    active: boolean;
+    revision: number;
+    pointer: DriftPointerState;
+    /** Resting book shift so the pointer ray lands on the right leaf. */
+    shift: number;
+    landing: boolean;
+    onLoosened?: () => void;
+    onLanded?: () => void;
+  };
 }
 
 export function BookScene({
@@ -828,6 +753,7 @@ export function BookScene({
   ph,
   onRiffleComplete,
   ignite,
+  drift,
 }: BookSceneProps) {
   const group = useRef<THREE.Group>(null);
   const light = useRef<THREE.DirectionalLight>(null);
@@ -1056,6 +982,19 @@ export function BookScene({
             onIgnition={ignite.onIgnition}
             onProgress={ignite.onProgress}
             onComplete={ignite.onComplete}
+          />
+        ) : drift?.active ? (
+          <DriftBook
+            key={`${current}:${drift.revision}`}
+            currentSpread={current}
+            pointer={drift.pointer}
+            pw={pw}
+            ph={ph}
+            shift={drift.shift}
+            paperBump={paperBump}
+            landing={drift.landing}
+            onLoosened={drift.onLoosened}
+            onLanded={drift.onLanded}
           />
         ) : (
           <>

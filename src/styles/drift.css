@@ -1,0 +1,188 @@
+/* Drift mode chrome: the same liquid-glass capsule language as the ignite
+   HUD, holding a status word and the collect action instead of a burn
+   progress track. */
+
+.bstage.bstage--drift {
+  touch-action: none;
+}
+
+.bstage--drift .bstage__edge,
+.bstage--drift .bstage__nav {
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* CSS backstop for the JS-driven overlay suppression: while leaves float,
+   the page is textures only. */
+.bstage--drift-ready .bstage__spread {
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+.drift-hud {
+  position: absolute;
+  right: max(clamp(14px, 2.1vw, 30px), calc(env(safe-area-inset-right) + 8px));
+  bottom: max(clamp(14px, 2.1vw, 30px), calc(env(safe-area-inset-bottom) + 8px));
+  z-index: 115;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  isolation: isolate;
+  width: 180px;
+  height: 58px;
+  gap: 10px;
+  padding: 0 16px;
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+  animation: drift-hud-in 420ms var(--ease-settle) both;
+}
+
+.drift-hud__surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.72) 0%,
+      rgba(246, 247, 246, 0.52) 45%,
+      rgba(225, 228, 226, 0.4) 100%
+    ),
+    rgba(246, 247, 246, 0.42);
+  box-shadow:
+    0 18px 38px rgba(14, 14, 12, 0.13),
+    0 4px 11px rgba(14, 14, 12, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 1px 0 0 rgba(255, 255, 255, 0.48),
+    inset -1px 0 0 rgba(14, 14, 12, 0.07),
+    inset 0 -1px 0 rgba(14, 14, 12, 0.14);
+  -webkit-backdrop-filter: blur(18px) saturate(170%) brightness(1.05);
+  backdrop-filter: blur(18px) saturate(170%) brightness(1.05);
+  pointer-events: none;
+}
+
+.drift-hud__surface::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background:
+    radial-gradient(
+      ellipse 130% 18% at 28% 22%,
+      rgba(255, 255, 255, 0.9) 0,
+      rgba(255, 255, 255, 0.32) 18%,
+      transparent 58%
+    ),
+    linear-gradient(
+      105deg,
+      rgba(255, 255, 255, 0.48),
+      transparent 22%,
+      transparent 70%,
+      rgba(255, 255, 255, 0.2)
+    );
+  opacity: 0.68;
+  mix-blend-mode: screen;
+}
+
+.drift-hud__surface::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  border-radius: inherit;
+  box-shadow:
+    inset 7px 0 13px rgba(255, 255, 255, 0.18),
+    inset -6px 0 12px rgba(14, 14, 12, 0.04);
+  pointer-events: none;
+}
+
+@keyframes drift-hud-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.drift-hud__label,
+.drift-hud__collect {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  color: rgba(14, 14, 12, 0.76);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-feature-settings: "lnum" 1;
+  letter-spacing: 0.09em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.drift-hud__collect {
+  margin-right: -6px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  outline-offset: -3px;
+  transition:
+    color 170ms ease,
+    background-color 170ms ease,
+    box-shadow 170ms ease;
+}
+
+.drift-hud__collect:hover,
+.drift-hud__collect:focus-visible {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64),
+    0 2px 8px rgba(14, 14, 12, 0.06);
+}
+
+.drift-hud__collect:focus-visible {
+  outline-color: rgba(215, 38, 30, 0.78);
+}
+
+/* The disabled dock entry keeps its slot but reads as unavailable. Inline
+   motion styles own the button/wrap opacity, so the dimming lives on the raw
+   icon and label nodes instead. */
+.experience-dock__mode[data-disabled="true"] {
+  cursor: default;
+}
+
+.experience-dock__mode[data-disabled="true"] .experience-dock__icon,
+.experience-dock__mode[data-disabled="true"] .experience-dock__label {
+  opacity: 0.35;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .drift-hud__surface {
+    background: rgba(246, 247, 246, 0.94);
+  }
+}
+
+@media (prefers-contrast: more) {
+  .drift-hud__surface {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(14, 14, 12, 0.3);
+  }
+}
+
+@media (max-width: 700px) {
+  .drift-hud {
+    right: max(10px, calc(env(safe-area-inset-right) + 6px));
+    bottom: max(10px, calc(env(safe-area-inset-bottom) + 6px));
+    width: min(180px, calc(100vw - 84px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drift-hud {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

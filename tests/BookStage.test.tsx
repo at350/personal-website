@@ -10,6 +10,7 @@ vi.mock("@react-three/fiber", () => ({
 const scene = vi.hoisted(() => ({
   motion: null as null | {
     onSettled: (() => void) | null;
+    onPose: ((pose: number, handoff: number) => void) | null;
     target: number | null;
     pointerActive: boolean;
     pointerX: number;
@@ -18,18 +19,28 @@ const scene = vi.hoisted(() => ({
     foilPointerY: number;
   },
   onRiffleComplete: null as null | (() => void),
+  drift: undefined as
+    | undefined
+    | {
+        active: boolean;
+        landing: boolean;
+        onLanded?: () => void;
+      },
 }));
 
 vi.mock("@/book3d/BookScene", () => ({
   BookScene: ({
     motion,
     onRiffleComplete,
+    drift,
   }: {
     motion: NonNullable<typeof scene.motion>;
     onRiffleComplete: () => void;
+    drift: typeof scene.drift;
   }) => {
     scene.motion = motion;
     scene.onRiffleComplete = onRiffleComplete;
+    scene.drift = drift;
     return null;
   },
 }));
@@ -68,17 +79,38 @@ function stubMatchMedia() {
   );
 }
 
-function renderStage(targetSpread = 0, experienceMode: "read" | "ignite" = "read") {
+function renderStage(
+  targetSpread = 0,
+  experienceMode: "read" | "ignite" | "drift" = "read",
+  onExperienceModeChange?: (mode: string) => void,
+) {
   const onSpreadSettled = vi.fn();
   const view = render(
     <BookStage
       targetSpread={targetSpread}
       onSpreadSettled={onSpreadSettled}
       experienceMode={experienceMode}
+      onExperienceModeChange={onExperienceModeChange}
     />,
   );
   const stage = view.container.querySelector(".bstage")!;
   return { ...view, onSpreadSettled, stage };
+}
+
+/** Drains the microtask-deferred mode-transition state (the ignite pattern
+    both modes share for entering/leaving). */
+async function settleModeTransition() {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
+/** The scene reports a flat, aligned book — the drift/ignite ready signal. */
+async function reportFlatPose() {
+  await act(async () => {
+    scene.motion?.onPose?.(1, 1);
+    await Promise.resolve();
+  });
 }
 
 function completeTurn() {
@@ -115,6 +147,7 @@ afterEach(() => {
   cleanup();
   scene.motion = null;
   scene.onRiffleComplete = null;
+  scene.drift = undefined;
   vi.unstubAllGlobals();
 });
 
@@ -148,6 +181,101 @@ describe("BookStage page-turn input", () => {
     ).toBe("0");
     expect(screen.queryByText("Ignite / armed")).toBeNull();
     expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
+  });
+
+  it("locks navigation and floats the leaves once flat in Drift mode", async () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1, "drift");
+
+    expect(stage.getAttribute("data-experience")).toBe("drift");
+    expect(stage.classList.contains("bstage--drift")).toBe(true);
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", {
+        name: "Previous spread",
+      }).disabled,
+    ).toBe(true);
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", { name: "Next spread" })
+        .disabled,
+    ).toBe(true);
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", { name: "Contents" })
+        .disabled,
+    ).toBe(true);
+    await settleModeTransition();
+    // Still flattening: the floating book has not mounted yet.
+    expect(screen.getByRole("status").textContent).toContain(
+      "Opening the spread",
+    );
+    expect(scene.drift).toBeUndefined();
+
+    await reportFlatPose();
+
+    expect(stage.classList.contains("bstage--drift-ready")).toBe(true);
+    expect(scene.drift?.active).toBe(true);
+    expect(scene.drift?.landing).toBe(false);
+    expect(screen.getByRole("status").textContent).toContain(
+      "Gravity letting go",
+    );
+  });
+
+  it("lands the leaves through Escape before releasing the page-turn lock", async () => {
+    stubMatchMedia();
+    const onExperienceModeChange = vi.fn();
+    const { rerender, stage } = renderStage(1, "drift", onExperienceModeChange);
+    await settleModeTransition();
+    await reportFlatPose();
+    expect(scene.drift?.active).toBe(true);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onExperienceModeChange).toHaveBeenCalledTimes(1);
+    expect(onExperienceModeChange).toHaveBeenLastCalledWith("read");
+
+    // The owner flips the mode; the leaves glide home before anything unlocks.
+    await act(async () => {
+      rerender(
+        <BookStage
+          targetSpread={1}
+          experienceMode="read"
+          onExperienceModeChange={onExperienceModeChange}
+        />,
+      );
+      await Promise.resolve();
+    });
+    expect(scene.drift?.active).toBe(true);
+    expect(scene.drift?.landing).toBe(true);
+    expect(screen.getByRole("status").textContent).toContain("Re-collating");
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", { name: "Next spread" })
+        .disabled,
+    ).toBe(true);
+
+    act(() => {
+      scene.drift?.onLanded?.();
+    });
+    expect(scene.drift).toBeUndefined();
+    expect(stage.classList.contains("bstage--drift")).toBe(false);
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", { name: "Next spread" })
+        .disabled,
+    ).toBe(false);
+  });
+
+  it("lands the drift from Escape even while a button holds focus", async () => {
+    stubMatchMedia();
+    const onExperienceModeChange = vi.fn();
+    renderStage(1, "drift", onExperienceModeChange);
+    await settleModeTransition();
+    await reportFlatPose();
+
+    // Entering via the dock leaves focus on a button; that keydown target
+    // must not swallow the exit key.
+    const next = screen.getByRole("button", { name: "Next spread" });
+    next.focus();
+    fireEvent.keyDown(next, { key: "Escape" });
+
+    expect(onExperienceModeChange).toHaveBeenCalledTimes(1);
+    expect(onExperienceModeChange).toHaveBeenLastCalledWith("read");
   });
 
   it("keeps the cover foil pointer live while the chassis pose is locked", () => {
