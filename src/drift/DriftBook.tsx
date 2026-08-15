@@ -35,12 +35,12 @@ export const DRIFT_SHEET_CURVATURE_SCALE = 0.3;
 /** Sheet-level radial current at the pointer (px/s² at its center). The rigid
     carriers get their own current inside driftField; this term is what makes
     the paper itself belly away from a close pass. */
-const SHEET_CURRENT_ACCEL = 1000;
+const SHEET_CURRENT_ACCEL = 1600;
 const SHEET_CURRENT_RADIUS_RATIO = 0.5;
 /** Apparent-airflow gain: a leaf moving through still air feels wind opposite
     its own velocity, so a dragged or gusted sheet trails and bows instead of
     translating rigidly. Acceleration per px/s of carrier speed. */
-const MOTION_FLEX = 2.6;
+const MOTION_FLEX = 3.2;
 const FIELD_SEED = 0xd21f7;
 
 interface DriftBookProps {
@@ -229,6 +229,7 @@ export function DriftBook({
     followRate: DRIFT_SHEET_FOLLOW_RATE,
     damping: DRIFT_SHEET_DAMPING,
     curvatureScale: DRIFT_SHEET_CURVATURE_SCALE,
+    restScale: 1,
   });
   const currentScratch = useRef<DriftVec>({ x: 0, y: 0, z: 0 });
   const reportedLoosened = useRef(false);
@@ -268,6 +269,9 @@ export function DriftBook({
       if (!bound) continue;
       const guide = guides[leaf.index]!;
       writeDriftLeafGuide(leaf, restGrid.xs, restGrid.ys, guide);
+      // The cloth's rest lengths track the perspective counter-scale, or the
+      // constraints would fight the shrunken guide.
+      options.restScale = leaf.scale;
 
       if (active) {
         // Apparent airflow: the faster a carrier moves, the harder its free

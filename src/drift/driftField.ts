@@ -56,6 +56,23 @@ export interface DriftLeafState {
   pairFZ: number;
   /** sin of the out-of-plane tilt, refreshed by the depth projection. */
   swing: number;
+  /** World-space in-plane axes and normal, refreshed by the projection. */
+  axisUX: number;
+  axisUY: number;
+  axisUZ: number;
+  axisVX: number;
+  axisVY: number;
+  axisVZ: number;
+  axisNX: number;
+  axisNY: number;
+  axisNZ: number;
+  /** How many neighbours crowd this leaf's footprint, refreshed with the
+      soft pair pass; crowded pages press flat. */
+  crowd: number;
+  /** Perspective counter-scale (d - z) / d, capped at 1: the leaf's world
+      size shrinks by exactly the factor perspective would magnify it, so a
+      floating page never looks zoomed and lands at exactly full size. */
+  scale: number;
   sepX: number;
   sepY: number;
   sepZ: number;
@@ -103,6 +120,14 @@ export interface DriftField {
   wasPressed: boolean;
   /** Set for one step when a click lands on open air. */
   puffed: boolean;
+  /** Last pointer position on the page plane, for the gust wake. */
+  pointerWX: number;
+  pointerWY: number;
+  pointerTracked: boolean;
+  /** Depth-sorted leaf indices and their inverse, rebuilt each projection
+      pass so every pairwise correction agrees on one stacking order. */
+  readonly order: number[];
+  readonly rank: number[];
   /** Rotational inertia of one leaf (unit mass thin plate). */
   readonly inertia: number;
   /** Linear force scale so motion feels page-relative on every viewport. */
@@ -121,68 +146,101 @@ export const DRIFT_RELEASE_SECONDS = 1.0;
 export const DRIFT_RELEASE_STAGGER = 0.55;
 const REFERENCE_PAGE_WIDTH = 560;
 
-const LINEAR_DAMPING = 0.72;
-const ANGULAR_DAMPING = 0.9;
+const LINEAR_DAMPING = 0.5;
+const ANGULAR_DAMPING = 0.55;
 const GRABBED_EXTRA_DAMPING = 2.4;
-export const DRIFT_MAX_SPEED = 300;
-export const DRIFT_MAX_SPIN = 1.25;
+export const DRIFT_MAX_SPEED = 520;
+export const DRIFT_MAX_SPIN = 2.4;
 
-const AMBIENT_ACCEL = 34;
-/** Angular acceleration amplitude (rad/s²); against the angular damping this
-    sustains a slow idle tumble of roughly 0.05-0.1 rad/s. The mix below is
-    roll-dominant: in-plane spin can never cut a neighbouring sheet. */
-const AMBIENT_TORQUE = 0.08;
-/** Paper drifting in still air settles broadside-on. This restoring torque
-    (∝ sin of the tilt) holds every sheet within a gentle wobble of facing
-    the camera — the calm look, and the reason mostly-parallel leaves can
-    share the depth range without knifing through one another. */
-const ALIGN_TORQUE = 0.85;
-/** Hard ceiling (~18°) on the out-of-plane tilt. Torques merely prefer
-    broadside; this clamp is what guarantees the tilt budget the depth
-    projection below prices its gaps against, so no yank can wheel a sheet
-    through its neighbours. In-plane roll stays unlimited. */
-const SWING_CAP = 0.32;
-const COS_SWING_CAP = Math.cos(SWING_CAP);
+const AMBIENT_ACCEL = 46;
+/** Angular acceleration amplitude (rad/s²). All three axes carry real
+    energy now — pages pitch, yaw, and roll; the depth projection prices
+    every tilt, so tumble no longer needs to be roll-only to stay safe. */
+const AMBIENT_TORQUE = 0.15;
+/** Paper drifting in still air settles broadside-on — eventually. Kept
+    deliberately weak so gusted pages linger at dramatic angles before
+    easing back toward the camera. */
+const ALIGN_TORQUE = 0.4;
+/** Hard ceiling (~62°) on the out-of-plane tilt: deep enough to read as
+    paper wheeling through the air, bounded enough that the depth projection
+    can always price a gap that fits the containment volume. In-plane roll
+    stays unlimited — pages spin freely. */
+const SWING_CAP = 0.95;
+/** A pinched page stays flat in the hand: the held leaf keeps a shallow
+    tilt so the pile it is swept through only ever needs modest gaps to
+    part around it — the grabbed leaf barely yields in the projection. */
+const GRABBED_SWING_CAP = 0.35;
 
 /** Two leaves whose centers overlap in the viewing plane should hold this
     much depth between them; inside it a soft shuffle pushes them apart,
-    depth-first with a light lateral shrug. Comfort spacing only — the hard
-    guarantee is the depth projection below. */
-const PAIR_XY_REACH_RATIO = 0.7;
-const PAIR_Z_CLEARANCE = 72;
-const PAIR_PUSH_ACCEL = 620;
-const PAIR_LATERAL_ACCEL = 90;
+    depth-first with a broad lateral shrug that also scatters the pile
+    across the viewport. Comfort spacing only — the hard guarantee is the
+    depth projection below. */
+const PAIR_XY_REACH_RATIO = 0.85;
+const PAIR_Z_CLEARANCE = 84;
+const PAIR_PUSH_ACCEL = 900;
+const PAIR_LATERAL_ACCEL = 170;
 
 /** Non-penetration, position-based: after integration, any two released
     leaves whose footprints overlap in the viewing plane are PROJECTED apart
     in depth until their gap covers both sheets' actual reach — a flex
-    budget plus a term for how far each tilted plane departs from vertical
-    slabhood. Scaled by release so the resting pile can exist, rate-limited
-    so neighbours part instead of teleporting, and skipped entirely during
-    the landing collapse. */
-const PAIR_HARD_X_RATIO = 0.95;
-const PAIR_HARD_Y_RATIO = 0.9;
-const PAIR_HARD_BASE_GAP = 48;
-const PAIR_HARD_TILT_GAP = 190;
-const PAIR_HARD_ITERATIONS = 3;
-const PAIR_HARD_MAX_STEP = 260;
-/** A held leaf is the reader's anchor: the pile parts around it. */
-const PAIR_GRABBED_MOBILITY = 0.12;
-const HARD_Z_FLOOR = 6;
+    budget plus each tilted plane's true depth extent (sin of its tilt times
+    its scaled half-diagonal), discounted by how far off-center the pair
+    sits: two tilted planes can only cross where they overlap, so an
+    edge-brushing pair needs a fraction of a concentric pair's gap. Scaled
+    by release so the resting pile can exist, rate-limited so neighbours
+    part instead of teleporting — EXCEPT when a true slab overlap already
+    exists, which resolves at panic speed because visible clipping is worse
+    than a fast shove. Skipped entirely during the landing collapse. */
+const PAIR_HARD_X_RATIO = 1.3;
+const PAIR_HARD_Y_RATIO = 1.15;
+/** Extra slack over the exact geometric requirement: cloth flex off the
+    carrier plane plus solver discreteness. */
+const PAIR_HARD_MARGIN = 34;
+/** Depth corrections are nearly invisible on screen — the perspective
+    counter-scale holds apparent size constant — so the stack passes may
+    move leaves briskly along z without reading as snaps. */
+const PAIR_HARD_PANIC_STEP = 9000;
+/** When the stacking chain demands more depth than the range holds (a gust
+    herding the whole pile into one column), gaps scale down to fit — and
+    the residual pressure escapes sideways: crowded pages slide apart in the
+    viewing plane like real sheets squirting out of a squeezed stack. */
+const PAIR_CHAIN_FILL = 0.92;
+const PAIR_LATERAL_RELIEF = 0.9;
+/** Crowded pages press flat: each overlapping neighbour multiplies the
+    broadside restoring torque, cutting the tilt reach that drives the
+    depth demand in the first place. */
+const CROWD_ALIGN_BOOST = 2.2;
+/** Sheets buried in a crowd are shielded from the wind: force and torque
+    fade with neighbours, so piles peel from the outside in instead of the
+    whole column being spun past what the depth range can hold. */
+const CROWD_WIND_SHIELD = 0.8;
+const CROWD_SPIN_DAMPING = 0.7;
+const HARD_Z_FLOOR_RATIO = -0.3;
 const HARD_Z_HEADROOM = 40;
-export const DRIFT_CURRENT_ACCEL = 340;
-export const DRIFT_CURRENT_RADIUS_RATIO = 0.6;
-export const DRIFT_PUFF_SPEED = 230;
-export const DRIFT_PUFF_RADIUS_RATIO = 0.95;
+export const DRIFT_CURRENT_ACCEL = 900;
+export const DRIFT_CURRENT_RADIUS_RATIO = 0.75;
+export const DRIFT_PUFF_SPEED = 420;
+export const DRIFT_PUFF_RADIUS_RATIO = 1.1;
+/** The cursor's own motion is the wind. Its velocity across the page plane
+    couples into every nearby leaf, so a fast sweep fans the pile in the
+    sweep direction instead of merely parting it radially. */
+const GUST_WAKE_COUPLING = 0.6;
+const GUST_WAKE_RADIUS_RATIO = 1.05;
+const GUST_WAKE_SPEED_CAP = 2600;
+const GUST_WAKE_DISPERSION = 0.9;
 
-const SEPARATION_SPEED = 92;
-const SEPARATION_SPIN = 0.34;
+const SEPARATION_SPEED = 130;
+const SEPARATION_SPIN = 0.6;
 
 const CONTAIN_ACCEL = 7;
 const CONTAIN_BRAKE = 3;
 const CONTAIN_MARGIN_X_RATIO = 0.45;
 const CONTAIN_MARGIN_Y_RATIO = 0.42;
-const CONTAIN_Z_MIN = 10;
+/** The drift volume extends BEHIND the resting page plane too — empty white
+    void where a page simply reads a little smaller. Eleven wild sheets
+    cannot layer in the front half alone. */
+const CONTAIN_Z_MIN_RATIO = -0.25;
 /** Deep enough toward the camera that eleven sheets can layer with real
     clearance; the perspective-aware x/y bounds shrink to compensate. */
 const CONTAIN_Z_MAX_RATIO = 0.7;
@@ -190,6 +248,14 @@ const CONTAIN_Z_MAX_RATIO = 0.7;
 const GRAB_STIFFNESS = 60;
 const GRAB_DAMPING = 15.5;
 const GRAB_PICK_PAD = 6;
+/** A held page rises gently toward the reader's hand — to the middle of the
+    depth range, so the pile keeps headroom to clear over or under it. */
+const GRAB_LIFT_RATE = 2;
+const GRAB_LIFT_BAND = 0.55;
+/** The hand's bow wave flattens the pages it sweeps past: leaves near the
+    held one get their broadside restoring torque multiplied, dropping their
+    tilt reach — and with it the depth gap they need — before contact. */
+const GRAB_WAKE_ALIGN_BOOST = 3.5;
 
 export const DRIFT_LAND_RATE = 3.2;
 const LAND_BRAKE = 6;
@@ -289,6 +355,17 @@ export function createDriftField(params: DriftFieldParams): DriftField {
       pairFY: 0,
       pairFZ: 0,
       swing: 0,
+      crowd: 0,
+      axisUX: 1,
+      axisUY: 0,
+      axisUZ: 0,
+      axisVX: 0,
+      axisVY: 1,
+      axisVZ: 0,
+      axisNX: 0,
+      axisNY: 0,
+      axisNZ: 1,
+      scale: 1,
       sepX: (sx / length) * SEPARATION_SPEED,
       sepY: (sy / length) * SEPARATION_SPEED,
       sepZ: (sz / length) * SEPARATION_SPEED,
@@ -314,6 +391,11 @@ export function createDriftField(params: DriftFieldParams): DriftField {
     grabLocalY: 0,
     wasPressed: false,
     puffed: false,
+    pointerWX: 0,
+    pointerWY: 0,
+    pointerTracked: false,
+    order: leaves.map((leaf) => leaf.index),
+    rank: leaves.map((leaf) => leaf.index),
     inertia: (pw * pw + ph * ph) / 12,
     pageScale: pw / REFERENCE_PAGE_WIDTH,
     pickLocalX: 0,
@@ -351,10 +433,12 @@ export function pickDriftLeaf(field: DriftField, input: DriftPointerInput): numb
   const rdz = -d;
   let best = -1;
   let bestS = Infinity;
-  const halfW = field.pw / 2 + GRAB_PICK_PAD;
-  const halfH = field.ph / 2 + GRAB_PICK_PAD;
 
   for (const leaf of field.leaves) {
+    // Picking respects the perspective counter-scale: the rendered sheet is
+    // leaf.scale of its nominal size, so the hit rectangle is too.
+    const halfW = (field.pw / 2) * leaf.scale + GRAB_PICK_PAD;
+    const halfH = (field.ph / 2) * leaf.scale + GRAB_PICK_PAD;
     // Ray into the leaf frame: rotate by the conjugate quaternion.
     rotate(
       -leaf.qx,
@@ -375,8 +459,16 @@ export function pickDriftLeaf(field: DriftField, input: DriftPointerInput): numb
     if (Math.abs(hx) > halfW || Math.abs(hy) > halfH) continue;
     best = leaf.index;
     bestS = s;
-    field.pickLocalX = clamp(hx, -field.pw / 2, field.pw / 2);
-    field.pickLocalY = clamp(hy, -field.ph / 2, field.ph / 2);
+    field.pickLocalX = clamp(
+      hx,
+      (-field.pw / 2) * leaf.scale,
+      (field.pw / 2) * leaf.scale,
+    );
+    field.pickLocalY = clamp(
+      hy,
+      (-field.ph / 2) * leaf.scale,
+      (field.ph / 2) * leaf.scale,
+    );
   }
   return best;
 }
@@ -422,8 +514,10 @@ function applyPuff(field: DriftField, input: DriftPointerInput) {
       pointScratch.z - leaf.z,
       gripScratch,
     );
-    const lx = clamp(gripScratch.x, -field.pw / 2, field.pw / 2);
-    const ly = clamp(gripScratch.y, -field.ph / 2, field.ph / 2);
+    const halfW = (field.pw / 2) * leaf.scale;
+    const halfH = (field.ph / 2) * leaf.scale;
+    const lx = clamp(gripScratch.x, -halfW, halfW);
+    const ly = clamp(gripScratch.y, -halfH, halfH);
     rotate(leaf.qx, leaf.qy, leaf.qz, leaf.qw, lx, ly, 0, gripScratch);
     leaf.vx += jx;
     leaf.vy += jy;
@@ -523,8 +617,35 @@ export function stepDriftField(
   if (field.phase === "landing") {
     field.wasPressed = input.pressed;
     stepLanding(field, dt);
+    for (const leaf of field.leaves) {
+      leaf.scale = Math.min(
+        1,
+        (input.cameraDistance - leaf.z) / input.cameraDistance,
+      );
+    }
     return;
   }
+
+  // The gust wake: pointer velocity across the page plane, the directional
+  // half of the wind. Tracked here so a still cursor blows nothing.
+  pointerPointAtDepth(input, 0, pointScratch);
+  let wakeX = 0;
+  let wakeY = 0;
+  if (input.inside && field.pointerTracked) {
+    wakeX = clamp(
+      (pointScratch.x - field.pointerWX) / dt,
+      -GUST_WAKE_SPEED_CAP,
+      GUST_WAKE_SPEED_CAP,
+    );
+    wakeY = clamp(
+      (pointScratch.y - field.pointerWY) / dt,
+      -GUST_WAKE_SPEED_CAP,
+      GUST_WAKE_SPEED_CAP,
+    );
+  }
+  field.pointerWX = pointScratch.x;
+  field.pointerWY = pointScratch.y;
+  field.pointerTracked = input.inside;
 
   if (field.phase === "loosen") {
     let allReleased = true;
@@ -575,6 +696,7 @@ export function stepDriftField(
     leaf.pairFX = 0;
     leaf.pairFY = 0;
     leaf.pairFZ = 0;
+    leaf.crowd = 0;
   }
   for (let i = 0; i < field.leaves.length; i += 1) {
     const a = field.leaves[i]!;
@@ -595,6 +717,8 @@ export function stepDriftField(
       const deficit = (PAIR_Z_CLEARANCE - gap) / PAIR_Z_CLEARANCE;
       const closeness = 1 - lateral / reach;
       const gate = a.release * b.release;
+      a.crowd += closeness * gate;
+      b.crowd += closeness * gate;
       const push = PAIR_PUSH_ACCEL * deficit * closeness * gate * 0.5;
       a.pairFZ -= direction * push;
       b.pairFZ += direction * push;
@@ -635,16 +759,26 @@ export function stepDriftField(
         0.4 * Math.sin(t * 0.13 + leaf.seedC * TAU + leaf.x * 0.003));
     fz += amb * 0.5 * Math.sin(t * 0.17 + leaf.seedC * TAU);
     const ambientSpin = AMBIENT_TORQUE * r * field.inertia;
-    tx += ambientSpin * 0.35 * Math.sin(t * 0.23 + leaf.seedC * TAU);
-    ty += ambientSpin * 0.5 * Math.sin(t * 0.19 + leaf.seedA * TAU);
-    tz += ambientSpin * 1.1 * Math.sin(t * 0.31 + leaf.seedB * TAU);
+    tx += ambientSpin * 0.8 * Math.sin(t * 0.23 + leaf.seedC * TAU);
+    ty += ambientSpin * 0.9 * Math.sin(t * 0.19 + leaf.seedA * TAU);
+    tz += ambientSpin * Math.sin(t * 0.31 + leaf.seedB * TAU);
 
     // Broadside-on preference: torque along n × ẑ eases the sheet's normal
     // toward whichever camera-facing pole it is already nearest, so flipped
     // leaves stay flipped and every sheet wobbles instead of knifing.
     rotate(leaf.qx, leaf.qy, leaf.qz, leaf.qw, 0, 0, 1, gripScratch);
     const facing = gripScratch.z >= 0 ? 1 : -1;
-    const alignGain = ALIGN_TORQUE * field.inertia * r * facing;
+    // Crowded pages press flat, and pages in a held leaf's path press
+    // flatter still — dropping the tilt reach that drives depth demand.
+    let alignBoost = 1 + CROWD_ALIGN_BOOST * Math.min(2.5, leaf.crowd);
+    if (field.grabIndex >= 0 && field.grabIndex !== leaf.index) {
+      const held = field.leaves[field.grabIndex]!;
+      const px = (leaf.x - held.x) / (field.pw * PAIR_HARD_X_RATIO);
+      const py = (leaf.y - held.y) / (field.ph * PAIR_HARD_Y_RATIO);
+      const proximity = 1 - Math.min(1, px * px + py * py);
+      alignBoost += GRAB_WAKE_ALIGN_BOOST * proximity;
+    }
+    const alignGain = ALIGN_TORQUE * alignBoost * field.inertia * r * facing;
     tx += gripScratch.y * alignGain;
     ty += -gripScratch.x * alignGain;
 
@@ -653,20 +787,34 @@ export function stepDriftField(
     fz += leaf.pairFZ;
 
     if (input.inside && field.grabIndex !== leaf.index) {
-      // The pointer's air current: a soft radial push, applied at the point
-      // of the sheet nearest the hand so close passes shoulder leaves into a
-      // slow tumble rather than a parallel slide.
+      // The pointer's wind: a radial push away from the hand plus the
+      // directional wake of the hand's own motion, both applied at the
+      // point of the sheet nearest the pointer, so pages tumble and wheel
+      // away instead of sliding off in formation.
       pointerPointAtDepth(input, leaf.z, pointScratch);
       const dx = leaf.x - pointScratch.x;
       const dy = leaf.y - pointScratch.y;
       const distance = Math.hypot(dx, dy);
       if (distance > 1e-3) {
+        const shield = 1 / (1 + CROWD_WIND_SHIELD * leaf.crowd);
         const falloff = Math.exp(
           -(distance * distance) / (currentRadius * currentRadius),
         );
-        const strength = DRIFT_CURRENT_ACCEL * field.pageScale * falloff * r;
-        const cfx = (dx / distance) * strength;
-        const cfy = (dy / distance) * strength;
+        const strength =
+          DRIFT_CURRENT_ACCEL * field.pageScale * falloff * r * shield;
+        const wakeRadius = field.pw * GUST_WAKE_RADIUS_RATIO;
+        const wakeFalloff = Math.exp(
+          -(distance * distance) / (wakeRadius * wakeRadius),
+        );
+        const wakeGain = GUST_WAKE_COUPLING * wakeFalloff * r * shield;
+        // Real gusts disperse: each leaf rides the wake with its own seeded
+        // sideways bias, so a sweep fans the pile out instead of herding
+        // every page into the corridor of the hand.
+        const disperse = (leaf.seedB - 0.5) * GUST_WAKE_DISPERSION;
+        const cfx =
+          (dx / distance) * strength + (wakeX - wakeY * disperse) * wakeGain;
+        const cfy =
+          (dy / distance) * strength + (wakeY + wakeX * disperse) * wakeGain;
         fx += cfx;
         fy += cfy;
         rotate(
@@ -679,8 +827,10 @@ export function stepDriftField(
           pointScratch.z - leaf.z,
           gripScratch,
         );
-        const lx = clamp(gripScratch.x, -field.pw / 2, field.pw / 2);
-        const ly = clamp(gripScratch.y, -field.ph / 2, field.ph / 2);
+        const halfW = (field.pw / 2) * leaf.scale;
+        const halfH = (field.ph / 2) * leaf.scale;
+        const lx = clamp(gripScratch.x, -halfW, halfW);
+        const ly = clamp(gripScratch.y, -halfH, halfH);
         rotate(leaf.qx, leaf.qy, leaf.qz, leaf.qw, lx, ly, 0, gripScratch);
         tx += -gripScratch.z * cfy;
         ty += gripScratch.z * cfx;
@@ -691,6 +841,8 @@ export function stepDriftField(
     let grabbed = false;
     if (field.grabIndex === leaf.index) {
       grabbed = true;
+      // Lift the held page toward the hand, above the pile it crosses.
+      fz += (zMax * GRAB_LIFT_BAND - leaf.z) * GRAB_LIFT_RATE;
       // Critically-damped spring from the gripped point of the sheet to the
       // pointer ray at the grip's own depth — dragging never changes depth.
       rotate(
@@ -750,8 +902,10 @@ export function stepDriftField(
     }
     if (leaf.z > zMax) {
       fz -= (leaf.z - zMax) * CONTAIN_ACCEL * r + CONTAIN_BRAKE * Math.max(0, leaf.vz);
-    } else if (leaf.z < CONTAIN_Z_MIN) {
-      fz += (CONTAIN_Z_MIN - leaf.z) * CONTAIN_ACCEL * r - CONTAIN_BRAKE * Math.min(0, leaf.vz);
+    } else if (leaf.z < field.ph * CONTAIN_Z_MIN_RATIO) {
+      fz +=
+        (field.ph * CONTAIN_Z_MIN_RATIO - leaf.z) * CONTAIN_ACCEL * r -
+        CONTAIN_BRAKE * Math.min(0, leaf.vz);
     }
 
     // Semi-implicit Euler with exponential damping; unit mass.
@@ -779,7 +933,9 @@ export function stepDriftField(
     leaf.wy += (ty / field.inertia) * dt;
     leaf.wz += (tz / field.inertia) * dt;
     const angularDamp = Math.exp(
-      -(ANGULAR_DAMPING + (grabbed ? GRABBED_EXTRA_DAMPING : 0)) * dt,
+      -(ANGULAR_DAMPING * (1 + CROWD_SPIN_DAMPING * Math.min(2.5, leaf.crowd)) +
+        (grabbed ? GRABBED_EXTRA_DAMPING : 0)) *
+        dt,
     );
     leaf.wx *= angularDamp;
     leaf.wy *= angularDamp;
@@ -805,28 +961,37 @@ export function stepDriftField(
     leaf.qy = nqy / norm;
     leaf.qz = nqz / norm;
     leaf.qw = nqw / norm;
-    clampSwing(leaf);
+    clampSwing(leaf, grabbed ? GRABBED_SWING_CAP : SWING_CAP);
   }
 
   projectDepthClearance(field, dt);
+
+  // The perspective counter-scale reads the FINAL depth of the frame, after
+  // the projection has had its say, so rendered size never lags a shove.
+  for (const leaf of field.leaves) {
+    leaf.scale = Math.min(
+      1,
+      (input.cameraDistance - leaf.z) / input.cameraDistance,
+    );
+  }
 }
 
 /** Hard tilt ceiling: rotate the leaf back toward its nearest camera-facing
-    pole just enough to stay inside SWING_CAP. Applied about the world axis
+    pole just enough to stay inside the cap. Applied about the world axis
     n × pole, which never disturbs in-plane roll. */
-function clampSwing(leaf: DriftLeafState) {
+function clampSwing(leaf: DriftLeafState, cap: number) {
   const { qx, qy, qz, qw } = leaf;
   const nx = 2 * (qx * qz + qy * qw);
   const ny = 2 * (qy * qz - qx * qw);
   const nz = 1 - 2 * (qx * qx + qy * qy);
   const pole = nz >= 0 ? 1 : -1;
   const cosTilt = clamp(nz * pole, -1, 1);
-  if (cosTilt >= COS_SWING_CAP) return;
+  if (cosTilt >= Math.cos(cap)) return;
   const axisX = ny * pole;
   const axisY = -nx * pole;
   const axisLength = Math.hypot(axisX, axisY);
   if (axisLength < 1e-6) return;
-  const half = (Math.acos(cosTilt) - SWING_CAP) / 2;
+  const half = (Math.acos(cosTilt) - cap) / 2;
   const s = Math.sin(half) / axisLength;
   const rx = axisX * s;
   const ry = axisY * s;
@@ -848,51 +1013,182 @@ function clampSwing(leaf: DriftLeafState) {
 function projectDepthClearance(field: DriftField, dt: number) {
   const reachX = field.pw * PAIR_HARD_X_RATIO;
   const reachY = field.ph * PAIR_HARD_Y_RATIO;
-  const maxStep = PAIR_HARD_MAX_STEP * dt;
+  const zFloor = field.ph * HARD_Z_FLOOR_RATIO;
   const zCeil = field.ph * CONTAIN_Z_MAX_RATIO + HARD_Z_HEADROOM;
-  for (const leaf of field.leaves) {
-    const nz = 1 - 2 * (leaf.qx * leaf.qx + leaf.qy * leaf.qy);
-    leaf.swing = Math.sqrt(Math.max(0, 1 - nz * nz));
+  const refreshAxes = (leaf: DriftLeafState) => {
+    const { qx, qy, qz, qw } = leaf;
+    leaf.axisUX = 1 - 2 * (qy * qy + qz * qz);
+    leaf.axisUY = 2 * (qx * qy + qz * qw);
+    leaf.axisUZ = 2 * (qx * qz - qy * qw);
+    leaf.axisVX = 2 * (qx * qy - qz * qw);
+    leaf.axisVY = 1 - 2 * (qx * qx + qz * qz);
+    leaf.axisVZ = 2 * (qy * qz + qx * qw);
+    leaf.axisNX = 2 * (qx * qz + qy * qw);
+    leaf.axisNY = 2 * (qy * qz - qx * qw);
+    leaf.axisNZ = 1 - 2 * (qx * qx + qy * qy);
+    leaf.swing = Math.sqrt(
+      Math.max(0, 1 - leaf.axisNZ * leaf.axisNZ),
+    );
+  };
+  for (const leaf of field.leaves) refreshAxes(leaf);
+  // One stacking order per frame (insertion sort, stable by index). Every
+  // correction pushes along this order — a pair can never be shoved both
+  // ways in one frame, which is what used to let near-coplanar sheets
+  // oscillate straight through each other.
+  const { order, rank } = field;
+  for (let i = 1; i < order.length; i += 1) {
+    const moving = order[i]!;
+    const movingZ = field.leaves[moving]!.z;
+    let slot = i - 1;
+    while (
+      slot >= 0 &&
+      (field.leaves[order[slot]!]!.z > movingZ ||
+        (field.leaves[order[slot]!]!.z === movingZ && order[slot]! > moving))
+    ) {
+      order[slot + 1] = order[slot]!;
+      slot -= 1;
+    }
+    order[slot + 1] = moving;
   }
-  for (let sweep = 0; sweep < PAIR_HARD_ITERATIONS; sweep += 1) {
-    for (let i = 0; i < field.leaves.length; i += 1) {
-      const a = field.leaves[i]!;
-      if (a.release <= 0) continue;
-      for (let j = i + 1; j < field.leaves.length; j += 1) {
-        const b = field.leaves[j]!;
-        if (b.release <= 0) continue;
-        // Elliptical footprint-overlap test so tall pages separate on their
-        // long axis too, not just across the spine.
-        const ox = (b.x - a.x) / reachX;
-        const oy = (b.y - a.y) / reachY;
-        if (ox * ox + oy * oy >= 1) continue;
-        const gate = a.release * b.release;
-        const required =
-          gate *
-          (PAIR_HARD_BASE_GAP + PAIR_HARD_TILT_GAP * (a.swing + b.swing));
-        const dz = b.z - a.z;
-        const gap = Math.abs(dz);
-        if (gap >= required) continue;
-        // Co-planar tie: the later sheet steps toward the camera.
-        const direction = dz !== 0 ? Math.sign(dz) : 1;
-        const correction = Math.min(required - gap, maxStep);
-        const mobilityA =
-          field.grabIndex === a.index ? PAIR_GRABBED_MOBILITY : 1;
-        const mobilityB =
-          field.grabIndex === b.index ? PAIR_GRABBED_MOBILITY : 1;
-        const total = mobilityA + mobilityB;
-        a.z -= direction * correction * (mobilityA / total);
-        b.z += direction * correction * (mobilityB / total);
-        a.z = clamp(a.z, HARD_Z_FLOOR, zCeil);
-        b.z = clamp(b.z, HARD_Z_FLOOR, zCeil);
-        // Inelastic contact: closing depth velocity dies with the overlap.
-        if ((b.vz - a.vz) * direction < 0) {
-          const shared =
-            (a.vz * mobilityB + b.vz * mobilityA) / total;
-          a.vz = shared;
-          b.vz = shared;
-        }
+  for (let position = 0; position < order.length; position += 1) {
+    rank[order[position]!] = position;
+  }
+
+  const requiredFor = (a: DriftLeafState, b: DriftLeafState) => {
+    const ox = (b.x - a.x) / reachX;
+    const oy = (b.y - a.y) / reachY;
+    if (ox * ox + oy * oy >= 1) return 0;
+    // Exact and continuous: |dz| covering the sum of both sheets' true
+    // z-extents makes the depth axis a separating axis — airtight by SAT
+    // sufficiency, whatever the pair's orientation. Near-parallel stacks
+    // over-pay by this metric, which is precisely when the chain scaler
+    // below flattens them until the demand fits the depth range.
+    const gate = a.release * b.release;
+    const extA =
+      (field.pw / 2) * a.scale * Math.abs(a.axisUZ) +
+      (field.ph / 2) * a.scale * Math.abs(a.axisVZ);
+    const extB =
+      (field.pw / 2) * b.scale * Math.abs(b.axisUZ) +
+      (field.ph / 2) * b.scale * Math.abs(b.axisVZ);
+    return gate * (extA + extB + PAIR_HARD_MARGIN);
+  };
+
+  // A gust can herd every leaf into one column whose stacking chain wants
+  // more depth than the range holds. Gaps scale down to fit — the residual
+  // pressure escapes through the lateral relief below instead.
+  let chainDemand = 0;
+  for (let position = 1; position < order.length; position += 1) {
+    chainDemand += requiredFor(
+      field.leaves[order[position - 1]!]!,
+      field.leaves[order[position]!]!,
+    );
+  }
+  const chainRoom = (zCeil - zFloor) * PAIR_CHAIN_FILL;
+  let demandScale = chainDemand > chainRoom ? chainRoom / chainDemand : 1;
+
+  // If the tilts themselves are what cannot fit, the crowd pressure
+  // physically flattens the pages until the chain fits again — wind-pressed
+  // paper in a squeezed stack lies nearly flat. The cap walks down
+  // geometrically until demand actually fits (flat pages always do), so a
+  // feasible layout exists every frame; free play (an unsaturated chain)
+  // never enters this loop and keeps the full cap.
+  let crowdCap = SWING_CAP;
+  for (let pass = 0; pass < 6 && demandScale < 1; pass += 1) {
+    crowdCap = Math.max(0.04, crowdCap * 0.55);
+    for (const leaf of field.leaves) {
+      if (leaf.index === field.grabIndex) continue;
+      clampSwing(leaf, crowdCap);
+      refreshAxes(leaf);
+    }
+    chainDemand = 0;
+    for (let position = 1; position < order.length; position += 1) {
+      chainDemand += requiredFor(
+        field.leaves[order[position - 1]!]!,
+        field.leaves[order[position]!]!,
+      );
+    }
+    demandScale = chainDemand > chainRoom ? chainRoom / chainDemand : 1;
+  }
+
+  // One budgeted forward/backward stack pass instead of pairwise sweeps:
+  // extent-based requirements obey the triangle inequality, so satisfying
+  // every leaf against its predecessors (and the ceiling from above) covers
+  // all pairs without the conflicting pushes that stall Gauss-Seidel.
+  const budget = PAIR_HARD_PANIC_STEP * dt;
+  const floorFor = (position: number) => {
+    const leaf = field.leaves[order[position]!]!;
+    let floorZ = zFloor;
+    let binding: DriftLeafState | null = null;
+    for (let below = 0; below < position; below += 1) {
+      const other = field.leaves[order[below]!]!;
+      if (other.release <= 0) continue;
+      const required = requiredFor(other, leaf);
+      if (required <= 0) continue;
+      const need = other.z + required;
+      if (need > floorZ) {
+        floorZ = need;
+        binding = other;
       }
+    }
+    return { floorZ, binding };
+  };
+  const ceilFor = (position: number) => {
+    const leaf = field.leaves[order[position]!]!;
+    let ceilZ = zCeil;
+    for (let above = position + 1; above < order.length; above += 1) {
+      const other = field.leaves[order[above]!]!;
+      if (other.release <= 0) continue;
+      const required = requiredFor(leaf, other);
+      if (required <= 0) continue;
+      ceilZ = Math.min(ceilZ, other.z - required);
+    }
+    return ceilZ;
+  };
+
+  // Two budgeted, two-sided stack passes instead of pairwise sweeps:
+  // extent-based requirements obey the triangle inequality, so satisfying
+  // every leaf against its neighbours in rank order covers all pairs, and
+  // each move stays inside the leaf's own feasible interval so the passes
+  // can never fling a leaf through the constraint it was escaping.
+  for (let position = 1; position < order.length; position += 1) {
+    const leaf = field.leaves[order[position]!]!;
+    if (leaf.release <= 0) continue;
+    const { floorZ, binding } = floorFor(position);
+    if (binding === null || leaf.z >= floorZ) continue;
+    const ceilZ = Math.max(ceilFor(position), leaf.z);
+    const target = Math.min(floorZ, ceilZ);
+    const deficit = floorZ - leaf.z;
+    leaf.z = Math.min(leaf.z + Math.min(deficit, budget), target);
+    // Contact: closing depth speed dies with the squeeze.
+    if (leaf.vz < 0) leaf.vz *= 0.2;
+    if (binding.vz > 0) binding.vz *= 0.2;
+    // Squeezed pages escape sideways too, draining the very overlap that
+    // created the demand. Velocity, not position: containment and the
+    // speed cap stay in charge of the outcome.
+    const lateralX = leaf.x - binding.x;
+    const lateralY = leaf.y - binding.y;
+    const lateralLength = Math.hypot(lateralX, lateralY);
+    if (lateralLength > 1e-3) {
+      const slide = Math.min(deficit * PAIR_LATERAL_RELIEF, 1400) * dt * 0.5;
+      leaf.vx += (lateralX / lateralLength) * slide;
+      leaf.vy += (lateralY / lateralLength) * slide;
+      binding.vx -= (lateralX / lateralLength) * slide;
+      binding.vy -= (lateralY / lateralLength) * slide;
+    }
+  }
+  for (let position = order.length - 1; position >= 0; position -= 1) {
+    const leaf = field.leaves[order[position]!]!;
+    if (leaf.release <= 0) continue;
+    const ceilZ = ceilFor(position);
+    if (leaf.z > ceilZ) {
+      const { floorZ } = floorFor(position);
+      const target = Math.max(ceilZ, Math.min(floorZ, leaf.z));
+      leaf.z = Math.max(leaf.z - budget, target);
+      if (leaf.vz > 0) leaf.vz *= 0.2;
+    }
+    if (leaf.z < zFloor) {
+      leaf.z = zFloor;
+      if (leaf.vz < 0) leaf.vz = 0;
     }
   }
 }
@@ -915,7 +1211,9 @@ export function driftLeafPoint(
  * Writes the carrier-transformed rest grid into a preallocated guide array —
  * the target surface the sheet solver then flexes against. One rotation
  * matrix per leaf per frame beats half a thousand quaternion sandwiches.
- * Grid order matches PlaneGeometry: rows top to bottom, column 0 the spine.
+ * The matrix folds in leaf.scale, the perspective counter-scale that keeps
+ * a floating page's apparent size constant at any depth. Grid order matches
+ * PlaneGeometry: rows top to bottom, column 0 the spine.
  */
 export function writeDriftLeafGuide(
   leaf: DriftLeafState,
@@ -923,13 +1221,13 @@ export function writeDriftLeafGuide(
   rowsY: ArrayLike<number>,
   guide: DriftVec[],
 ) {
-  const { qx, qy, qz, qw } = leaf;
-  const m00 = 1 - 2 * (qy * qy + qz * qz);
-  const m01 = 2 * (qx * qy - qz * qw);
-  const m10 = 2 * (qx * qy + qz * qw);
-  const m11 = 1 - 2 * (qx * qx + qz * qz);
-  const m20 = 2 * (qx * qz - qy * qw);
-  const m21 = 2 * (qy * qz + qx * qw);
+  const { qx, qy, qz, qw, scale } = leaf;
+  const m00 = (1 - 2 * (qy * qy + qz * qz)) * scale;
+  const m01 = 2 * (qx * qy - qz * qw) * scale;
+  const m10 = 2 * (qx * qy + qz * qw) * scale;
+  const m11 = (1 - 2 * (qx * qx + qz * qz)) * scale;
+  const m20 = 2 * (qx * qz - qy * qw) * scale;
+  const m21 = 2 * (qy * qz + qx * qw) * scale;
   let vertex = 0;
   for (let row = 0; row < rowsY.length; row += 1) {
     const ly = rowsY[row]!;

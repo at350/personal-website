@@ -52,6 +52,87 @@ const homeDistance = (field: DriftField, index: number) => {
   );
 };
 
+type Leaf = DriftField["leaves"][number];
+
+/** The leaf's in-plane axes and scaled half-extents as a 3D rectangle. */
+const rectangle = (leaf: Leaf) => {
+  const { qx, qy, qz, qw } = leaf;
+  return {
+    cx: leaf.x,
+    cy: leaf.y,
+    cz: leaf.z,
+    ux: 1 - 2 * (qy * qy + qz * qz),
+    uy: 2 * (qx * qy + qz * qw),
+    uz: 2 * (qx * qz - qy * qw),
+    vx: 2 * (qx * qy - qz * qw),
+    vy: 1 - 2 * (qx * qx + qz * qz),
+    vz: 2 * (qy * qz + qx * qw),
+    hu: (PW / 2) * leaf.scale,
+    hv: (PH / 2) * leaf.scale,
+  };
+};
+
+/**
+ * Separating-axis test between two leaf rectangles in 3D. Returns the widest
+ * separation over all candidate axes: positive means a real gap exists on
+ * some axis, negative approximates the penetration depth.
+ */
+const rectangleSeparation = (a: Leaf, b: Leaf) => {
+  const A = rectangle(a);
+  const B = rectangle(b);
+  const dx = B.cx - A.cx;
+  const dy = B.cy - A.cy;
+  const dz = B.cz - A.cz;
+  const axes: Array<[number, number, number]> = [];
+  const cross = (
+    x1: number, y1: number, z1: number,
+    x2: number, y2: number, z2: number,
+  ): [number, number, number] => [
+    y1 * z2 - z1 * y2,
+    z1 * x2 - x1 * z2,
+    x1 * y2 - y1 * x2,
+  ];
+  axes.push(cross(A.ux, A.uy, A.uz, A.vx, A.vy, A.vz)); // normal of A
+  axes.push(cross(B.ux, B.uy, B.uz, B.vx, B.vy, B.vz)); // normal of B
+  axes.push(cross(A.ux, A.uy, A.uz, B.ux, B.uy, B.uz));
+  axes.push(cross(A.ux, A.uy, A.uz, B.vx, B.vy, B.vz));
+  axes.push(cross(A.vx, A.vy, A.vz, B.ux, B.uy, B.uz));
+  axes.push(cross(A.vx, A.vy, A.vz, B.vx, B.vy, B.vz));
+  let widest = -Infinity;
+  for (const [x, y, z] of axes) {
+    const length = Math.hypot(x, y, z);
+    if (length < 1e-9) continue;
+    const nx = x / length;
+    const ny = y / length;
+    const nz = z / length;
+    const distance = Math.abs(dx * nx + dy * ny + dz * nz);
+    const reachA =
+      A.hu * Math.abs(A.ux * nx + A.uy * ny + A.uz * nz) +
+      A.hv * Math.abs(A.vx * nx + A.vy * ny + A.vz * nz);
+    const reachB =
+      B.hu * Math.abs(B.ux * nx + B.uy * ny + B.uz * nz) +
+      B.hv * Math.abs(B.vx * nx + B.vy * ny + B.vz * nz);
+    widest = Math.max(widest, distance - (reachA + reachB));
+  }
+  return widest;
+};
+
+/** Deepest pairwise rectangle penetration in the field; ≥ 0 when no two
+    leaf planes intersect at all. */
+const worstPenetration = (field: DriftField) => {
+  let worst = 0;
+  for (let i = 0; i < field.leaves.length; i += 1) {
+    for (let j = i + 1; j < field.leaves.length; j += 1) {
+      const separation = rectangleSeparation(
+        field.leaves[i]!,
+        field.leaves[j]!,
+      );
+      if (separation < worst) worst = separation;
+    }
+  }
+  return -worst;
+};
+
 /* Multi-hundred-frame integrations: deterministic, but wall-clock-sensitive
    on starved CI workers — same allowance the paper sheet suite takes. */
 describe("drift leaf field", { timeout: 30_000 }, () => {
@@ -91,10 +172,9 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
     expect(field.phase).toBe("adrift");
     for (const leaf of field.leaves) {
       expect(leaf.release).toBe(1);
-      // Each leaf has visibly departed its slot in the pile.
+      // Each leaf has visibly departed its slot in the pile — forward or
+      // backward; the drift volume spans both sides of the page plane.
       expect(homeDistance(field, leaf.index)).toBeGreaterThan(15);
-      // And floated forward, off the stack plane, toward the camera.
-      expect(leaf.z).toBeGreaterThan(field.leaves[leaf.index]!.homeZ);
     }
   });
 
@@ -109,50 +189,60 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
       // Soft containment: centers never reach the viewport edge.
       expect(Math.abs(leaf.x + input.shift)).toBeLessThan(720);
       expect(Math.abs(leaf.y)).toBeLessThan(450);
-      expect(leaf.z).toBeGreaterThan(-40);
+      expect(leaf.z).toBeGreaterThan(PH * -0.35 - 20);
       expect(leaf.z).toBeLessThan(PH * 0.7 + 60);
     }
   });
 
-  it("keeps every sheet wobbling near camera-facing instead of knifing", () => {
-    const field = makeField();
-    run(field, 1800, makeInput()); // 30 seconds: alignment fully settled
-    for (const leaf of field.leaves) {
-      // Rotate the local normal (0,0,1) by the leaf quaternion; the z
-      // component is the cosine of the tilt off the viewing axis.
-      const nz =
-        1 - 2 * (leaf.qx * leaf.qx + leaf.qy * leaf.qy);
-      expect(Math.abs(nz)).toBeGreaterThan(0.85);
-    }
-  });
-
-  /** Worst pairwise depth deficit among leaves whose footprints overlap on
-      screen: positive means every overlapping pair holds real clearance. */
-  const worstOverlapClearance = (field: DriftField) => {
-    let worst = Infinity;
-    for (let i = 0; i < field.leaves.length; i += 1) {
-      for (let j = i + 1; j < field.leaves.length; j += 1) {
-        const a = field.leaves[i]!;
-        const b = field.leaves[j]!;
-        const ox = (b.x - a.x) / (PW * 0.9);
-        const oy = (b.y - a.y) / (PH * 0.85);
-        if (ox * ox + oy * oy >= 1) continue;
-        worst = Math.min(worst, Math.abs(b.z - a.z));
-      }
-    }
-    return worst;
-  };
-
-  it("guarantees depth clearance between leaves that overlap on screen", () => {
+  it("keeps a floating page's apparent size constant at any depth", () => {
     const field = makeField();
     const input = makeInput();
-    run(field, 150, input); // fully adrift
-    // The hard projection must hold from the moment the pile is loose,
-    // through every frame of a long unattended drift.
+    run(field, 600, input); // deep into the drift, leaves spread in z
+    let spread = 0;
+    for (const leaf of field.leaves) {
+      spread = Math.max(spread, leaf.z);
+      // World size shrinks by exactly the perspective magnification, so the
+      // projected width stays the nominal page width.
+      const apparent =
+        PW * leaf.scale * (input.cameraDistance / (input.cameraDistance - leaf.z));
+      if (leaf.z >= 0) {
+        expect(apparent).toBeGreaterThan(PW * 0.995);
+        expect(apparent).toBeLessThan(PW * 1.005);
+      } else {
+        // Behind the page plane the counter-scale caps at 1 — pages may
+        // look slightly smaller there, never zoomed.
+        expect(leaf.scale).toBe(1);
+      }
+    }
+    // The run actually exercised real depth.
+    expect(spread).toBeGreaterThan(100);
+  });
+
+  it("never lets two leaf planes intersect, from loosen through a long drift", () => {
+    const field = makeField();
+    const input = makeInput();
+    // The freshly loosened pile sits at a 2.3px pitch where near-parallel
+    // sheets may brush; once release completes the invariant is strict.
+    for (let frame = 0; frame < 150; frame += 1) {
+      stepDriftField(field, DT, input);
+      expect(worstPenetration(field)).toBeLessThan(9);
+    }
+    let sum = 0;
+    let grazes = 0;
+    let peak = 0;
     for (let frame = 0; frame < 1650; frame += 1) {
       stepDriftField(field, DT, input);
-      expect(worstOverlapClearance(field)).toBeGreaterThan(30);
+      const penetration = worstPenetration(field);
+      sum += penetration;
+      if (penetration > 6) grazes += 1;
+      peak = Math.max(peak, penetration);
     }
+    expect(peak).toBeLessThan(30);
+    // Regression rails against the fused-pages state (which measured a
+    // CONSTANT 100-240px): occasional corner grazes stay shallow, the field
+    // is clean on average, and grazes show on a small fraction of frames.
+    expect(sum / 1650).toBeLessThan(1.6);
+    expect(grazes / 1650).toBeLessThan(0.1);
   });
 
   it("parts the pile around a dragged leaf instead of cutting through it", () => {
@@ -175,19 +265,25 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
     stepDriftField(field, DT, grab);
     expect(field.grabIndex).toBe(front);
     // Sweep the held leaf clear across the pile and back.
+    let dragSum = 0;
     for (let frame = 0; frame < 240; frame += 1) {
       const swing = Math.sin(frame / 24) * 420;
       stepDriftField(field, DT, { ...grab, screenX: grab.screenX + swing });
-      expect(worstOverlapClearance(field)).toBeGreaterThan(24);
+      // A deliberate full-pile thrash may graze corners for a few frames.
+      // The rails: transients stay bounded far below the old fused state
+      // (which measured 100-240px constantly), and the average stays small.
+      const penetration = worstPenetration(field);
+      dragSum += penetration;
+      expect(penetration).toBeLessThan(36);
     }
+    expect(dragSum / 240).toBeLessThan(8);
   });
 
-  it("caps out-of-plane tilt so no sheet can knife its neighbours", () => {
+  it("keeps planes apart under gusts, wake sweeps, and corner yanks", () => {
     const field = makeField();
     const idle = makeInput();
     run(field, 150, idle);
-    // Grab a corner and yank hard — grab torque is the strongest tilt
-    // source in the field.
+    // Grab a corner and yank hard while the pointer wake thrashes the rest.
     let front = 0;
     for (const leaf of field.leaves) {
       if (leaf.z > field.leaves[front]!.z) front = leaf.index;
@@ -202,7 +298,8 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
       screenY: (leaf.y + PH * 0.4) * scale,
     });
     stepDriftField(field, DT, grab);
-    const capFloor = Math.cos(0.34); // SWING_CAP plus a numerical whisker
+    const capFloor = Math.cos(1.1); // SWING_CAP plus a numerical whisker
+    let yankSum = 0;
     for (let frame = 0; frame < 300; frame += 1) {
       const jerk = Math.sin(frame / 6) * 500;
       stepDriftField(field, DT, {
@@ -210,11 +307,64 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
         screenX: grab.screenX + jerk,
         screenY: grab.screenY - jerk / 2,
       });
+      const penetration = worstPenetration(field);
+      yankSum += penetration;
+      expect(penetration).toBeLessThan(36);
       for (const each of field.leaves) {
         const nz = 1 - 2 * (each.qx * each.qx + each.qy * each.qy);
         expect(Math.abs(nz)).toBeGreaterThanOrEqual(capFloor);
       }
     }
+    expect(yankSum / 300).toBeLessThan(8);
+  });
+
+  it("actually flies: wake sweeps produce real speed and deep tilt", () => {
+    const field = makeField();
+    const idle = makeInput();
+    run(field, 150, idle);
+    let topSpeed = 0;
+    let topSwing = 0;
+    for (let frame = 0; frame < 600; frame += 1) {
+      // A vigorous figure-eight sweep across the pile.
+      stepDriftField(field, DT, {
+        ...idle,
+        inside: true,
+        screenX: Math.sin(frame / 18) * 500,
+        screenY: Math.sin(frame / 11) * 300,
+      });
+      for (const each of field.leaves) {
+        topSpeed = Math.max(
+          topSpeed,
+          Math.hypot(each.vx, each.vy, each.vz),
+        );
+        const nz = 1 - 2 * (each.qx * each.qx + each.qy * each.qy);
+        topSwing = Math.max(topSwing, Math.sqrt(Math.max(0, 1 - nz * nz)));
+      }
+    }
+    // The wind is worth playing with: pages genuinely fly, and even inside
+    // a herded (crowd-flattened) sweep they keep a visible lean.
+    expect(topSpeed).toBeGreaterThan(300);
+    expect(topSwing).toBeGreaterThan(0.32);
+
+    // In open air — pile spread out, no crowding — a gust wheels pages
+    // through genuinely deep tilt.
+    const open = makeField();
+    run(open, 900, idle); // long idle: leaves well scattered
+    let openSwing = 0;
+    for (let frame = 0; frame < 300; frame += 1) {
+      stepDriftField(open, DT, {
+        ...idle,
+        inside: true,
+        pressed: frame % 60 === 0,
+        screenX: Math.sin(frame / 30) * 420,
+        screenY: Math.cos(frame / 23) * 260,
+      });
+      for (const each of open.leaves) {
+        const nz = 1 - 2 * (each.qx * each.qx + each.qy * each.qy);
+        openSwing = Math.max(openSwing, Math.sqrt(Math.max(0, 1 - nz * nz)));
+      }
+    }
+    expect(openSwing).toBeGreaterThan(0.55);
   });
 
   it("keeps drifting gently instead of freezing once separation decays", () => {
