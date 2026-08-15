@@ -29,6 +29,9 @@ export interface DriftSheetOptions {
       runs them at full strength to kill the accordion mode; a floating leaf
       wants to actually hold a bow, so drift runs them relaxed. */
   curvatureScale?: number;
+  /** Scales the structural rest lengths to match a uniformly scaled guide
+      (drift's perspective counter-scale). The page-turn regime is always 1. */
+  restScale?: number;
 }
 
 interface Constraint {
@@ -90,6 +93,8 @@ export class PaperSheet {
   private readonly previous: LeafVertex[];
   private initialized = false;
   private energy = 0;
+  /** Drift's uniform guide scale; every other regime runs at 1. */
+  private restScale = 1;
 
   constructor(
     width: number,
@@ -164,6 +169,7 @@ export class PaperSheet {
 
   step(target: readonly LeafVertex[], options: PaperStepOptions): LeafVertex[] {
     if (!this.initialized) this.reset(target);
+    this.restScale = 1;
     const dt = Math.min(1 / 30, Math.max(1 / 240, options.dt));
     const frameScale = dt * 60;
     const damping = Math.pow(
@@ -255,6 +261,7 @@ export class PaperSheet {
     options: DriftSheetOptions,
   ): LeafVertex[] {
     if (!this.initialized) this.reset(target);
+    this.restScale = options.restScale ?? 1;
     const dt = Math.min(1 / 30, Math.max(1 / 240, options.dt));
     const frameScale = dt * 60;
     const damping = Math.pow(options.damping, frameScale);
@@ -435,7 +442,8 @@ export class PaperSheet {
     const weight = weightA + weightB;
     if (weight === 0) return;
     const correction =
-      ((length - constraint.rest) / length) * constraint.stiffness / weight;
+      ((length - constraint.rest * this.restScale) / length) *
+      constraint.stiffness / weight;
 
     if (weightA) {
       const moveX = dx * correction * weightA;
