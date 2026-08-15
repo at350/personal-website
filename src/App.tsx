@@ -131,6 +131,9 @@ function Meta() {
 export default function App() {
   return (
     <BrowserRouter basename={routerBasename()}>
+      <div className="wip-banner" role="status">
+        This site is currently a work in progress.
+      </div>
       <Meta />
       <Routes>
         <Route path="/writing/:slug" element={<WritingPage />} />
