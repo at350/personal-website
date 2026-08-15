@@ -95,3 +95,21 @@ ol {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.wip-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 0.6em 1.25em;
+  padding-top: calc(0.6em + env(safe-area-inset-top));
+  background: var(--red);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.4;
+}
