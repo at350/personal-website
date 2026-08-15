@@ -75,6 +75,13 @@ function landingProximityFade(progress: number) {
   return t * t * (3 - 2 * t);
 }
 
+/** Motion-only gleam for the weightless drift leaves. No turn-position term
+    exists in open air; the shared energy knee still guarantees a resting leaf
+    shows the exact canonical pixels the DOM swap needs. */
+export function paperDriftActivity(energy: number) {
+  return motionGleam(energy);
+}
+
 /**
  * The gleam envelope the materials actually follow. Position gives the broad
  * mid-flight gloss; motion keeps it breathing while the under-damped sheet is

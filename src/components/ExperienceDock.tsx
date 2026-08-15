@@ -113,6 +113,23 @@ const OPEN_HEIGHT =
   ITEM_GAP * (EXPERIENCE_MODES.length - 1) +
   DOCK_PADDING * 2;
 
+/** The book itself falls back to the stacked reader below this width, and
+    Drift is a book-only experience. */
+export const DRIFT_MIN_VIEWPORT_WIDTH = 900;
+
+/** Drift mirrors the book's own fallback rules: no weightless physics under
+    reduced motion or on viewports where the reader takes over. */
+export function driftModeAvailable(
+  reducedMotion: boolean,
+  viewportWidth: number,
+): boolean {
+  return !reducedMotion && viewportWidth >= DRIFT_MIN_VIEWPORT_WIDTH;
+}
+
+function viewportWidthNow() {
+  return typeof window === "undefined" ? 1280 : window.innerWidth;
+}
+
 /**
  * A compact, global mode switcher. The selected mode collapses into the lone
  * orb; hovering, focusing, or tapping it reveals the remaining experiences.
@@ -127,6 +144,7 @@ export function ExperienceDock({
   const selectedMode = controlledMode ?? uncontrolledMode;
   const [expanded, setExpanded] = useState(false);
   const [availableHeight, setAvailableHeight] = useState(viewportHeight);
+  const [viewportWidth, setViewportWidth] = useState(viewportWidthNow);
   const dockRef = useRef<HTMLDivElement>(null);
   const buttonsRef = useRef<Array<HTMLButtonElement | null>>([]);
   const restoringFocusRef = useRef(false);
@@ -216,10 +234,15 @@ export function ExperienceDock({
   );
 
   useEffect(() => {
-    const onResize = () => setAvailableHeight(viewportHeight());
+    const onResize = () => {
+      setAvailableHeight(viewportHeight());
+      setViewportWidth(viewportWidthNow());
+    };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  const driftAvailable = driftModeAvailable(Boolean(reduceMotion), viewportWidth);
 
   useEffect(() => {
     if (!expanded) return;
@@ -283,6 +306,9 @@ export function ExperienceDock({
       keyboardFocusRef.current = true;
 
       if (event.key === "Escape") {
+        // With nothing open, Escape belongs to the page (it lands Drift
+        // there); the dock only claims the key while it has a flyout to close.
+        if (!expanded) return;
         closeDock();
         restoringFocusRef.current = true;
         buttonsRef.current[selectedIndex]?.focus();
@@ -316,7 +342,7 @@ export function ExperienceDock({
       event.preventDefault();
       event.stopPropagation();
     },
-    [closeDock, openDock, selectedIndex],
+    [closeDock, expanded, openDock, selectedIndex],
   );
 
   return (
@@ -367,6 +393,9 @@ export function ExperienceDock({
 
       {EXPERIENCE_MODES.map(({ id, label, detail, Icon }, index) => {
         const selected = id === selectedMode;
+        // aria-disabled instead of the native attribute so the roving arrow
+        // focus can still pass through the unavailable slot.
+        const disabled = id === "drift" && !driftAvailable;
         const openY = DOCK_PADDING + index * (ITEM_SIZE + ITEM_GAP);
 
         return (
@@ -377,7 +406,9 @@ export function ExperienceDock({
             }}
             type="button"
             className="experience-dock__mode"
-            aria-label={`${label}: ${detail}${selected ? ", selected" : ""}`}
+            aria-label={`${label}: ${detail}${selected ? ", selected" : ""}${disabled ? ", unavailable" : ""}`}
+            aria-disabled={disabled || undefined}
+            data-disabled={disabled ? "true" : undefined}
             aria-pressed={selected}
             aria-expanded={selected ? expanded : undefined}
             aria-hidden={!expanded && !selected}
@@ -407,7 +438,13 @@ export function ExperienceDock({
               keyboardFocusRef.current = false;
               expandedAtPointerDownRef.current = expanded;
             }}
-            onClick={() => selectMode(id)}
+            onClick={() => {
+              // A disabled entry cannot be chosen, but the collapsed orb IS
+              // the dock's only handle: when the selected mode itself has
+              // become unavailable, tapping it must still open the flyout.
+              if (disabled && id !== selectedMode) return;
+              selectMode(id);
+            }}
           >
             <motion.span
               className="experience-dock__icon-wrap"

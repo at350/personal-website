@@ -71,6 +71,7 @@ function BookView() {
           targetSpread={target}
           onSpreadSettled={onSettled}
           experienceMode={experienceMode}
+          onExperienceModeChange={setExperienceMode}
         />
       </Suspense>
       {experienceMode === "ignite" ? (
