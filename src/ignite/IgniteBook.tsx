@@ -1228,6 +1228,7 @@ export function IgniteBook({
             pw={pw}
             ph={ph}
             tableZ={TABLE_Z}
+            layerGap={IGNITE_LAYER_GAP}
             reducedMotion={reducedMotion}
           />
         </>

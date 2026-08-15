@@ -7,6 +7,7 @@ import {
   DEFAULT_SETTLED_FIBRE_COUNT,
   MAX_SETTLED_ASH_COUNT,
   MAX_SETTLED_FIBRE_COUNT,
+  RESIDUE_YIELD_PER_LAYER,
   createResidueTextureState,
   createAttachedRemnantLayout,
   createClusteredAshLayout,
@@ -51,9 +52,14 @@ describe("ignite material conservation", () => {
     expect(Array.from(new Set(first.cluster)).length).toBeGreaterThanOrEqual(14);
     // Fragments trail the fine powder: none pop out at first perforation,
     // yet a solid share has revealed by mid-consumption of the local stack.
-    expect(Math.min(...first.threshold)).toBeGreaterThanOrEqual(0.015);
-    expect(first.threshold.filter((gate) => gate < 0.2).length)
+    // Gates are read against absolute deposit depth, where 1 is the deepest
+    // stack fully consumed, so a sheet or two is a few hundredths.
+    expect(Math.min(...first.threshold)).toBeGreaterThanOrEqual(0.025);
+    expect(first.threshold.filter((gate) => gate < 0.5).length)
       .toBeGreaterThanOrEqual(DEFAULT_SETTLED_ASH_COUNT * 0.25);
+    // And the tail keeps arriving deep into the stack rather than emptying
+    // out over the first leaves.
+    expect(Math.max(...first.threshold)).toBeGreaterThanOrEqual(0.6);
     expect(Math.max(...first.scale)).toBeLessThanOrEqual(0.029);
 
     for (const cluster of new Set(first.cluster)) {
@@ -140,6 +146,49 @@ describe("ignite material conservation", () => {
     updateResidueTextureState(state, field);
     expect(Array.from(state.density)).toEqual(Array.from(first));
     expect(Math.max(...state.bytes)).toBeGreaterThan(120);
+  });
+
+  const depositDepth = (consumedLayers: number, stackLayers: number) => {
+    const mass = consumedLayers * RESIDUE_YIELD_PER_LAYER;
+    const field = {
+      width: 2,
+      height: 2,
+      maxLayers: stackLayers,
+      capacity: new Float32Array(4).fill(stackLayers),
+      residue: new Float32Array(4).fill(mass),
+      grain: new Float32Array([0.5, 0.5, 0.5, 0.5]),
+    } as never;
+    const state = createResidueTextureState(16, 12);
+    updateResidueTextureState(state, field);
+    return Math.max(...state.density);
+  };
+
+  it("keeps deposit depth separable deep into a tall stack", () => {
+    // Three consumed sheets and twelve have to write visibly different
+    // deposit depths. The reconstruction used to lift the residue ratio until
+    // it clipped after roughly three sheets, so every deeper burn stored the
+    // same number and every surface reading it drew the same ash.
+    const shallow = depositDepth(3, 20);
+    const deep = depositDepth(12, 20);
+    const full = depositDepth(20, 20);
+    expect(shallow).toBeGreaterThan(0.05);
+    expect(shallow).toBeLessThan(0.35);
+    expect(deep).toBeGreaterThan(shallow + 0.3);
+    expect(full).toBeGreaterThan(deep);
+  });
+
+  it("reads spent paper the same however deep its half of the book was", () => {
+    // Depth is measured against the local stack, so a half that has burned
+    // away entirely looks spent whether it held three leaves or eighteen.
+    // Measuring against the deepest stack in the book instead left the thin
+    // side of every off-centre spread with a fraction of the other's ash.
+    const thin = depositDepth(3, 3);
+    const thick = depositDepth(18, 18);
+    expect(thin).toBeGreaterThan(0.8);
+    expect(Math.abs(thin - thick)).toBeLessThan(0.02);
+    // Part-burned stays part-burned: consistency at the end must not come
+    // from flattening the ramp that gets there.
+    expect(depositDepth(4, 18)).toBeLessThan(thick * 0.4);
   });
 
   it("maps every physical leaf to its successive printed page", () => {
