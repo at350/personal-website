@@ -119,6 +119,18 @@ export function reduce(state: EngineState, event: EngineEvent, total: number): E
   }
 }
 
+/** The spread the book will occupy once the motion in flight completes.
+    At rest — and mid-drag, before release picks a side — this is `current`.
+    The stage pre-renders this spread in the DOM overlay so its images and
+    entrance motion settle while the paper is still moving. */
+export function landingSpread(state: EngineState): number {
+  if (state.riffle !== null) return state.riffle.to;
+  if (state.sheet !== null && state.settleTarget !== null) {
+    return state.settleTarget === 1 ? state.sheet + 1 : state.sheet;
+  }
+  return state.current;
+}
+
 function startAutoTurn(state: EngineState, direction: 1 | -1): EngineState {
   const sheet = direction === 1 ? state.current : state.current - 1;
   return {

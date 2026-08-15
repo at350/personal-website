@@ -31,7 +31,9 @@ npm run lint
   and cached (`pageTextures.tsx`). A minimal entry gate pre-captures all 20
   printable faces before the book becomes interactive. At rest the flat spread
   swaps to a perfectly aligned live DOM overlay, so every page stays a fully
-  interactive website.
+  interactive website. The overlay pre-renders a turn's destination during the
+  flight and only appears once its images are decoded (`overlayReadiness.ts`),
+  so landing never flashes unloaded content over the finished texture.
 - **Engine** — `src/magazine/engine.ts`: a pure state machine drives turns;
   drag maps the pointer to leaf angle and releases into a critically damped
   spring. Reduced-motion and small screens get the stacked **reader**
