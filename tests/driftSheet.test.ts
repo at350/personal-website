@@ -41,6 +41,7 @@ const options = (over: Partial<DriftSheetOptions> = {}): DriftSheetOptions => ({
   puffRadius: PW * 0.5,
   followRate: 3.4,
   damping: 0.94,
+  curvatureScale: 1,
   ...over,
 });
 
@@ -79,6 +80,46 @@ describe("weightless drift sheet regime", { timeout: 30_000 }, () => {
     expect(tip.z).toBeGreaterThan(4);
     expect(tip.z).toBeGreaterThan(middle.z);
     expect(middle.z).toBeGreaterThan(0.2);
+  });
+
+  it("lets a pointed gust carve real local curvature when relaxed", () => {
+    // A swing about the pinned spine is curvature-free, so uniform wind
+    // amplitude is governed by the follow tether. What curvatureScale owns
+    // is LOCAL bending: how sharply a pointed gust can dimple the sheet.
+    const stiff = new PaperSheet(PW, PH, LEAF_SEGMENTS, LEAF_ROWS);
+    const supple = new PaperSheet(PW, PH, LEAF_SEGMENTS, LEAF_ROWS);
+    const guide = flatGuide();
+    stiff.reset(guide);
+    supple.reset(guide);
+    let stiffCurrent: readonly LeafVertex[] = guide;
+    let suppleCurrent: readonly LeafVertex[] = guide;
+    const gust = {
+      puffX: PW / 4,
+      puffY: 0,
+      puffZ: -40,
+      puffStrength: 2600,
+      puffRadius: PW * 0.12,
+      followRate: 0.9,
+    };
+    for (let frame = 0; frame < 150; frame += 1) {
+      stiffCurrent = stiff.stepDrift(guide, options(gust));
+      suppleCurrent = supple.stepDrift(
+        guide,
+        options({ ...gust, curvatureScale: 0.3 }),
+      );
+    }
+    const bump = (vertices: readonly LeafVertex[]) => {
+      // Prominence of the dimple over its along-row neighbours: a pure
+      // spine-swing has none, only genuine local curvature registers.
+      const row = LEAF_ROWS / 2;
+      const center = Math.round(((PW / 4 + PW / 2) / PW) * LEAF_SEGMENTS);
+      const here = vertices[indexOf(row, center)]!.z;
+      const left = vertices[indexOf(row, center - 5)]!.z;
+      const right = vertices[indexOf(row, center + 5)]!.z;
+      return here - (left + right) / 2;
+    };
+    expect(bump(suppleCurrent)).toBeGreaterThan(bump(stiffCurrent) * 1.15);
+    expect(bump(suppleCurrent)).toBeGreaterThan(5);
   });
 
   it("keeps edge lengths paper-tight under a hard gust", () => {

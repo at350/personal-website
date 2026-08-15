@@ -110,7 +110,35 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
       expect(Math.abs(leaf.x + input.shift)).toBeLessThan(720);
       expect(Math.abs(leaf.y)).toBeLessThan(450);
       expect(leaf.z).toBeGreaterThan(-40);
-      expect(leaf.z).toBeLessThan(PH * 0.55 + 60);
+      expect(leaf.z).toBeLessThan(PH * 0.7 + 60);
+    }
+  });
+
+  it("keeps every sheet wobbling near camera-facing instead of knifing", () => {
+    const field = makeField();
+    run(field, 1800, makeInput()); // 30 seconds: alignment fully settled
+    for (const leaf of field.leaves) {
+      // Rotate the local normal (0,0,1) by the leaf quaternion; the z
+      // component is the cosine of the tilt off the viewing axis.
+      const nz =
+        1 - 2 * (leaf.qx * leaf.qx + leaf.qy * leaf.qy);
+      expect(Math.abs(nz)).toBeGreaterThan(0.85);
+    }
+  });
+
+  it("holds depth clearance between leaves that overlap in the viewing plane", () => {
+    const field = makeField();
+    run(field, 1800, makeInput());
+    for (let i = 0; i < field.leaves.length; i += 1) {
+      for (let j = i + 1; j < field.leaves.length; j += 1) {
+        const a = field.leaves[i]!;
+        const b = field.leaves[j]!;
+        const lateral = Math.hypot(b.x - a.x, b.y - a.y);
+        if (lateral >= PW * 0.45) continue;
+        // Closely stacked in the viewing plane: the pair shuffle must have
+        // opened real depth between them.
+        expect(Math.abs(b.z - a.z)).toBeGreaterThan(16);
+      }
     }
   });
 

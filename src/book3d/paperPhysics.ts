@@ -25,6 +25,10 @@ export interface DriftSheetOptions {
   followRate: number;
   /** Per-frame Verlet damping base, like SETTLE_DAMPING. */
   damping: number;
+  /** Scales the bend-flattening constraints (0..1). The page-turn regime
+      runs them at full strength to kill the accordion mode; a floating leaf
+      wants to actually hold a bow, so drift runs them relaxed. */
+  curvatureScale?: number;
 }
 
 interface Constraint {
@@ -257,6 +261,7 @@ export class PaperSheet {
     const follow = 1 - Math.exp(-options.followRate * dt);
     const dtSquared = dt * dt;
     const radius = Math.max(1, options.puffRadius);
+    const curvatureScale = options.curvatureScale ?? 1;
 
     for (let index = 0; index < this.positions.length; index += 1) {
       const point = this.positions[index]!;
@@ -296,7 +301,7 @@ export class PaperSheet {
       for (const constraint of this.shapeConstraints) this.solveConstraint(constraint);
       for (const constraint of this.structuralConstraints) this.solveConstraint(constraint);
       for (const constraint of this.curvatureConstraints) {
-        this.solveCurvatureConstraint(constraint, target);
+        this.solveCurvatureConstraint(constraint, target, curvatureScale);
       }
       this.pinSpine(target);
     }
@@ -468,6 +473,7 @@ export class PaperSheet {
   private solveCurvatureConstraint(
     constraint: CurvatureConstraint,
     target: readonly LeafVertex[],
+    scale = 1,
   ) {
     const a = this.positions[constraint.a]!;
     const b = this.positions[constraint.b]!;
@@ -485,7 +491,7 @@ export class PaperSheet {
       const current = a[axis] - 2 * b[axis] + c[axis];
       const desired = targetA[axis] - 2 * targetB[axis] + targetC[axis];
       const correction =
-        ((current - desired) * constraint.stiffness) / denominator;
+        ((current - desired) * constraint.stiffness * scale) / denominator;
       const moveA = -correction * weightA;
       const moveB = correction * 2 * weightB;
       const moveC = -correction * weightC;
