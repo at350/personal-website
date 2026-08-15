@@ -54,6 +54,8 @@ export interface DriftLeafState {
   pairFX: number;
   pairFY: number;
   pairFZ: number;
+  /** sin of the out-of-plane tilt, refreshed by the depth projection. */
+  swing: number;
   sepX: number;
   sepY: number;
   sepZ: number;
@@ -134,16 +136,40 @@ const AMBIENT_TORQUE = 0.08;
     (∝ sin of the tilt) holds every sheet within a gentle wobble of facing
     the camera — the calm look, and the reason mostly-parallel leaves can
     share the depth range without knifing through one another. */
-const ALIGN_TORQUE = 0.5;
+const ALIGN_TORQUE = 0.85;
+/** Hard ceiling (~18°) on the out-of-plane tilt. Torques merely prefer
+    broadside; this clamp is what guarantees the tilt budget the depth
+    projection below prices its gaps against, so no yank can wheel a sheet
+    through its neighbours. In-plane roll stays unlimited. */
+const SWING_CAP = 0.32;
+const COS_SWING_CAP = Math.cos(SWING_CAP);
 
 /** Two leaves whose centers overlap in the viewing plane should hold this
     much depth between them; inside it a soft shuffle pushes them apart,
-    depth-first with a light lateral shrug. Best-effort by design — the
-    landing pile must still be able to collapse to its 2.3px pitch. */
+    depth-first with a light lateral shrug. Comfort spacing only — the hard
+    guarantee is the depth projection below. */
 const PAIR_XY_REACH_RATIO = 0.7;
 const PAIR_Z_CLEARANCE = 72;
 const PAIR_PUSH_ACCEL = 620;
 const PAIR_LATERAL_ACCEL = 90;
+
+/** Non-penetration, position-based: after integration, any two released
+    leaves whose footprints overlap in the viewing plane are PROJECTED apart
+    in depth until their gap covers both sheets' actual reach — a flex
+    budget plus a term for how far each tilted plane departs from vertical
+    slabhood. Scaled by release so the resting pile can exist, rate-limited
+    so neighbours part instead of teleporting, and skipped entirely during
+    the landing collapse. */
+const PAIR_HARD_X_RATIO = 0.95;
+const PAIR_HARD_Y_RATIO = 0.9;
+const PAIR_HARD_BASE_GAP = 48;
+const PAIR_HARD_TILT_GAP = 190;
+const PAIR_HARD_ITERATIONS = 3;
+const PAIR_HARD_MAX_STEP = 260;
+/** A held leaf is the reader's anchor: the pile parts around it. */
+const PAIR_GRABBED_MOBILITY = 0.12;
+const HARD_Z_FLOOR = 6;
+const HARD_Z_HEADROOM = 40;
 export const DRIFT_CURRENT_ACCEL = 340;
 export const DRIFT_CURRENT_RADIUS_RATIO = 0.6;
 export const DRIFT_PUFF_SPEED = 230;
@@ -262,6 +288,7 @@ export function createDriftField(params: DriftFieldParams): DriftField {
       pairFX: 0,
       pairFY: 0,
       pairFZ: 0,
+      swing: 0,
       sepX: (sx / length) * SEPARATION_SPEED,
       sepY: (sy / length) * SEPARATION_SPEED,
       sepZ: (sz / length) * SEPARATION_SPEED,
@@ -778,6 +805,95 @@ export function stepDriftField(
     leaf.qy = nqy / norm;
     leaf.qz = nqz / norm;
     leaf.qw = nqw / norm;
+    clampSwing(leaf);
+  }
+
+  projectDepthClearance(field, dt);
+}
+
+/** Hard tilt ceiling: rotate the leaf back toward its nearest camera-facing
+    pole just enough to stay inside SWING_CAP. Applied about the world axis
+    n × pole, which never disturbs in-plane roll. */
+function clampSwing(leaf: DriftLeafState) {
+  const { qx, qy, qz, qw } = leaf;
+  const nx = 2 * (qx * qz + qy * qw);
+  const ny = 2 * (qy * qz - qx * qw);
+  const nz = 1 - 2 * (qx * qx + qy * qy);
+  const pole = nz >= 0 ? 1 : -1;
+  const cosTilt = clamp(nz * pole, -1, 1);
+  if (cosTilt >= COS_SWING_CAP) return;
+  const axisX = ny * pole;
+  const axisY = -nx * pole;
+  const axisLength = Math.hypot(axisX, axisY);
+  if (axisLength < 1e-6) return;
+  const half = (Math.acos(cosTilt) - SWING_CAP) / 2;
+  const s = Math.sin(half) / axisLength;
+  const rx = axisX * s;
+  const ry = axisY * s;
+  const rw = Math.cos(half);
+  const cqx = rw * qx + rx * qw + ry * qz;
+  const cqy = rw * qy + ry * qw - rx * qz;
+  const cqz = rw * qz + rx * qy - ry * qx;
+  const cqw = rw * qw - rx * qx - ry * qy;
+  const norm = Math.hypot(cqx, cqy, cqz, cqw);
+  leaf.qx = cqx / norm;
+  leaf.qy = cqy / norm;
+  leaf.qz = cqz / norm;
+  leaf.qw = cqw / norm;
+}
+
+/** Position-based non-penetration between overlapping leaves; see the
+    constant block above for the contract. Gauss-Seidel over all pairs — a
+    few sweeps settle an eleven-leaf chain. */
+function projectDepthClearance(field: DriftField, dt: number) {
+  const reachX = field.pw * PAIR_HARD_X_RATIO;
+  const reachY = field.ph * PAIR_HARD_Y_RATIO;
+  const maxStep = PAIR_HARD_MAX_STEP * dt;
+  const zCeil = field.ph * CONTAIN_Z_MAX_RATIO + HARD_Z_HEADROOM;
+  for (const leaf of field.leaves) {
+    const nz = 1 - 2 * (leaf.qx * leaf.qx + leaf.qy * leaf.qy);
+    leaf.swing = Math.sqrt(Math.max(0, 1 - nz * nz));
+  }
+  for (let sweep = 0; sweep < PAIR_HARD_ITERATIONS; sweep += 1) {
+    for (let i = 0; i < field.leaves.length; i += 1) {
+      const a = field.leaves[i]!;
+      if (a.release <= 0) continue;
+      for (let j = i + 1; j < field.leaves.length; j += 1) {
+        const b = field.leaves[j]!;
+        if (b.release <= 0) continue;
+        // Elliptical footprint-overlap test so tall pages separate on their
+        // long axis too, not just across the spine.
+        const ox = (b.x - a.x) / reachX;
+        const oy = (b.y - a.y) / reachY;
+        if (ox * ox + oy * oy >= 1) continue;
+        const gate = a.release * b.release;
+        const required =
+          gate *
+          (PAIR_HARD_BASE_GAP + PAIR_HARD_TILT_GAP * (a.swing + b.swing));
+        const dz = b.z - a.z;
+        const gap = Math.abs(dz);
+        if (gap >= required) continue;
+        // Co-planar tie: the later sheet steps toward the camera.
+        const direction = dz !== 0 ? Math.sign(dz) : 1;
+        const correction = Math.min(required - gap, maxStep);
+        const mobilityA =
+          field.grabIndex === a.index ? PAIR_GRABBED_MOBILITY : 1;
+        const mobilityB =
+          field.grabIndex === b.index ? PAIR_GRABBED_MOBILITY : 1;
+        const total = mobilityA + mobilityB;
+        a.z -= direction * correction * (mobilityA / total);
+        b.z += direction * correction * (mobilityB / total);
+        a.z = clamp(a.z, HARD_Z_FLOOR, zCeil);
+        b.z = clamp(b.z, HARD_Z_FLOOR, zCeil);
+        // Inelastic contact: closing depth velocity dies with the overlap.
+        if ((b.vz - a.vz) * direction < 0) {
+          const shared =
+            (a.vz * mobilityB + b.vz * mobilityA) / total;
+          a.vz = shared;
+          b.vz = shared;
+        }
+      }
+    }
   }
 }
 
