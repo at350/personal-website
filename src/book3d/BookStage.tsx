@@ -2,13 +2,18 @@
    At rest you are reading real HTML. The moment paper moves, the mesh takes
    over with the same rasterized pages, real bend, real light. */
 
-import { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { useReducedMotion } from "motion/react";
 import * as THREE from "three";
 import { ISSUE } from "@/magazine/issue-map";
 import { SPREADS, pageLabel, spreadPages } from "@/magazine/folio";
-import { initialEngineState, reduce, type EngineEvent } from "@/magazine/engine";
+import {
+  initialEngineState,
+  landingSpread,
+  reduce,
+  type EngineEvent,
+} from "@/magazine/engine";
 import { BookScene, type BookMotion } from "./BookScene";
 import {
   bookPointerFrame,
@@ -25,6 +30,7 @@ import {
   refreshSpreadTextures,
   type TextureProgress,
 } from "./pageTextures";
+import { settleOverlay } from "./overlayReadiness";
 import { useLibraryFilter } from "@/components/MediaWall";
 import {
   usePersistentInteraction,
@@ -462,6 +468,39 @@ export function BookStage({
             ? 1
             : 0;
   }, [dispatch, modeLocked, motion, pw, state, touchOnly]);
+
+  // The overlay pre-renders the landing spread the moment a turn knows its
+  // destination. Its images then fetch and decode — and its entrance motion
+  // plays out — during the flight, while the canvas still owns the stage.
+  // Without the lookahead, the landed spread mounts fresh `<img>` elements at
+  // the very frame the DOM replaces the canvas, and every image flashes
+  // paper-white until it arrives.
+  const overlaySpread = landingSpread(state);
+  const overlaySettledRef = useRef(false);
+  const overlaySwapped = useRef(false);
+  useLayoutEffect(() => {
+    overlaySettledRef.current = false;
+    const el = overlayRef.current;
+    // The commit that changes overlaySpread also swaps the overlay's children,
+    // and it can land between the canvas frames that own this layer's opacity.
+    // Hide the layer before this commit paints, or a single frame can show
+    // the destination's unloaded DOM through the still-visible overlay. The
+    // initial mount keeps its inline opacity: touch devices read the overlay
+    // while the canvas is still loading, and there is no swap to hide.
+    if (overlaySwapped.current && el) {
+      el.style.opacity = "0";
+      el.style.visibility = "hidden";
+      el.style.pointerEvents = "none";
+    }
+    overlaySwapped.current = true;
+    let live = true;
+    void settleOverlay(el).then(() => {
+      if (live) overlaySettledRef.current = true;
+    });
+    return () => {
+      live = false;
+    };
+  }, [overlaySpread]);
 
   // The overlay only appears once the landed mesh reaches its new resting
   // center. During a cover turn, BookScene moves that center with the sheet.
@@ -973,9 +1012,13 @@ export function BookStage({
         el.style.pointerEvents = "none";
         return;
       }
-      el.style.opacity = String(handoff);
-      el.style.visibility = handoff < 0.02 ? "hidden" : "visible";
-      el.style.pointerEvents = handoff > 0.98 ? "auto" : "none";
+      // Geometry alone is not enough: until the landed spread's images have
+      // decoded and its entrance motion finished, the mesh — whose texture
+      // already shows the finished page — keeps the stage.
+      const shown = overlaySettledRef.current ? handoff : 0;
+      el.style.opacity = String(shown);
+      el.style.visibility = shown < 0.02 ? "hidden" : "visible";
+      el.style.pointerEvents = shown > 0.98 ? "auto" : "none";
     };
     return () => {
       motion.onPose = null;
@@ -1384,8 +1427,8 @@ export function BookStage({
             transform: `scale(${rasterLayout.scale})`,
           }}
         >
-          <OverlayFace spread={state.current} face="verso" showGrid={showGrid} />
-          <OverlayFace spread={state.current} face="recto" showGrid={showGrid} />
+          <OverlayFace spread={overlaySpread} face="verso" showGrid={showGrid} />
+          <OverlayFace spread={overlaySpread} face="recto" showGrid={showGrid} />
         </div>
       </div>
 

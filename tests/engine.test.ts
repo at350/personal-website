@@ -3,6 +3,7 @@ import {
   type EngineEvent,
   type EngineState,
   initialEngineState,
+  landingSpread,
   reduce,
 } from "@/magazine/engine";
 
@@ -159,5 +160,48 @@ describe("magazine engine", () => {
     const riffle = run(initialEngineState(1), { type: "TURN", to: 6 });
     expect(run(riffle, { type: "DRAG_START", edge: "fore" })).toBe(riffle);
     expect(run(riffle, { type: "TURN", to: 8 })).toBe(riffle);
+  });
+});
+
+describe("landingSpread", () => {
+  it("is the current spread at rest", () => {
+    expect(landingSpread(initialEngineState(3))).toBe(3);
+  });
+
+  it("is the destination of an auto turn from launch", () => {
+    expect(landingSpread(run(initialEngineState(2), { type: "TURN", to: 3 }))).toBe(3);
+    expect(landingSpread(run(initialEngineState(2), { type: "TURN", to: 1 }))).toBe(1);
+  });
+
+  it("stays on the origin while a drag is still in hand", () => {
+    const held = run(initialEngineState(2), { type: "DRAG_START", edge: "fore" });
+    expect(landingSpread(held)).toBe(2);
+  });
+
+  it("follows the committed side of a released drag", () => {
+    const start: EngineEvent[] = [
+      { type: "DRAG_START", edge: "fore" },
+      { type: "DRAG_MOVE", progress: 0.5 },
+      { type: "DRAG_END", velocity: 0 },
+    ];
+    expect(landingSpread(run(initialEngineState(2), ...start))).toBe(3);
+    const timid = run(
+      initialEngineState(2),
+      { type: "DRAG_START", edge: "fore" },
+      { type: "DRAG_MOVE", progress: 0.1 },
+      { type: "DRAG_END", velocity: 0 },
+    );
+    expect(landingSpread(timid)).toBe(2);
+  });
+
+  it("is the riffle destination during a jump", () => {
+    expect(landingSpread(run(initialEngineState(2), { type: "TURN", to: 7 }))).toBe(7);
+  });
+
+  it("matches where TICK_COMPLETE actually lands the book", () => {
+    const settling = run(initialEngineState(4), { type: "TURN", to: 5 });
+    expect(landingSpread(settling)).toBe(
+      run(settling, { type: "TICK_COMPLETE" }).current,
+    );
   });
 });

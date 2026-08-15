@@ -59,8 +59,13 @@ vi.mock("@/book3d/pageTextures", () => ({
   refreshSpreadTextures: vi.fn(),
 }));
 
+/* Every mocked face carries an image that jsdom will never load, so the
+   overlay-readiness gate stays observable: tests decide when a page's
+   pictures "arrive" by firing load events. */
 vi.mock("@/magazine/issue-map", () => ({
-  ISSUE: Array.from({ length: 11 }, () => ({ Component: () => null })),
+  ISSUE: Array.from({ length: 11 }, () => ({
+    Component: () => <img src="/plate.png" alt="" />,
+  })),
 }));
 
 function stubMatchMedia() {
@@ -592,6 +597,72 @@ describe("BookStage page-turn input", () => {
     expect(stage.getAttribute("aria-busy")).toBe("false");
     expect(onSpreadSettled).toHaveBeenCalledTimes(1);
     expect(onSpreadSettled).toHaveBeenLastCalledWith(7);
+  });
+
+  it("pre-renders the landing spread in the overlay while paper is in flight", () => {
+    stubMatchMedia();
+    const { container } = renderStage(1);
+    const overlay = container.querySelector<HTMLElement>(".bstage__spread")!;
+    // At rest the overlay shows the current spread's folios (pages 02–03).
+    expect(overlay.textContent).toContain("02");
+
+    pointerTap(screen.getByRole("button", { name: "Next spread" }), 1);
+    // The destination's DOM mounts at launch, so its images and entrance
+    // motion settle during the flight, not at the swap...
+    expect(overlay.textContent).toContain("04");
+    expect(overlay.textContent).not.toContain("02");
+
+    completeTurn();
+    // ...and the landing commit leaves that DOM untouched.
+    expect(overlay.textContent).toContain("04");
+  });
+
+  it("pre-renders a riffle's destination during the jump", () => {
+    stubMatchMedia();
+    const { rerender, container } = renderStage(1);
+    const overlay = container.querySelector<HTMLElement>(".bstage__spread")!;
+
+    rerender(<BookStage targetSpread={6} />);
+    expect(overlay.textContent).toContain("12");
+
+    completeRiffle();
+    expect(overlay.textContent).toContain("12");
+  });
+
+  it("holds the DOM handoff until the landed spread's images settle", async () => {
+    stubMatchMedia();
+    const { container } = renderStage(1);
+    const overlay = container.querySelector<HTMLElement>(".bstage__spread")!;
+    const arriveImages = async () => {
+      await act(async () => {
+        for (const image of Array.from(overlay.querySelectorAll("img"))) {
+          fireEvent.load(image);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    };
+
+    // Even a perfectly aligned book keeps the canvas while images are pending.
+    act(() => scene.motion?.onPose?.(1, 1));
+    expect(overlay.style.opacity).toBe("0");
+    expect(overlay.style.pointerEvents).toBe("none");
+
+    await arriveImages();
+    act(() => scene.motion?.onPose?.(1, 1));
+    expect(overlay.style.opacity).toBe("1");
+    expect(overlay.style.visibility).toBe("visible");
+    expect(overlay.style.pointerEvents).toBe("auto");
+
+    // A turn re-arms the gate for the incoming spread's freshly mounted DOM.
+    pointerTap(screen.getByRole("button", { name: "Next spread" }), 1);
+    act(() => scene.motion?.onPose?.(1, 1));
+    expect(overlay.style.opacity).toBe("0");
+    expect(overlay.style.pointerEvents).toBe("none");
+
+    await arriveImages();
+    act(() => scene.motion?.onPose?.(1, 1));
+    expect(overlay.style.opacity).toBe("1");
+    expect(overlay.style.pointerEvents).toBe("auto");
   });
 
   it("finishes finite taps before resuming a held arrow", () => {
