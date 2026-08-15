@@ -23,16 +23,24 @@ import {
 import type { DriftPointerState } from "./types";
 
 export const DRIFT_TOTAL_LEAVES = SPREADS.length - 1;
-/** Gentle tether from the flexing sheet to its rigid carrier: low enough that
-    air visibly bends the paper, high enough that the leaf never detaches from
-    its own tumbling frame. */
-export const DRIFT_SHEET_FOLLOW_RATE = 3.4;
-export const DRIFT_SHEET_DAMPING = 0.94;
+/** Whisper of a tether from the flexing sheet to its rigid carrier. The
+    pinned spine column plus the structural web are what actually carry the
+    sheet; keeping this rate low is what lets air and motion visibly bend the
+    paper instead of ironing every vertex back onto the flat guide. */
+export const DRIFT_SHEET_FOLLOW_RATE = 0.9;
+export const DRIFT_SHEET_DAMPING = 0.955;
+/** Floating paper holds a real bow: the page-turn regime's bend-flattening
+    runs at a fraction of its strength out here. */
+export const DRIFT_SHEET_CURVATURE_SCALE = 0.3;
 /** Sheet-level radial current at the pointer (px/s² at its center). The rigid
     carriers get their own current inside driftField; this term is what makes
     the paper itself belly away from a close pass. */
-const SHEET_CURRENT_ACCEL = 520;
+const SHEET_CURRENT_ACCEL = 1000;
 const SHEET_CURRENT_RADIUS_RATIO = 0.5;
+/** Apparent-airflow gain: a leaf moving through still air feels wind opposite
+    its own velocity, so a dragged or gusted sheet trails and bows instead of
+    translating rigidly. Acceleration per px/s of carrier speed. */
+const MOTION_FLEX = 2.6;
 const FIELD_SEED = 0xd21f7;
 
 interface DriftBookProps {
@@ -220,6 +228,7 @@ export function DriftBook({
     puffRadius: pw * SHEET_CURRENT_RADIUS_RATIO,
     followRate: DRIFT_SHEET_FOLLOW_RATE,
     damping: DRIFT_SHEET_DAMPING,
+    curvatureScale: DRIFT_SHEET_CURVATURE_SCALE,
   });
   const currentScratch = useRef<DriftVec>({ x: 0, y: 0, z: 0 });
   const reportedLoosened = useRef(false);
@@ -260,6 +269,17 @@ export function DriftBook({
       const guide = guides[leaf.index]!;
       writeDriftLeafGuide(leaf, restGrid.xs, restGrid.ys, guide);
 
+      if (active) {
+        // Apparent airflow: the faster a carrier moves, the harder its free
+        // paper trails behind the pinned spine column.
+        options.windX = -leaf.vx * MOTION_FLEX;
+        options.windY = -leaf.vy * MOTION_FLEX;
+        options.windZ = -leaf.vz * MOTION_FLEX;
+      } else {
+        options.windX = 0;
+        options.windY = 0;
+        options.windZ = 0;
+      }
       if (active && frame.inside && field.grabIndex !== leaf.index) {
         pointerPointAtDepth(frame, leaf.z, currentScratch.current);
         options.puffX = currentScratch.current.x;

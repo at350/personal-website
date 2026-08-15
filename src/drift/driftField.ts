@@ -50,6 +50,10 @@ export interface DriftLeafState {
   releaseDelay: number;
   /** Landing glide rate variation so the pile reassembles organically. */
   landRate: number;
+  /** Pairwise clearance force, accumulated before integration each step. */
+  pairFX: number;
+  pairFY: number;
+  pairFZ: number;
   sepX: number;
   sepY: number;
   sepZ: number;
@@ -123,8 +127,23 @@ export const DRIFT_MAX_SPIN = 1.25;
 
 const AMBIENT_ACCEL = 34;
 /** Angular acceleration amplitude (rad/s²); against the angular damping this
-    sustains a slow idle tumble of roughly 0.05-0.1 rad/s. */
+    sustains a slow idle tumble of roughly 0.05-0.1 rad/s. The mix below is
+    roll-dominant: in-plane spin can never cut a neighbouring sheet. */
 const AMBIENT_TORQUE = 0.08;
+/** Paper drifting in still air settles broadside-on. This restoring torque
+    (∝ sin of the tilt) holds every sheet within a gentle wobble of facing
+    the camera — the calm look, and the reason mostly-parallel leaves can
+    share the depth range without knifing through one another. */
+const ALIGN_TORQUE = 0.5;
+
+/** Two leaves whose centers overlap in the viewing plane should hold this
+    much depth between them; inside it a soft shuffle pushes them apart,
+    depth-first with a light lateral shrug. Best-effort by design — the
+    landing pile must still be able to collapse to its 2.3px pitch. */
+const PAIR_XY_REACH_RATIO = 0.7;
+const PAIR_Z_CLEARANCE = 72;
+const PAIR_PUSH_ACCEL = 620;
+const PAIR_LATERAL_ACCEL = 90;
 export const DRIFT_CURRENT_ACCEL = 340;
 export const DRIFT_CURRENT_RADIUS_RATIO = 0.6;
 export const DRIFT_PUFF_SPEED = 230;
@@ -138,7 +157,9 @@ const CONTAIN_BRAKE = 3;
 const CONTAIN_MARGIN_X_RATIO = 0.45;
 const CONTAIN_MARGIN_Y_RATIO = 0.42;
 const CONTAIN_Z_MIN = 10;
-const CONTAIN_Z_MAX_RATIO = 0.55;
+/** Deep enough toward the camera that eleven sheets can layer with real
+    clearance; the perspective-aware x/y bounds shrink to compensate. */
+const CONTAIN_Z_MAX_RATIO = 0.7;
 
 const GRAB_STIFFNESS = 60;
 const GRAB_DAMPING = 15.5;
@@ -238,11 +259,16 @@ export function createDriftField(params: DriftFieldParams): DriftField {
         (layer / Math.max(1, total - 1)) * DRIFT_RELEASE_STAGGER * 0.6 +
         seedB * DRIFT_RELEASE_STAGGER * 0.4,
       landRate: 0.85 + 0.3 * seedA,
+      pairFX: 0,
+      pairFY: 0,
+      pairFZ: 0,
       sepX: (sx / length) * SEPARATION_SPEED,
       sepY: (sy / length) * SEPARATION_SPEED,
       sepZ: (sz / length) * SEPARATION_SPEED,
-      spinX: (seedA - 0.5) * SEPARATION_SPIN,
-      spinY: (seedB - 0.5) * SEPARATION_SPIN,
+      // Departure spin is roll-dominant: the pile starts at a 2.3px pitch,
+      // where any early out-of-plane tilt slices straight into a neighbour.
+      spinX: (seedA - 0.5) * SEPARATION_SPIN * 0.3,
+      spinY: (seedB - 0.5) * SEPARATION_SPIN * 0.3,
       spinZ: (seedC - 0.5) * SEPARATION_SPIN * 1.6,
       seedA,
       seedB,
@@ -515,6 +541,49 @@ export function stepDriftField(
   const maxSpeed = DRIFT_MAX_SPEED * field.pageScale;
   const zMax = field.ph * CONTAIN_Z_MAX_RATIO;
 
+  // Pairwise clearance: any two released leaves that overlap in the viewing
+  // plane shuffle apart, depth-first. O(n²) over eleven leaves is nothing.
+  const reach = field.pw * PAIR_XY_REACH_RATIO;
+  for (const leaf of field.leaves) {
+    leaf.pairFX = 0;
+    leaf.pairFY = 0;
+    leaf.pairFZ = 0;
+  }
+  for (let i = 0; i < field.leaves.length; i += 1) {
+    const a = field.leaves[i]!;
+    if (a.release <= 0) continue;
+    for (let j = i + 1; j < field.leaves.length; j += 1) {
+      const b = field.leaves[j]!;
+      if (b.release <= 0) continue;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lateral = Math.hypot(dx, dy);
+      if (lateral >= reach) continue;
+      const dz = b.z - a.z;
+      const gap = Math.abs(dz);
+      if (gap >= PAIR_Z_CLEARANCE) continue;
+      // Perfectly co-planar pairs (the freshly loosened pile) break the tie
+      // deterministically: the later sheet steps toward the camera.
+      const direction = dz !== 0 ? Math.sign(dz) : 1;
+      const deficit = (PAIR_Z_CLEARANCE - gap) / PAIR_Z_CLEARANCE;
+      const closeness = 1 - lateral / reach;
+      const gate = a.release * b.release;
+      const push = PAIR_PUSH_ACCEL * deficit * closeness * gate * 0.5;
+      a.pairFZ -= direction * push;
+      b.pairFZ += direction * push;
+      if (lateral > 1e-3) {
+        const shrug =
+          PAIR_LATERAL_ACCEL * deficit * closeness * gate * 0.5;
+        const nx = dx / lateral;
+        const ny = dy / lateral;
+        a.pairFX -= nx * shrug;
+        a.pairFY -= ny * shrug;
+        b.pairFX += nx * shrug;
+        b.pairFY += ny * shrug;
+      }
+    }
+  }
+
   for (const leaf of field.leaves) {
     if (leaf.release <= 0) continue;
     const r = leaf.release;
@@ -539,9 +608,22 @@ export function stepDriftField(
         0.4 * Math.sin(t * 0.13 + leaf.seedC * TAU + leaf.x * 0.003));
     fz += amb * 0.5 * Math.sin(t * 0.17 + leaf.seedC * TAU);
     const ambientSpin = AMBIENT_TORQUE * r * field.inertia;
-    tx += ambientSpin * 0.6 * Math.sin(t * 0.23 + leaf.seedC * TAU);
-    ty += ambientSpin * Math.sin(t * 0.19 + leaf.seedA * TAU);
-    tz += ambientSpin * 0.5 * Math.sin(t * 0.31 + leaf.seedB * TAU);
+    tx += ambientSpin * 0.35 * Math.sin(t * 0.23 + leaf.seedC * TAU);
+    ty += ambientSpin * 0.5 * Math.sin(t * 0.19 + leaf.seedA * TAU);
+    tz += ambientSpin * 1.1 * Math.sin(t * 0.31 + leaf.seedB * TAU);
+
+    // Broadside-on preference: torque along n × ẑ eases the sheet's normal
+    // toward whichever camera-facing pole it is already nearest, so flipped
+    // leaves stay flipped and every sheet wobbles instead of knifing.
+    rotate(leaf.qx, leaf.qy, leaf.qz, leaf.qw, 0, 0, 1, gripScratch);
+    const facing = gripScratch.z >= 0 ? 1 : -1;
+    const alignGain = ALIGN_TORQUE * field.inertia * r * facing;
+    tx += gripScratch.y * alignGain;
+    ty += -gripScratch.x * alignGain;
+
+    fx += leaf.pairFX;
+    fy += leaf.pairFY;
+    fz += leaf.pairFZ;
 
     if (input.inside && field.grabIndex !== leaf.index) {
       // The pointer's air current: a soft radial push, applied at the point
