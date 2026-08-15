@@ -126,18 +126,93 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
     }
   });
 
-  it("holds depth clearance between leaves that overlap in the viewing plane", () => {
-    const field = makeField();
-    run(field, 1800, makeInput());
+  /** Worst pairwise depth deficit among leaves whose footprints overlap on
+      screen: positive means every overlapping pair holds real clearance. */
+  const worstOverlapClearance = (field: DriftField) => {
+    let worst = Infinity;
     for (let i = 0; i < field.leaves.length; i += 1) {
       for (let j = i + 1; j < field.leaves.length; j += 1) {
         const a = field.leaves[i]!;
         const b = field.leaves[j]!;
-        const lateral = Math.hypot(b.x - a.x, b.y - a.y);
-        if (lateral >= PW * 0.45) continue;
-        // Closely stacked in the viewing plane: the pair shuffle must have
-        // opened real depth between them.
-        expect(Math.abs(b.z - a.z)).toBeGreaterThan(16);
+        const ox = (b.x - a.x) / (PW * 0.9);
+        const oy = (b.y - a.y) / (PH * 0.85);
+        if (ox * ox + oy * oy >= 1) continue;
+        worst = Math.min(worst, Math.abs(b.z - a.z));
+      }
+    }
+    return worst;
+  };
+
+  it("guarantees depth clearance between leaves that overlap on screen", () => {
+    const field = makeField();
+    const input = makeInput();
+    run(field, 150, input); // fully adrift
+    // The hard projection must hold from the moment the pile is loose,
+    // through every frame of a long unattended drift.
+    for (let frame = 0; frame < 1650; frame += 1) {
+      stepDriftField(field, DT, input);
+      expect(worstOverlapClearance(field)).toBeGreaterThan(30);
+    }
+  });
+
+  it("parts the pile around a dragged leaf instead of cutting through it", () => {
+    const field = makeField();
+    const idle = makeInput();
+    run(field, 200, idle);
+    let front = 0;
+    for (const leaf of field.leaves) {
+      if (leaf.z > field.leaves[front]!.z) front = leaf.index;
+    }
+    const leaf = field.leaves[front]!;
+    const d = idle.cameraDistance;
+    const scale = d / (d - leaf.z);
+    const grab = makeInput({
+      inside: true,
+      pressed: true,
+      screenX: (leaf.x + idle.shift) * scale,
+      screenY: leaf.y * scale,
+    });
+    stepDriftField(field, DT, grab);
+    expect(field.grabIndex).toBe(front);
+    // Sweep the held leaf clear across the pile and back.
+    for (let frame = 0; frame < 240; frame += 1) {
+      const swing = Math.sin(frame / 24) * 420;
+      stepDriftField(field, DT, { ...grab, screenX: grab.screenX + swing });
+      expect(worstOverlapClearance(field)).toBeGreaterThan(24);
+    }
+  });
+
+  it("caps out-of-plane tilt so no sheet can knife its neighbours", () => {
+    const field = makeField();
+    const idle = makeInput();
+    run(field, 150, idle);
+    // Grab a corner and yank hard — grab torque is the strongest tilt
+    // source in the field.
+    let front = 0;
+    for (const leaf of field.leaves) {
+      if (leaf.z > field.leaves[front]!.z) front = leaf.index;
+    }
+    const leaf = field.leaves[front]!;
+    const d = idle.cameraDistance;
+    const scale = d / (d - leaf.z);
+    const grab = makeInput({
+      inside: true,
+      pressed: true,
+      screenX: (leaf.x + idle.shift + PW * 0.4) * scale,
+      screenY: (leaf.y + PH * 0.4) * scale,
+    });
+    stepDriftField(field, DT, grab);
+    const capFloor = Math.cos(0.34); // SWING_CAP plus a numerical whisker
+    for (let frame = 0; frame < 300; frame += 1) {
+      const jerk = Math.sin(frame / 6) * 500;
+      stepDriftField(field, DT, {
+        ...grab,
+        screenX: grab.screenX + jerk,
+        screenY: grab.screenY - jerk / 2,
+      });
+      for (const each of field.leaves) {
+        const nz = 1 - 2 * (each.qx * each.qx + each.qy * each.qy);
+        expect(Math.abs(nz)).toBeGreaterThanOrEqual(capFloor);
       }
     }
   });
