@@ -75,46 +75,47 @@ const FRAGMENT_SHADER = /* glsl */ `
     float time = mix(uTime, 7.3, stillness);
     float speed = mix(uSpeed, 0.0, stillness);
     vec2 motion = mix(uMotion, vec2(0.0), stillness);
+    float swirlPhase = mix(uSwirl, 4.2, stillness);
 
-    // The swirl orbits an inertial air parcel that trails the hand; the tiny
+    // The wisps orbit an inertial air parcel that trails the hand; the tiny
     // contact dot below stays registered to the exact pointer pixel.
     vec2 p = vLocal - uBodyOffset;
     float r = length(p);
-    // atan(0,0) is spec-undefined; the exact center belongs to the lens.
-    float theta = r > 0.0001 ? atan(p.y, p.x) : 0.0;
-    // Noise sampled on the unit circle, not raw angle: no seam at the wrap.
-    vec2 rim = vec2(cos(theta), sin(theta));
+    vec2 pn = r > 0.0001 ? p / r : vec2(1.0, 0.0);
 
-    float breathe = 1.0 + 0.05 * sin(time * 1.7);
+    // Differential rotation: inner air turns faster than outer air, so no
+    // circular structure can survive — everything shears into spiral wisps.
+    // This is what keeps the glyph reading as moving air, never as rings.
+    float ang = swirlPhase * (0.7 + 26.0 / (r + 12.0));
+    float ca = cos(ang);
+    float sa = sin(ang);
+    vec2 qn = vec2(pn.x * ca - pn.y * sa, pn.x * sa + pn.y * ca);
 
-    // Three streamline arcs orbit at different radii and rates: a radial
-    // gaussian band times an angular comet — bright head, long dissolving
-    // tail — is the whole calligraphy of the wind glyph.
-    float wind = 0.0;
-    float head = 0.0;
-    for (int k = 0; k < 3; k += 1) {
-      float fk = float(k);
-      float baseRadius = (15.0 + fk * 12.5) * breathe;
-      float wobble = (windFbm(rim * 2.2 + vec2(fk * 7.3, time * 0.6)) - 0.5) * 7.0;
-      // Squared by hand: pow() is undefined for negative bases in ES 1.00.
-      float bandArm = (r - baseRadius - wobble) / (5.2 - fk * 0.5);
-      float band = exp(-bandArm * bandArm);
-      // uSwirl is the CPU-integrated orbit phase (speed folded in per frame),
-      // so a speed change bends the orbit rate instead of teleporting the
-      // comets — frequency modulation must integrate, not multiply raw time.
-      float phase = theta - uSwirl * (1.15 - fk * 0.22) - fk * 2.4;
-      float lap = fract(phase * 0.159155);
-      float comet = pow(1.0 - lap, 1.9);
-      wind += band * comet * (0.95 - fk * 0.16);
-      head += band * smoothstep(0.93, 1.0, 1.0 - lap) * (1.0 - fk * 0.3);
-    }
+    // Filaments are BORN from noise, not drawn: ridged fbm sampled on
+    // slowly growing circles in noise space gives long tangential wisps of
+    // uneven length and brightness, with no seam anywhere.
+    vec2 domain = qn * (1.3 + r * 0.05) +
+      vec2(swirlPhase * 0.21, -swirlPhase * 0.12);
+    float fieldA = windFbm(domain);
+    float fieldB = windFbm(domain * 1.9 + vec2(4.7, 9.2));
+    float filaments = smoothstep(0.5, 0.74, fieldA * 0.72 + fieldB * 0.38);
+
+    // Windsock envelope: a soft donut of air, stretched downwind while the
+    // hand moves so the whole glyph leans into the stroke.
+    float motionLength = length(motion);
+    vec2 direction = motionLength > 0.001 ? motion / motionLength : vec2(0.0);
+    float tail = motionLength > 0.001
+      ? max(0.0, dot(pn, -direction)) * speed
+      : 0.0;
+    float rEffective = r / (1.0 + tail * 0.9);
+    float donut = smoothstep(3.0, 13.0, rEffective) *
+      (1.0 - smoothstep(30.0, 58.0, rEffective));
+    float wind = filaments * donut;
 
     // Gust streaks trail opposite the motion while the hand moves — the
     // orb's wake, three flickering wind lines with ragged ends.
     float streaks = 0.0;
-    float motionLength = length(motion);
     if (speed > 0.02 && motionLength > 0.001) {
-      vec2 direction = motion / motionLength;
       float along = dot(p, -direction);
       float across = dot(p, vec2(-direction.y, direction.x));
       for (int s = 0; s < 3; s += 1) {
@@ -132,18 +133,17 @@ const FRAGMENT_SHADER = /* glsl */ `
       streaks *= speed;
     }
 
-    // The click gust: one expanding ring, thickening and fading as it grows,
-    // matching the radial shove the click gives the floating leaves. (The
-    // ring also fires when a click catches a leaf — the hand still moves
-    // air.) Guarded so the idle sentinel age never reaches the ring math:
-    // NaN from a negative-base pow would survive the step() multiplier.
+    // The click gust: one expanding ring, noise-broken so it reads as a
+    // pressure front rather than drawn geometry, dissolving into air well
+    // before the draw region's edge could clip it. Guarded so the idle
+    // sentinel age never reaches the ring math: NaN from a negative-base
+    // pow would survive a step() multiplier.
     float ring = 0.0;
     if (uBurstAge >= 0.0 && stillness < 0.5) {
       float burstRadius = 30.0 + uBurstAge * 430.0;
       float ringArm = (r - burstRadius) / (7.0 + uBurstAge * 26.0);
-      // Dissolve fully inside the quad: the expanding gust thins into air
-      // well before the draw region's edge could clip it into an arc.
-      ring = exp(-ringArm * ringArm) * exp(-uBurstAge * 3.4) *
+      float front = 0.55 + 0.45 * windNoise(qn * 3.0 + vec2(time * 0.9, 2.3));
+      ring = exp(-ringArm * ringArm) * exp(-uBurstAge * 3.4) * front *
         (1.0 - smoothstep(110.0, 160.0, burstRadius));
     }
 
@@ -153,15 +153,16 @@ const FRAGMENT_SHADER = /* glsl */ `
     float contact = exp(-pointerDistance * pointerDistance / 6.0);
     float lens = exp(-r * r / 256.0) * 0.5;
 
-    float wisps = clamp(wind * 0.8 + streaks * 0.85 + ring * 0.7, 0.0, 1.0);
-    float alpha = wisps * 0.52 + lens * 0.1 + contact * 0.4;
+    float wisps = clamp(wind * 0.95 + streaks * 0.85 + ring * 0.7, 0.0, 1.0);
+    float alpha = wisps * 0.44 + lens * 0.09 + contact * 0.4;
 
-    // Ink wisps on the white page; the site's red rides only the leading
-    // arc head, a fleck rather than a costume.
+    // Ink wisps on the white page; the site's red rides only the brightest
+    // filament tips, a fleck rather than a costume.
     vec3 pale = vec3(0.5, 0.54, 0.6);
     vec3 ink = vec3(0.24, 0.27, 0.32);
     vec3 color = mix(pale, ink, clamp(wind + streaks, 0.0, 1.0));
-    color = mix(color, vec3(0.84, 0.18, 0.12), clamp(head, 0.0, 1.0) * 0.5);
+    float tips = smoothstep(0.82, 0.95, fieldA) * donut;
+    color = mix(color, vec3(0.84, 0.18, 0.12), tips * 0.4);
     color = mix(color, vec3(0.30, 0.33, 0.38), ring * 0.6);
 
     float quadFade = (1.0 - smoothstep(168.0, 184.0, abs(vLocal.x))) *
