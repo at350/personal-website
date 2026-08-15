@@ -27,6 +27,7 @@ import {
   type ExperienceMode,
 } from "./components/ExperienceDock";
 import { IgniteCursor } from "./components/IgniteCursor";
+import { DriftCursor } from "./components/DriftCursor";
 
 function IssueView() {
   const location = useLocation();
@@ -98,6 +99,7 @@ function BookView() {
         </Suspense>
       ) : null}
       {experienceMode === "ignite" ? <IgniteCursor /> : null}
+      {experienceMode === "drift" ? <DriftCursor /> : null}
       <ExperienceDock
         mode={experienceMode}
         onModeChange={setExperienceMode}

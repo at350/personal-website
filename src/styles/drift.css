@@ -2,6 +2,38 @@
    HUD, holding a status word and the collect action instead of a burn
    progress track. */
 
+.drift-cursor {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+html.drift-hides-cursor .bstage,
+html.drift-hides-cursor .bstage canvas,
+html.drift-hides-cursor .bstage__spread {
+  cursor: none !important;
+}
+
+html.drift-hides-cursor .experience-dock,
+html.drift-hides-cursor .experience-dock *,
+html.drift-hides-cursor .drift-hud,
+html.drift-hides-cursor .drift-hud * {
+  cursor: auto !important;
+}
+
+html.drift-hides-cursor .experience-dock button,
+html.drift-hides-cursor .drift-hud button {
+  cursor: pointer !important;
+}
+
+html.drift-active .cursor-orb {
+  display: none;
+}
+
 .bstage.bstage--drift {
   touch-action: none;
 }
@@ -184,5 +216,11 @@
   .drift-hud {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .drift-cursor {
+    display: none;
   }
 }
