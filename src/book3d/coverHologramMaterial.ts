@@ -22,12 +22,30 @@ export interface CoverHologramMaterialState {
   strength?: number;
 }
 
-/** Visual contract: a white foil sweep leads; chroma remains the fringe. */
-export const COVER_HOLOGRAM_CHROMA_GAIN = 0.045;
-export const COVER_HOLOGRAM_GLARE_GAIN = 0.42;
-export const COVER_HOLOGRAM_PEAK_WHITE_MIX_MIN = 0.96;
+/**
+ * Visual contract: the foil is a moving rainbow gradient (TiltHologramCard),
+ * with white glare as a specular highlight rather than the whole coating.
+ *
+ * Stops match the reference linear gradient:
+ * #ff3b30, #ff9500, #ffcc00, #4cd964, #34aadc, #5856d6, #ff3b30
+ */
+export const COVER_HOLOGRAM_RAINBOW_STOPS = [
+  [1.0, 0.231, 0.188],
+  [1.0, 0.584, 0.0],
+  [1.0, 0.8, 0.0],
+  [0.298, 0.851, 0.392],
+  [0.204, 0.667, 0.863],
+  [0.345, 0.337, 0.839],
+] as const;
+export const COVER_HOLOGRAM_CHROMA_GAIN = 0.28;
+export const COVER_HOLOGRAM_GLARE_GAIN = 0.16;
+export const COVER_HOLOGRAM_PEAK_WHITE_MIX_MAX = 0.42;
 export const COVER_HOLOGRAM_MAX_ALPHA = 0.48;
-export const COVER_HOLOGRAM_FRESNEL_GAIN = 0.18;
+export const COVER_HOLOGRAM_FRESNEL_GAIN = 0.12;
+
+const glslVec3 = (rgb: readonly number[]) =>
+  `vec3(${rgb.map((channel) => channel.toFixed(3)).join(", ")})`;
+const RAINBOW_GLSL = COVER_HOLOGRAM_RAINBOW_STOPS.map(glslVec3);
 
 export const COVER_HOLOGRAM_VERTEX_SHADER = /* glsl */ `
   varying vec2 vHoloUv;
@@ -61,14 +79,28 @@ export const COVER_HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
     return exp(-(x * x));
   }
 
-  // A smooth, cyclic HSV spectrum without a branch or lookup texture.
+  // One looping rainbow gradient, the same stops as TiltHologramCard.
   vec3 holoSpectrum(float phase) {
-    vec3 rgb = clamp(
-      abs(mod(phase * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0,
-      0.0,
-      1.0
+    vec3 c0 = ${RAINBOW_GLSL[0]};
+    vec3 c1 = ${RAINBOW_GLSL[1]};
+    vec3 c2 = ${RAINBOW_GLSL[2]};
+    vec3 c3 = ${RAINBOW_GLSL[3]};
+    vec3 c4 = ${RAINBOW_GLSL[4]};
+    vec3 c5 = ${RAINBOW_GLSL[5]};
+    float x = fract(phase) * 6.0;
+    float seg = floor(x);
+    float f = x - seg;
+    vec3 a = mix(
+      mix(mix(c0, c1, step(1.0, seg)), mix(c2, c3, step(3.0, seg)), step(2.0, seg)),
+      mix(c4, c5, step(5.0, seg)),
+      step(4.0, seg)
     );
-    return rgb * rgb * (3.0 - 2.0 * rgb);
+    vec3 b = mix(
+      mix(mix(c1, c2, step(1.0, seg)), mix(c3, c4, step(3.0, seg)), step(2.0, seg)),
+      mix(c5, c0, step(5.0, seg)),
+      step(4.0, seg)
+    );
+    return mix(a, b, f);
   }
 
   void main() {
@@ -101,20 +133,20 @@ export const COVER_HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
     float secondary = holoBell(diagonal - (center - 0.34), 0.11);
     float colorBand = clamp(primaryWide + 0.55 * secondary, 0.0, 1.0);
 
-    float phase = diagonal * 1.18
-      + uPointer.x * 0.12
-      - uPointer.y * 0.08
-      + uFlip * 0.14
-      + normalTravel * 0.7;
-    vec3 spectrum = holoSpectrum(fract(phase));
+    float phase = diagonal * 1.0
+      + uPointer.x * 0.32
+      - uPointer.y * 0.24
+      + uFlip * 0.18
+      + normalTravel * 1.1;
+    vec3 spectrum = holoSpectrum(phase);
 
     float angularResponse = 0.72 + grazing * 0.55;
-    float colorFoil = (0.012 + colorBand * ${COVER_HOLOGRAM_CHROMA_GAIN.toFixed(3)})
+    float colorFoil = (0.08 + colorBand * ${COVER_HOLOGRAM_CHROMA_GAIN.toFixed(3)})
       * angularResponse;
-    float whiteReflection = primaryWide * (0.18 + grazing * 0.12)
-      + primaryCore * (${COVER_HOLOGRAM_GLARE_GAIN.toFixed(2)} + grazing * 0.20)
-      + secondary * (0.07 + grazing * 0.045);
-    float fresnelSheen = (0.018 + grazing * ${COVER_HOLOGRAM_FRESNEL_GAIN.toFixed(2)})
+    float whiteReflection = primaryWide * (0.04 + grazing * 0.03)
+      + primaryCore * (${COVER_HOLOGRAM_GLARE_GAIN.toFixed(2)} + grazing * 0.08)
+      + secondary * (0.03 + grazing * 0.02);
+    float fresnelSheen = (0.012 + grazing * ${COVER_HOLOGRAM_FRESNEL_GAIN.toFixed(2)})
       * (0.42 + 0.58 * primaryWide);
     float totalFoil = colorFoil + whiteReflection + fresnelSheen;
     // Flip and pointer tilt are independent paths into the same coating. The
@@ -127,18 +159,16 @@ export const COVER_HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
       0.0,
       ${COVER_HOLOGRAM_MAX_ALPHA.toFixed(2)}
     );
-    // Pure white vanishes against white stock. A broad neutral-silver shoulder
-    // gives the narrow white core enough contrast to read as reflected light;
-    // only a small spectrum fraction remains at the fringe.
-    vec3 silverPearl = mix(vec3(0.48, 0.57, 0.68), spectrum, 0.10);
+    // Rainbow is the coating. White only punches through at the glare core,
+    // matching the reference's separate light-reflection layer.
     float reflectionMix = clamp(
-      primaryCore * primaryCore * ${COVER_HOLOGRAM_PEAK_WHITE_MIX_MIN.toFixed(2)}
-        + primaryWide * 0.06
-        + secondary * 0.08,
+      primaryCore * primaryCore * 0.34
+        + primaryWide * 0.05
+        + secondary * 0.04,
       0.0,
-      0.96
+      ${COVER_HOLOGRAM_PEAK_WHITE_MIX_MAX.toFixed(2)}
     );
-    vec3 color = mix(silverPearl, vec3(1.0), reflectionMix);
+    vec3 color = mix(spectrum, vec3(1.0), reflectionMix);
 
     gl_FragColor = vec4(color, alpha);
   }
