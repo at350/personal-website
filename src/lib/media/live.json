@@ -1,6 +1,20 @@
 {
   "items": [
     {
+      "id": "letterboxd:letterboxd-watch-1454550113",
+      "source": "letterboxd",
+      "kind": "film",
+      "title": "La La Land",
+      "url": "https://letterboxd.com/alantai/film/la-la-land/",
+      "publishedAt": "2026-08-17T01:35:26.000Z",
+      "year": 2016,
+      "rating": 5,
+      "image": {
+        "src": "/media/thumbs/fa1f2cf30c66.jpg",
+        "alt": "Poster for La La Land"
+      }
+    },
+    {
       "id": "letterboxd:letterboxd-watch-1442793135",
       "source": "letterboxd",
       "kind": "film",
@@ -684,21 +698,7 @@
         "src": "/media/thumbs/7151e616036a.jpg",
         "alt": "Poster for The Social Network"
       }
-    },
-    {
-      "id": "letterboxd:letterboxd-review-938760782",
-      "source": "letterboxd",
-      "kind": "film",
-      "title": "Jurassic World Rebirth",
-      "url": "https://letterboxd.com/alantai/film/jurassic-world-rebirth/",
-      "publishedAt": "2025-07-07T05:18:50.000Z",
-      "year": 2025,
-      "rating": 2.5,
-      "image": {
-        "src": "/media/thumbs/15d5962dfe8f.jpg",
-        "alt": "Poster for Jurassic World Rebirth"
-      }
     }
   ],
-  "generatedAt": "2026-08-16T09:43:47.354Z"
+  "generatedAt": "2026-08-17T09:58:25.355Z"
 }
