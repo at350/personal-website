@@ -1,5 +1,5 @@
 /* V2 contents — verso: the TOC as the artwork, previews print in the fore-edge
-   band. Recto: a hung mono ledger and the imprint. White, ink, one red. */
+   band. Recto: a hung mono section index. White, ink, one red. */
 
 .contents2 {
   position: absolute;
@@ -123,7 +123,7 @@
   color: var(--red);
 }
 
-/* ————— Recto: departments + imprint ————— */
+/* ————— Recto: section index ————— */
 
 .contents2[data-face="recto"] {
   padding: 13cqh 9cqw 11cqh 15cqw;
@@ -177,30 +177,6 @@
 .contents2__dept:hover .contents2__dept-title,
 .contents2__dept:focus-visible .contents2__dept-title {
   transform: translateX(0.8cqw);
-}
-
-/* The imprint: one quiet block, low and right. */
-.contents2__imprint {
-  margin-top: auto;
-  margin-left: auto;
-  max-width: 32ch;
-}
-
-.contents2__place {
-  font-family: var(--font-mono);
-  font-size: max(11px, 1.6cqw);
-  letter-spacing: 0.08em;
-  color: var(--ink-3);
-  font-feature-settings: "lnum" 1;
-}
-
-.contents2__intro {
-  margin-top: 1.6cqh;
-  font-family: var(--font-body);
-  line-height: 1.58;
-  font-size: clamp(11px, 2.3cqw, 15px);
-  
-  color: var(--ink-2);
 }
 
 @media (prefers-reduced-motion: reduce) {

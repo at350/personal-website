@@ -4,7 +4,6 @@ export const SiteMetaSchema = z.object({
   name: z.string(),
   title: z.string(),
   description: z.string(),
-  intro: z.string(),
   location: z.string(),
   issue: z.object({
     number: z.string(),
