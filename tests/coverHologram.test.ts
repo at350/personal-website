@@ -15,7 +15,8 @@ import {
   COVER_HOLOGRAM_FRESNEL_GAIN,
   COVER_HOLOGRAM_GLARE_GAIN,
   COVER_HOLOGRAM_MAX_ALPHA,
-  COVER_HOLOGRAM_PEAK_WHITE_MIX_MIN,
+  COVER_HOLOGRAM_PEAK_WHITE_MIX_MAX,
+  COVER_HOLOGRAM_RAINBOW_STOPS,
   createCoverHologramMaterial,
   updateCoverHologramMaterial,
 } from "@/book3d/coverHologramMaterial";
@@ -107,14 +108,18 @@ describe("cover hologram", () => {
     expect(coverHologramTiltEnvelope(true, Number.POSITIVE_INFINITY)).toBe(0);
   });
 
-  it("makes white glare stronger than chroma without becoming opaque", () => {
-    expect(COVER_HOLOGRAM_GLARE_GAIN).toBeGreaterThan(
-      COVER_HOLOGRAM_CHROMA_GAIN,
+  it("keeps the rainbow gradient as the foil color, with white as a highlight", () => {
+    expect(COVER_HOLOGRAM_RAINBOW_STOPS).toHaveLength(6);
+    expect(COVER_HOLOGRAM_RAINBOW_STOPS[0]).toEqual([1.0, 0.231, 0.188]);
+    expect(COVER_HOLOGRAM_RAINBOW_STOPS[2]).toEqual([1.0, 0.8, 0.0]);
+    expect(COVER_HOLOGRAM_RAINBOW_STOPS[5]).toEqual([0.345, 0.337, 0.839]);
+    expect(COVER_HOLOGRAM_CHROMA_GAIN).toBeGreaterThan(
+      COVER_HOLOGRAM_GLARE_GAIN,
     );
-    expect(COVER_HOLOGRAM_FRESNEL_GAIN).toBeGreaterThan(
-      COVER_HOLOGRAM_CHROMA_GAIN,
+    expect(COVER_HOLOGRAM_CHROMA_GAIN).toBeGreaterThan(
+      COVER_HOLOGRAM_FRESNEL_GAIN,
     );
-    expect(COVER_HOLOGRAM_PEAK_WHITE_MIX_MIN).toBeGreaterThanOrEqual(0.6);
+    expect(COVER_HOLOGRAM_PEAK_WHITE_MIX_MAX).toBeLessThanOrEqual(0.5);
     expect(COVER_HOLOGRAM_MAX_ALPHA).toBeLessThanOrEqual(0.5);
   });
 
@@ -148,6 +153,7 @@ describe("cover hologram", () => {
     expect(material.toneMapped).toBe(false);
     expect(material.polygonOffset).toBe(true);
     expect(material.fragmentShader).not.toContain("backgroundFoil");
+    expect(material.fragmentShader).not.toContain("silverPearl");
     expect(material.fragmentShader).toContain("motionVisibility");
     expect(material.fragmentShader).toContain(
       "max(flipVisibility, uTilt)",
@@ -155,6 +161,11 @@ describe("cover hologram", () => {
     expect(material.fragmentShader).toMatch(
       /uStrength \* edgeFade \* motionVisibility/,
     );
+    expect(material.fragmentShader).toContain(
+      "mix(spectrum, vec3(1.0), reflectionMix)",
+    );
+    expect(material.fragmentShader).toContain("vec3(1.000, 0.231, 0.188)");
+    expect(material.fragmentShader).toContain("vec3(0.345, 0.337, 0.839)");
 
     updateCoverHologramMaterial(material, {
       pointerX: Number.NaN,
