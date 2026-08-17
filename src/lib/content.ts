@@ -12,8 +12,6 @@ export const siteMeta = {
   title: "Alan Tai",
   description:
     "Alan Tai is a Northwestern student building software, research, and early-stage products.",
-  intro:
-    "Use the index as a map, not an assignment. Start anywhere; the issue still reads front to back.",
   location: "Cupertino, Calif.",
   issue: {
     number: "01",

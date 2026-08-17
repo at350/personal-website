@@ -2,7 +2,6 @@ import { useState } from "react";
 import type { FocusEvent } from "react";
 import { useNavigate } from "react-router";
 import type { SpreadFaceProps } from "@/magazine/spread-types";
-import { siteMeta } from "@/lib/content";
 import { withBasePath } from "@/lib/basePath";
 import "@/styles/spreads/contents.css";
 
@@ -47,6 +46,9 @@ const FEATURES: readonly Feature[] = [
 ];
 
 const DEPARTMENTS = [
+  { no: "06", route: "/profile", title: "news" },
+  { no: "08", route: "/projects", title: "features" },
+  { no: "12", route: "/resume", title: "sports" },
   { no: "14", route: "/library", title: "arts & ent" },
   { no: "16", route: "/writing", title: "opinion" },
   { no: "18", route: "/contact", title: "letters" },
@@ -116,7 +118,7 @@ function FeaturesPage() {
   );
 }
 
-/* Recto — the sections as a hung mono ledger, then the imprint. Nothing else. */
+/* Recto — the section index as a hung mono ledger. Nothing else. */
 function DepartmentsPage() {
   const navigate = useNavigate();
 
@@ -137,11 +139,6 @@ function DepartmentsPage() {
           </button>
         ))}
       </nav>
-
-      <div className="contents2__imprint">
-        <p className="contents2__place">Published from {siteMeta.location}</p>
-        <p className="contents2__intro">{siteMeta.intro}</p>
-      </div>
     </div>
   );
 }
