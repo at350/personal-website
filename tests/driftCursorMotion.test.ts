@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
   DRIFT_BURST_START_RADIUS,
+  DRIFT_PUFF_LIFETIME,
+  DRIFT_PUFF_SPACING,
+  DRIFT_TRAIL_CAPACITY,
+  DRIFT_TRAIL_SPAN,
+  ageDriftTrail,
+  collectDriftTrail,
+  createDriftTrail,
   driftCursorGust,
   driftGustBurst,
-  stepDriftOrbBody,
-  type DriftOrbBodyState,
+  driftPuffRender,
+  resetDriftTrail,
+  shedDriftTrail,
 } from "@/drift/cursorMotion";
+
+const live = (trail: ReturnType<typeof createDriftTrail>) =>
+  trail.puffs.filter((puff) => puff.age >= 0);
 
 describe("drift cursor motion", () => {
   it("is still at rest and responds clearly to ordinary pointer speeds", () => {
@@ -29,51 +40,177 @@ describe("drift cursor motion", () => {
     expect(extreme.speed).toBeLessThanOrEqual(1);
   });
 
-  it("trails the pointer as a lazier air parcel than the flame body", () => {
-    let body: DriftOrbBodyState = { x: 0, y: 0, velocityX: 0, velocityY: 0 };
+  it("sheds air by distance travelled, not by elapsed time", () => {
+    const trail = createDriftTrail();
+    resetDriftTrail(trail, 0, 0);
 
-    // The orb visibly sloshes: after 100 ms it is still clearly short of a
-    // pointer step, and it settles without overshoot.
-    for (let frame = 0; frame < 6; frame += 1) {
-      body = stepDriftOrbBody(body, 100, 0, 1 / 60);
+    // Creeping along leaves nothing behind, however many samples arrive.
+    for (let step = 1; step <= 6; step += 1) {
+      expect(shedDriftTrail(trail, step * 2, 0, 0.4)).toBe(0);
     }
-    expect(body.x).toBeGreaterThan(55);
-    expect(body.x).toBeLessThan(75);
+    expect(live(trail)).toHaveLength(0);
 
-    let maximum = body.x;
-    for (let frame = 0; frame < 30; frame += 1) {
-      body = stepDriftOrbBody(body, 100, 0, 1 / 60);
-      maximum = Math.max(maximum, body.x);
-    }
-    expect(body.x).toBeGreaterThan(99);
-    expect(maximum).toBeLessThanOrEqual(101);
+    // Crossing a full spacing sheds exactly one parcel, on the path.
+    expect(shedDriftTrail(trail, DRIFT_PUFF_SPACING + 1, 0, 0.4)).toBe(1);
+    const shed = live(trail);
+    expect(shed).toHaveLength(1);
+    expect(shed[0]!.x).toBeCloseTo(DRIFT_PUFF_SPACING, 6);
+    expect(shed[0]!.age).toBe(0);
   });
 
-  it("is deterministic across 60Hz and 120Hz frame delivery", () => {
-    const initial: DriftOrbBodyState = {
-      x: -20,
-      y: 15,
-      velocityX: 0,
-      velocityY: 0,
-    };
-    let sixty = initial;
-    let oneTwenty = initial;
+  it("interpolates a fast flick so spacing never tracks pointer speed", () => {
+    const trail = createDriftTrail();
+    resetDriftTrail(trail, 0, 0);
 
-    for (let frame = 0; frame < 12; frame += 1) {
-      sixty = stepDriftOrbBody(sixty, 80, -35, 1 / 60);
+    // One 120px sample — a ~7000px/s flick between two 60Hz samples.
+    const shedCount = shedDriftTrail(trail, 120, 0, 1);
+    expect(shedCount).toBe(Math.floor(120 / DRIFT_PUFF_SPACING));
+
+    const xs = live(trail).map((puff) => puff.x).sort((a, b) => a - b);
+    // Evenly spaced along the real path, not one lonely parcel at the end.
+    for (let index = 1; index < xs.length; index += 1) {
+      expect(xs[index]! - xs[index - 1]!).toBeCloseTo(DRIFT_PUFF_SPACING, 6);
     }
-    for (let frame = 0; frame < 24; frame += 1) {
-      oneTwenty = stepDriftOrbBody(oneTwenty, 80, -35, 1 / 120);
+    // And no gaps: neighbours sit well inside a fresh parcel's own radius,
+    // so the wake reads as a path rather than a dotted line.
+    const { radius } = driftPuffRender(0, 1, 0);
+    expect(DRIFT_PUFF_SPACING).toBeLessThan(radius);
+  });
+
+  it("bounds the trail's length no matter how fast the pointer moves", () => {
+    for (const jump of [40, 200, 1200, 9000]) {
+      const trail = createDriftTrail();
+      resetDriftTrail(trail, 0, 0);
+      for (let sample = 1; sample <= 6; sample += 1) {
+        shedDriftTrail(trail, sample * jump, 0, 1);
+        ageDriftTrail(trail, 1 / 60);
+      }
+      const pointer = 6 * jump;
+      const furthest = Math.max(
+        ...live(trail).map((puff) => Math.abs(pointer - puff.x)),
+      );
+      // The span is capacity x spacing by construction — this is what keeps
+      // the wake inside the draw quad at any speed.
+      expect(furthest).toBeLessThanOrEqual(DRIFT_TRAIL_SPAN);
+    }
+  });
+
+  it("leaves parcels where they were dropped — they never chase the pointer", () => {
+    const trail = createDriftTrail();
+    resetDriftTrail(trail, 0, 0);
+    shedDriftTrail(trail, DRIFT_PUFF_SPACING, 0, 0.5);
+    const parcel = live(trail)[0]!;
+    const bornAt = { x: parcel.x, y: parcel.y };
+
+    // Sweep the pointer away, ageing the trail as frames pass. Only a short
+    // hop each sample, so the original parcel is not recycled.
+    for (let step = 1; step <= 3; step += 1) {
+      shedDriftTrail(trail, DRIFT_PUFF_SPACING + step * 16, step * 4, 0.9);
+      ageDriftTrail(trail, 1 / 120);
     }
 
-    expect(sixty.x).toBeCloseTo(oneTwenty.x, 8);
-    expect(sixty.y).toBeCloseTo(oneTwenty.y, 8);
-    expect(sixty.velocityX).toBeCloseTo(oneTwenty.velocityX, 8);
-    expect(sixty.velocityY).toBeCloseTo(oneTwenty.velocityY, 8);
+    // The original parcel has not moved a pixel: this is what separates
+    // shed air from a mass on a spring, which would have swung along.
+    expect(parcel.x).toBe(bornAt.x);
+    expect(parcel.y).toBe(bornAt.y);
+  });
+
+  it("keeps only the most recent stretch of path once the buffer is full", () => {
+    const trail = createDriftTrail();
+    resetDriftTrail(trail, 0, 0);
+    const steps = DRIFT_TRAIL_CAPACITY + 6;
+    for (let step = 1; step <= steps; step += 1) {
+      shedDriftTrail(trail, step * DRIFT_PUFF_SPACING, 0, 0.6);
+      ageDriftTrail(trail, 1 / 240);
+    }
+
+    const shed = live(trail);
+    expect(shed).toHaveLength(DRIFT_TRAIL_CAPACITY);
+    // Every survivor is from the most recent stretch — the discarded ones
+    // are exactly the earliest, whatever their ages did.
+    const oldestKeptX = Math.min(...shed.map((puff) => puff.x));
+    expect(oldestKeptX).toBeCloseTo(
+      (steps - DRIFT_TRAIL_CAPACITY + 1) * DRIFT_PUFF_SPACING,
+      6,
+    );
+  });
+
+  it("recycles strictly in insertion order even when ages tie", () => {
+    // Every parcel shed inside one frame has age 0, so an age-scanning
+    // recycler would keep re-picking the same slot and collapse the trail.
+    const trail = createDriftTrail();
+    resetDriftTrail(trail, 0, 0);
+    for (let step = 1; step <= DRIFT_TRAIL_CAPACITY + 4; step += 1) {
+      shedDriftTrail(trail, step * DRIFT_PUFF_SPACING, 0, 0.5);
+    }
+    const xs = live(trail).map((puff) => puff.x);
+    expect(new Set(xs).size).toBe(DRIFT_TRAIL_CAPACITY);
+  });
+
+  it("dissolves the tail of the buffer so nothing blinks out at full opacity", () => {
+    // Fast strokes recycle parcels long before they can age out, so the
+    // recency term has to carry the fade instead.
+    const fresh = driftPuffRender(0.05, 1, 0);
+    const oldest = driftPuffRender(0.05, 1, 1);
+    expect(fresh.envelope).toBeGreaterThan(0.5);
+    expect(oldest.envelope).toBe(0);
+
+    // And a parcel retired by age alone is equally quiet at the end.
+    expect(driftPuffRender(DRIFT_PUFF_LIFETIME * 0.99, 1, 0).envelope)
+      .toBeLessThan(0.05);
+  });
+
+  it("packs the live trail for the GPU with a y-up flip", () => {
+    const trail = createDriftTrail();
+    resetDriftTrail(trail, 0, 0);
+    shedDriftTrail(trail, 0, DRIFT_PUFF_SPACING * 2, 0.8);
+    ageDriftTrail(trail, 0.05);
+
+    const out = new Float32Array(DRIFT_TRAIL_CAPACITY * 4);
+    const count = collectDriftTrail(trail, out, 0, DRIFT_PUFF_SPACING * 2);
+    expect(count).toBe(2);
+
+    const packed = [];
+    for (let slot = 0; slot < DRIFT_TRAIL_CAPACITY; slot += 1) {
+      if (out[slot * 4 + 2]! > 0) packed.push(out.slice(slot * 4, slot * 4 + 4));
+    }
+    expect(packed).toHaveLength(2);
+    for (const entry of packed) {
+      // Shed below the pointer in client space (+y down) must appear ABOVE
+      // it in the shader's y-up frame.
+      expect(entry[1]!).toBeGreaterThanOrEqual(0);
+      expect(entry[3]!).toBeGreaterThan(0);
+    }
+  });
+
+  it("dissipates every parcel within its lifetime", () => {
+    const trail = createDriftTrail();
+    resetDriftTrail(trail, 0, 0);
+    shedDriftTrail(trail, DRIFT_PUFF_SPACING, 0, 1);
+    expect(live(trail)).toHaveLength(1);
+
+    ageDriftTrail(trail, DRIFT_PUFF_LIFETIME * 0.5);
+    expect(live(trail)).toHaveLength(1);
+    ageDriftTrail(trail, DRIFT_PUFF_LIFETIME * 0.6);
+    expect(live(trail)).toHaveLength(0);
+  });
+
+  it("forgets the trail when the cursor re-enters the page", () => {
+    const trail = createDriftTrail();
+    resetDriftTrail(trail, 0, 0);
+    for (let step = 1; step <= 4; step += 1) {
+      shedDriftTrail(trail, step * DRIFT_PUFF_SPACING, 0, 0.7);
+    }
+    expect(live(trail).length).toBeGreaterThan(0);
+
+    resetDriftTrail(trail, 900, 400);
+    expect(live(trail)).toHaveLength(0);
+    // And the next sample near the new position sheds nothing, so no parcel
+    // is stranded across the jump.
+    expect(shedDriftTrail(trail, 903, 402, 0.7)).toBe(0);
   });
 
   it("grows and fades the click-gust ring like the leaf shove it mirrors", () => {
-    // Unstarted bursts draw nothing.
     expect(driftGustBurst(-1).strength).toBe(0);
 
     const young = driftGustBurst(0);

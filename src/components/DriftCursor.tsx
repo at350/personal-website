@@ -1,11 +1,24 @@
 import { useEffect, useRef } from "react";
 import {
+  DRIFT_TRAIL_CAPACITY,
+  DRIFT_TRAIL_SPAN,
+  ageDriftTrail,
+  collectDriftTrail,
+  createDriftTrail,
   driftCursorGust,
   driftGustBurst,
-  stepDriftOrbBody,
-  type DriftOrbBodyState,
+  resetDriftTrail,
+  shedDriftTrail,
 } from "@/drift/cursorMotion";
 import "@/styles/drift.css";
+
+/** Room for the whorl, the widest shed parcel at the far end of the trail,
+    and the edge fade — the trail span is bounded by construction (fixed
+    spacing x capacity), so this containment holds at any pointer speed. */
+const MAX_PUFF_RADIUS = 39;
+const EDGE_FADE = 16;
+const QUAD_HALF_EXTENT =
+  DRIFT_TRAIL_SPAN + MAX_PUFF_RADIUS + EDGE_FADE + 35;
 
 const VERTEX_SHADER = /* glsl */ `
   attribute vec2 aCorner;
@@ -13,13 +26,14 @@ const VERTEX_SHADER = /* glsl */ `
   uniform vec2 uResolution;
   uniform vec2 uCenter;
   uniform float uDpr;
+  uniform float uHalfExtent;
 
   varying vec2 vLocal;
 
   void main() {
-    // Generous transparent room around the orb so gust streaks and the click
-    // ring never reveal the edge of the draw quad.
-    float halfExtent = 190.0 * uDpr;
+    // Generous transparent room around the orb so the shed trail and the
+    // click ring never reveal the edge of the draw quad.
+    float halfExtent = uHalfExtent * uDpr;
     vec2 pixel = uCenter + aCorner * halfExtent;
     vec2 clip = pixel / uResolution * 2.0 - 1.0;
 
@@ -37,7 +51,11 @@ const FRAGMENT_SHADER = /* glsl */ `
   uniform float uSwirl;
   uniform float uBurstAge;
   uniform float uReducedMotion;
-  uniform vec2 uBodyOffset;
+  uniform float uHalfExtent;
+  // Shed air: xy = position local to the pointer, z = opacity envelope
+  // (0 for empty slots), w = radius. The envelope curve lives in TypeScript
+  // where it can be unit tested; this shader only draws what it is handed.
+  uniform vec4 uPuffs[${DRIFT_TRAIL_CAPACITY}];
 
   varying vec2 vLocal;
 
@@ -77,9 +95,10 @@ const FRAGMENT_SHADER = /* glsl */ `
     vec2 motion = mix(uMotion, vec2(0.0), stillness);
     float swirlPhase = mix(uSwirl, 4.2, stillness);
 
-    // The wisps orbit an inertial air parcel that trails the hand; the tiny
-    // contact dot below stays registered to the exact pointer pixel.
-    vec2 p = vLocal - uBodyOffset;
+    // The whorl sits ON the pointer. Nothing here lags behind it: a trailing
+    // mass would swing like a pendulum when the hand circles, which is the
+    // one thing moving air never does.
+    vec2 p = vLocal;
     float r = length(p);
     vec2 pn = r > 0.0001 ? p / r : vec2(1.0, 0.0);
 
@@ -91,17 +110,11 @@ const FRAGMENT_SHADER = /* glsl */ `
     float sa = sin(ang);
     vec2 qn = vec2(pn.x * ca - pn.y * sa, pn.x * sa + pn.y * ca);
 
-    // Filaments are BORN from noise, not drawn: ridged fbm sampled on
-    // slowly growing circles in noise space gives long tangential wisps of
-    // uneven length and brightness, with no seam anywhere.
-    vec2 domain = qn * (1.3 + r * 0.05) +
-      vec2(swirlPhase * 0.21, -swirlPhase * 0.12);
-    float fieldA = windFbm(domain);
-    float fieldB = windFbm(domain * 1.9 + vec2(4.7, 9.2));
-    float filaments = smoothstep(0.5, 0.74, fieldA * 0.72 + fieldB * 0.38);
-
     // Windsock envelope: a soft donut of air, stretched downwind while the
-    // hand moves so the whole glyph leans into the stroke.
+    // hand moves so the whole glyph leans into the stroke. This is the ONLY
+    // motion response still attached to the pointer — a shape change, never
+    // a swinging offset. Computed first so it can gate the costly noise:
+    // the vast majority of this quad's fragments lie outside the whorl.
     float motionLength = length(motion);
     vec2 direction = motionLength > 0.001 ? motion / motionLength : vec2(0.0);
     float tail = motionLength > 0.001
@@ -110,28 +123,45 @@ const FRAGMENT_SHADER = /* glsl */ `
     float rEffective = r / (1.0 + tail * 0.9);
     float donut = smoothstep(3.0, 13.0, rEffective) *
       (1.0 - smoothstep(30.0, 58.0, rEffective));
-    float wind = filaments * donut;
 
-    // Gust streaks trail opposite the motion while the hand moves — the
-    // orb's wake, three flickering wind lines with ragged ends.
-    float streaks = 0.0;
-    if (speed > 0.02 && motionLength > 0.001) {
-      float along = dot(p, -direction);
-      float across = dot(p, vec2(-direction.y, direction.x));
-      for (int s = 0; s < 3; s += 1) {
-        float fs = float(s) - 1.0;
-        float lane = across - fs * 13.0 -
-          (windFbm(vec2(along * 0.05, time * 1.3 + fs * 9.0)) - 0.5) * 8.0;
-        float reach = 46.0 + speed * 120.0 + fs * 12.0;
-        float body = smoothstep(4.0, 18.0, along) *
-          (1.0 - smoothstep(reach * 0.55, reach, along));
-        float tube = exp(-lane * lane / 26.0);
-        float flicker = 0.6 +
-          0.4 * windNoise(vec2(along * 0.07 - time * 3.1, fs * 4.7));
-        streaks += body * tube * flicker;
-      }
-      streaks *= speed;
+    // Filaments are BORN from noise, not drawn: ridged fbm sampled on
+    // slowly growing circles in noise space gives long tangential wisps of
+    // uneven length and brightness, with no seam anywhere.
+    float wind = 0.0;
+    float fieldA = 0.0;
+    if (donut > 0.002) {
+      vec2 domain = qn * (1.3 + r * 0.05) +
+        vec2(swirlPhase * 0.21, -swirlPhase * 0.12);
+      fieldA = windFbm(domain);
+      float fieldB = windFbm(domain * 1.9 + vec2(4.7, 9.2));
+      wind = smoothstep(0.5, 0.74, fieldA * 0.72 + fieldB * 0.38) * donut;
     }
+
+    // Shed air: parcels left along the path the hand actually took, fixed
+    // where they were dropped and dissolving in place. Circling the pointer
+    // leaves a dissipating spiral instead of dragging a tail around after it.
+    float shed = 0.0;
+    for (int i = 0; i < ${DRIFT_TRAIL_CAPACITY}; i += 1) {
+      vec4 puff = uPuffs[i];
+      // A plain guard rather than continue/early-return keeps this inside
+      // the most conservative GLSL ES 1.00 loop forms, and the squared
+      // distance reject skips the costly noise for fragments this parcel
+      // cannot reach — which is nearly all of them.
+      if (puff.z > 0.0) {
+        vec2 delta = p - puff.xy;
+        float squared = dot(delta, delta);
+        float radiusSquared = puff.w * puff.w;
+        if (squared < radiusSquared * 4.0) {
+          // Break each parcel into filaments rather than a soft blob: a low
+          // floor and a finer domain make the wake read as torn air.
+          float wisp = 0.22 + 0.78 * windFbm(
+            delta * 0.115 + vec2(float(i) * 5.1, time * 0.35)
+          );
+          shed += exp(-squared / radiusSquared) * puff.z * wisp * wisp;
+        }
+      }
+    }
+    shed *= 1.0 - stillness;
 
     // The click gust: one expanding ring, noise-broken so it reads as a
     // pressure front rather than drawn geometry, dissolving into air well
@@ -144,29 +174,32 @@ const FRAGMENT_SHADER = /* glsl */ `
       float ringArm = (r - burstRadius) / (7.0 + uBurstAge * 26.0);
       float front = 0.55 + 0.45 * windNoise(qn * 3.0 + vec2(time * 0.9, 2.3));
       ring = exp(-ringArm * ringArm) * exp(-uBurstAge * 3.4) * front *
-        (1.0 - smoothstep(110.0, 160.0, burstRadius));
+        (1.0 - smoothstep(150.0, 205.0, burstRadius));
     }
 
-    // Registration: a precise contact dot on the raw pointer plus the
-    // faintest glassy lens where the air parcel sits.
-    float pointerDistance = length(vLocal);
-    float contact = exp(-pointerDistance * pointerDistance / 6.0);
+    // Registration: a precise contact dot on the raw pointer, with the
+    // faintest glassy lens around it.
+    float contact = exp(-r * r / 6.0);
     float lens = exp(-r * r / 256.0) * 0.5;
 
-    float wisps = clamp(wind * 0.95 + streaks * 0.85 + ring * 0.7, 0.0, 1.0);
+    float wisps = clamp(wind * 0.95 + shed * 0.8 + ring * 0.7, 0.0, 1.0);
     float alpha = wisps * 0.44 + lens * 0.09 + contact * 0.4;
 
     // Ink wisps on the white page; the site's red rides only the brightest
     // filament tips, a fleck rather than a costume.
     vec3 pale = vec3(0.5, 0.54, 0.6);
     vec3 ink = vec3(0.24, 0.27, 0.32);
-    vec3 color = mix(pale, ink, clamp(wind + streaks, 0.0, 1.0));
+    vec3 color = mix(pale, ink, clamp(wind + shed, 0.0, 1.0));
     float tips = smoothstep(0.82, 0.95, fieldA) * donut;
     color = mix(color, vec3(0.84, 0.18, 0.12), tips * 0.4);
     color = mix(color, vec3(0.30, 0.33, 0.38), ring * 0.6);
 
-    float quadFade = (1.0 - smoothstep(168.0, 184.0, abs(vLocal.x))) *
-      (1.0 - smoothstep(168.0, 184.0, abs(vLocal.y)));
+    // The fade band sits beyond everything the shader can draw, so it only
+    // ever guards against the quad edge itself, never clips live content.
+    float edge = uHalfExtent - 6.0;
+    float band = ${EDGE_FADE}.0;
+    float quadFade = (1.0 - smoothstep(edge - band, edge, abs(vLocal.x))) *
+      (1.0 - smoothstep(edge - band, edge, abs(vLocal.y)));
     alpha *= quadFade;
 
     if (alpha < 0.0015) discard;
@@ -209,8 +242,8 @@ function createWindProgram(context: WebGLRenderingContext) {
   return program;
 }
 
-/** A swirling orb of air that leans, streaks, and gusts with the pointer —
-    Drift's counterpart to the ignite flame cursor. */
+/** A whorl of air that leans into the stroke and sheds dissolving parcels
+    along the path — Drift's counterpart to the ignite flame cursor. */
 export function DriftCursor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -260,13 +293,14 @@ export function DriftCursor() {
     const resolutionUniform = context.getUniformLocation(program, "uResolution");
     const centerUniform = context.getUniformLocation(program, "uCenter");
     const dprUniform = context.getUniformLocation(program, "uDpr");
+    const halfExtentUniform = context.getUniformLocation(program, "uHalfExtent");
     const timeUniform = context.getUniformLocation(program, "uTime");
     const motionUniform = context.getUniformLocation(program, "uMotion");
     const speedUniform = context.getUniformLocation(program, "uSpeed");
     const swirlUniform = context.getUniformLocation(program, "uSwirl");
     const burstUniform = context.getUniformLocation(program, "uBurstAge");
     const reducedUniform = context.getUniformLocation(program, "uReducedMotion");
-    const bodyOffsetUniform = context.getUniformLocation(program, "uBodyOffset");
+    const puffsUniform = context.getUniformLocation(program, "uPuffs[0]");
     context.enableVertexAttribArray(cornerAttribute);
     context.vertexAttribPointer(cornerAttribute, 2, context.FLOAT, false, 0, 0);
     context.enable(context.BLEND);
@@ -285,13 +319,8 @@ export function DriftCursor() {
     let swirlPhase = 0;
     let burstAge = -1;
     let sessionStart = 0;
-    let orbBody: DriftOrbBodyState = {
-      x: cursorX,
-      y: cursorY,
-      velocityX: 0,
-      velocityY: 0,
-    };
-    let orbBodyInitialized = false;
+    const trail = createDriftTrail();
+    const puffData = new Float32Array(DRIFT_TRAIL_CAPACITY * 4);
     let visible = false;
     let frameId = 0;
     let previousFrameTime = 0;
@@ -309,31 +338,13 @@ export function DriftCursor() {
       context.viewport(0, 0, canvas.width, canvas.height);
     };
 
-    const resetOrbBody = () => {
-      orbBody = { x: cursorX, y: cursorY, velocityX: 0, velocityY: 0 };
-      orbBodyInitialized = true;
-    };
-
     const render = (timeSeconds: number) => {
       context.clearColor(0, 0, 0, 0);
       context.clear(context.COLOR_BUFFER_BIT);
       if (!visible) return;
 
       const gust = driftCursorGust(pointerVelocityX, pointerVelocityY);
-      const burst = driftGustBurst(burstAge);
-
-      let bodyOffsetX = orbBody.x - cursorX;
-      let bodyOffsetY = cursorY - orbBody.y;
-      const bodyOffsetLength = Math.hypot(bodyOffsetX, bodyOffsetY);
-      if (bodyOffsetLength > 26) {
-        const scale = 26 / bodyOffsetLength;
-        bodyOffsetX *= scale;
-        bodyOffsetY *= scale;
-      }
-      if (reducedMotion.matches) {
-        bodyOffsetX = 0;
-        bodyOffsetY = 0;
-      }
+      collectDriftTrail(trail, puffData, cursorX, cursorY);
 
       context.useProgram(program);
       context.uniform2f(resolutionUniform, canvas.width, canvas.height);
@@ -343,19 +354,16 @@ export function DriftCursor() {
         (window.innerHeight - cursorY) * dpr,
       );
       context.uniform1f(dprUniform, dpr);
+      context.uniform1f(halfExtentUniform, QUAD_HALF_EXTENT);
       context.uniform1f(timeUniform, timeSeconds);
-      // The shader's local frame is y-up; every directional upload flips y
-      // the way uBodyOffset already does, or vertical wakes would lead the
-      // pointer instead of trailing it.
+      // The shader's local frame is y-up; directional uploads flip y, or the
+      // windsock would lean the wrong way on vertical strokes.
       context.uniform2f(motionUniform, motionX, -motionY);
       context.uniform1f(speedUniform, gust.speed);
       context.uniform1f(swirlUniform, swirlPhase);
-      context.uniform1f(
-        burstUniform,
-        burst.strength > 0.01 ? Math.max(0, burstAge) : -1,
-      );
+      context.uniform1f(burstUniform, burstAge);
       context.uniform1f(reducedUniform, reducedMotion.matches ? 1 : 0);
-      context.uniform2f(bodyOffsetUniform, bodyOffsetX, bodyOffsetY);
+      context.uniform4fv(puffsUniform, puffData);
       context.drawArrays(context.TRIANGLE_STRIP, 0, 4);
     };
 
@@ -372,16 +380,19 @@ export function DriftCursor() {
       const velocityDecay = Math.exp(-delta * 10.5);
       pointerVelocityX *= velocityDecay;
       pointerVelocityY *= velocityDecay;
-      if (!orbBodyInitialized) resetOrbBody();
-      orbBody = stepDriftOrbBody(orbBody, cursorX, cursorY, delta);
       const gust = driftCursorGust(pointerVelocityX, pointerVelocityY);
       const response = 1 - Math.exp(-delta * 26);
       motionX += (gust.x - motionX) * response;
       motionY += (gust.y - motionY) * response;
-      // Integrated orbit phase: speed bends the arcs' rate smoothly.
+      // Integrated orbit phase: speed bends the whorl's rate smoothly.
       swirlPhase += (1 + gust.speed * 1.6) * delta;
-      if (burstAge >= 0) burstAge += delta;
-      if (burstAge > 0.6) burstAge = -1;
+      ageDriftTrail(trail, delta);
+      if (burstAge >= 0) {
+        burstAge += delta;
+        // Retire on the shared envelope rather than a second hard-coded
+        // lifetime, so the ring's visible life is defined in one place.
+        if (driftGustBurst(burstAge).strength < 0.02) burstAge = -1;
+      }
       render((now - sessionStart) / 1000);
 
       if (!reducedMotion.matches && visible) {
@@ -396,7 +407,11 @@ export function DriftCursor() {
     };
 
     const updatePointer = (event: PointerEvent) => {
-      const samples = event.getCoalescedEvents?.() ?? [event];
+      // An empty coalesced list still describes one real move: falling back
+      // to the event keeps velocity and shedding alive rather than freezing
+      // the whole wind response.
+      const coalesced = event.getCoalescedEvents?.();
+      const samples = coalesced && coalesced.length > 0 ? coalesced : [event];
       for (const sample of samples) {
         const eventTime = sample.timeStamp;
         const delta = (eventTime - previousPointerTime) / 1000;
@@ -413,6 +428,12 @@ export function DriftCursor() {
         previousCursorX = sample.clientX;
         previousCursorY = sample.clientY;
         previousPointerTime = eventTime;
+        // Shed along the real path, coalesced samples included: a fast flick
+        // leaves the same even spacing a slow drag does.
+        if (!reducedMotion.matches) {
+          const sampled = driftCursorGust(pointerVelocityX, pointerVelocityY);
+          shedDriftTrail(trail, sample.clientX, sample.clientY, sampled.speed);
+        }
       }
       cursorX = event.clientX;
       cursorY = event.clientY;
@@ -432,7 +453,7 @@ export function DriftCursor() {
       updatePointer(event);
       visible = !overChrome(event) &&
         (event.pointerType !== "touch" || event.pressure > 0);
-      if (visible && !wasVisible) resetOrbBody();
+      if (visible && !wasVisible) resetDriftTrail(trail, cursorX, cursorY);
       if (reducedMotion.matches) render(7.3);
       else wake();
     };
@@ -441,7 +462,7 @@ export function DriftCursor() {
       const wasVisible = visible;
       updatePointer(event);
       visible = !overChrome(event);
-      if (visible && !wasVisible) resetOrbBody();
+      if (visible && !wasVisible) resetDriftTrail(trail, cursorX, cursorY);
       // The click-gust ring launches with the same click that shoves leaves.
       // Never under reduced motion: the frame loop that ages the ring out is
       // not running there, and a stale age would replay a phantom ring if
@@ -460,7 +481,8 @@ export function DriftCursor() {
       motionX = 0;
       motionY = 0;
       burstAge = -1;
-      orbBodyInitialized = false;
+      resetDriftTrail(trail, cursorX, cursorY);
+      trail.seeded = false;
       render(0);
     };
 
