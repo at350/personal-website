@@ -1,10 +1,13 @@
 import type { ComponentType } from "react";
 
+/** "book" inside the WebGL flip engine and its capture farm; "single" in the
+    touch reader that turns one face at a time; "reader" in the linear stack. */
+export type SpreadMode = "book" | "single" | "reader";
+
 export interface SpreadFaceProps {
   /** Which physical page of the spread is being rendered. */
   face: "verso" | "recto";
-  /** "book" inside the flip engine; "reader" in the linear reading view. */
-  mode: "book" | "reader";
+  mode: SpreadMode;
 }
 
 export type SpreadComponent = ComponentType<SpreadFaceProps>;

@@ -39,6 +39,57 @@ export function spreadPages(index: number, defs: readonly SpreadDef[] = SPREADS)
   return [index * 2, index * 2 + 1];
 }
 
+export type PageSide = "verso" | "recto";
+
+export interface FaceDef {
+  /** Spread this face belongs to. */
+  spread: number;
+  side: PageSide;
+  /** Printed page number, or null on the unnumbered cover and back. */
+  page: number | null;
+}
+
+/** The cover has no verso and the back cover no recto: those are the outside
+    of the issue, not paper anyone reads. */
+export function isRenderableFace(
+  spread: number,
+  side: PageSide,
+  defs: readonly SpreadDef[] = SPREADS,
+): boolean {
+  const kind = defs[spread]?.kind;
+  return !(
+    (kind === "cover" && side === "verso") ||
+    (kind === "back" && side === "recto")
+  );
+}
+
+/** Every readable face in physical order — the sequence a single-page reader
+    turns through, and the set the capture farm rasterizes. Twenty faces: the
+    cover, two per spread, the back. */
+export const FACES: readonly FaceDef[] = SPREADS.flatMap((_, spread) =>
+  (["verso", "recto"] as const)
+    .filter((side) => isRenderableFace(spread, side))
+    .map((side) => {
+      const pages = spreadPages(spread);
+      return {
+        spread,
+        side,
+        page: pages ? (side === "verso" ? pages[0] : pages[1]) : null,
+      };
+    }),
+);
+
+/** A spread's first face — where a route lands when pages turn one at a time. */
+export function faceForSpread(spread: number, faces: readonly FaceDef[] = FACES): number {
+  const index = faces.findIndex((face) => face.spread === spread);
+  return index === -1 ? 0 : index;
+}
+
+export function spreadForFace(face: number, faces: readonly FaceDef[] = FACES): number {
+  const clamped = Math.min(Math.max(face, 0), faces.length - 1);
+  return faces[clamped]?.spread ?? 0;
+}
+
 export function pageLabel(index: number, defs: readonly SpreadDef[] = SPREADS): string {
   const def = defs[index];
   if (!def) return "";
