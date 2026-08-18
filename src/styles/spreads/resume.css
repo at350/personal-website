@@ -56,6 +56,16 @@
   margin-left: auto;
 }
 
+/* Once the word joins the flow it needs room. The head's fixed height exists
+   to reserve space for a word positioned out of flow; keeping it here crushes
+   the legend and the word into the same 38px band on a phone. */
+.resume2:is([data-mode="reader"], [data-mode="single"]) .resume2__head {
+  height: auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: max(6px, 0.8cqh);
+}
+
 .resume2__legend {
   font-family: var(--font-mono);
   font-size: max(11px, 1.5cqw);
@@ -393,11 +403,11 @@
 /* ————— Tight paper ————— */
 
 @container (max-width: 539px) {
+  /* Wrap rather than ellipsize. A truncated "Northwestern Network for
+     Collabora…" costs the reader the actual fact; an uneven row costs a line.
+     The page scrolls, so the extra line has somewhere to go. */
   .resume2__org {
     display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .resume2__rec-note {

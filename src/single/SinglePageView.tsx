@@ -230,15 +230,13 @@ export function SinglePageView({
      the page lands before the parent echoes the new route back, and the stale
      target would immediately turn it home again. Two faces also share one
      route, so turning from a verso to its own recto must not yank back. */
-  const currentRef = useRef(current);
-  currentRef.current = current;
   const appliedTarget = useRef(targetSpread);
   useEffect(() => {
     if (appliedTarget.current === targetSpread) return;
     appliedTarget.current = targetSpread;
-    if (spreadForFace(currentRef.current) === targetSpread) return;
+    if (spreadForFace(current) === targetSpread) return;
     turnTo(faceForSpread(targetSpread));
-  }, [targetSpread, turnTo]);
+  }, [targetSpread, current, turnTo]);
 
   const settledSpread =
     sheet === null && riffle === null ? spreadForFace(current) : null;

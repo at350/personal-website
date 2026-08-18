@@ -100,6 +100,36 @@
   touch-action: pan-y;
 }
 
+/* Furniture is pinned to the paper, as printed page furniture should be — but
+   a page whose composition overruns scrolls its content underneath it. Fade
+   the paper out behind the folio so text passes beneath a page number instead
+   of colliding with it, and let the running head do the same at the top. The
+   fade doubles as the only honest "there is more below" cue a printed page
+   can offer. */
+.single__face::after,
+.single__leaf-front::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: calc(var(--page-pad) * 2);
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    var(--washi) 62%,
+    rgba(255, 255, 255, 0)
+  );
+}
+
+.single__face > .folio,
+.single__face > .running-head,
+.single__leaf-front > .folio,
+.single__leaf-front > .running-head {
+  z-index: 4;
+}
+
 /* Mounted, not shown: a display:none image never starts fetching, so the next
    turn would land on a blank plate. */
 .single__face--ready {
@@ -129,7 +159,7 @@
 
 /* The gutter shadow deepens as the leaf lifts, so paper reads as paper rather
    than as a rotating rectangle. */
-.single__leaf-front::after {
+.single__leaf-front::before {
   content: "";
   position: absolute;
   inset: 0;
