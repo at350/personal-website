@@ -99,11 +99,15 @@ function catalogDate(iso: string): string {
 }
 
 function sourceLine(item: MediaItem): string {
+  // A diary entry carries two dates; the night it was watched is the fact
+  // worth printing, so it outranks the moment the entry was posted.
+  const logged = item.watchedAt ?? item.publishedAt;
   return [
     item.author,
     SOURCE_LABELS[item.source],
     item.year !== undefined ? String(item.year) : undefined,
-    item.publishedAt !== undefined ? catalogDate(item.publishedAt) : undefined,
+    logged !== undefined ? catalogDate(logged) : undefined,
+    item.isRewatch ? "REWATCH" : undefined,
   ]
     .filter(Boolean)
     .join(" · ");

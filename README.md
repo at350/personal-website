@@ -51,20 +51,44 @@ npm run lint
   `src/lib/technology-icons.ts`; uncatalogued tools and methods receive a
   monochrome typographic mark automatically.
 - **Media library** — `src/lib/media/`: a verified seed merged with
-  `live.json`, refreshed by `npm run refresh-media` (see below).
+  `live.json`, refreshed by `npm run refresh-media` (see below). Film plates
+  print the date the film was watched rather than the date the diary entry was
+  posted, star the member rating, mark a rewatch, and carry the review copy
+  when the entry has any.
 - **Editorial art** — generated concept still lifes live in
   `public/images/editorial/` and `public/images/projects/editorial/`. Their
   reproducible prompt set is in `docs/assets/editorial-image-prompts.md`.
 
 ## Library refresh
 
-`.github/workflows/refresh-media.yml` runs daily and commits a new
-`src/lib/media/live.json` when feeds change. Configure repo secrets
-(all optional; the seed keeps the page alive without them):
+The film log restocks itself from [letterboxd.com/alantai](https://letterboxd.com/alantai/).
+`.github/workflows/refresh-media.yml` runs **every two hours**: it reads the
+public RSS feed, mirrors each poster into `public/media/thumbs/`, and commits a
+new `src/lib/media/live.json` when anything changed. A film logged on
+letterboxd is on the site within one cycle. Nothing needs configuring —
+the username lives in `scripts/refresh-media.mjs` as `DEFAULT_LETTERBOXD_USER`.
+
+Two details in that workflow are load-bearing:
+
+- **It dispatches the deploy itself.** A push authenticated with
+  `GITHUB_TOKEN` deliberately does not start another workflow run, so
+  `deploy.yml` — which triggers on push — never sees the snapshot commit.
+  `workflow_dispatch` is the documented exception, so the refresh job calls it
+  explicitly. Remove that step and the commits keep landing while the
+  published site quietly stops changing.
+- **A feed that fails keeps its last-known items.** `refresh-media.mjs`
+  carries a failed feed's contribution forward from the previous snapshot
+  (and treats a `200` that yields zero items as a failure, since that is
+  nearly always an error page rather than an emptied diary). Without it, one
+  letterboxd hiccup while another feed succeeded would drop every film and
+  delete every mirrored poster.
+
+Run it by hand with `npm run refresh-media`, or from the Actions tab. Optional
+repo secrets, none required:
 
 | Secret | Purpose |
 |---|---|
-| `LETTERBOXD_USER` | Letterboxd username → film log via public RSS |
+| `LETTERBOXD_USER` | Point the film log at a different account |
 | `SUBSTACK_RSS_URL` | Substack feed URL once the newsletter exists |
 | `X_BEARER_TOKEN` + `X_USER_ID` | Recent posts via the X API |
 

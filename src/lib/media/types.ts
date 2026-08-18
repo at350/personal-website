@@ -58,11 +58,20 @@ export const MediaItemSchema = z.object({
   url: safeLink.optional(),
   author: z.string().trim().min(1).max(120).optional(),
   publishedAt: z.string().datetime({ offset: true }).optional(),
+  /**
+   * When the thing itself happened, as opposed to when the entry was posted.
+   * Letterboxd logs both: a diary entry published today can record a film
+   * watched last week, so film plates print this and the sort keeps using
+   * `publishedAt` (the shared activity axis across every source).
+   */
+  watchedAt: z.string().datetime({ offset: true }).optional(),
   image: MediaImageSchema.optional(),
   relatedLinks: z.array(MediaRelatedLinkSchema).max(4).default([]),
   tags: z.array(z.string().trim().min(1).max(48)).max(12).default([]),
   rating: z.number().min(0).max(5).optional(),
   year: z.number().int().min(1888).max(2200).optional(),
+  /** Letterboxd marks a repeat viewing; printed as a mark on the plate. */
+  isRewatch: z.boolean().default(false),
   isFallback: z.boolean().default(false),
 });
 
