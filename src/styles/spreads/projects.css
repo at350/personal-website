@@ -118,7 +118,9 @@
   border-top: 1px solid var(--hairline);
 }
 
-.proj-index[data-mode="book"] .proj-index__list {
+/* A fixed page box scrolls its archive internally; the reader's paper
+   grows instead. */
+.proj-index:is([data-mode="book"], [data-mode="single"]) .proj-index__list {
   min-height: 0;
   margin-left: -3.2cqw;
   padding-left: 3.2cqw;

@@ -49,8 +49,8 @@
   transform: translateX(-50%);
 }
 
-/* The reader has no spine: the verso keeps the whole word, in flow. */
-.resume2[data-mode="reader"] .resume2__word {
+/* No spine outside the book: the verso keeps the whole word, in flow. */
+.resume2:is([data-mode="reader"], [data-mode="single"]) .resume2__word {
   position: static;
   transform: none;
   margin-left: auto;

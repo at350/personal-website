@@ -1,0 +1,213 @@
+/* The touch reader: one printed face, held in the hand.
+
+   The page box is a real-pixel `container-type: size` element, which is the
+   whole point of this renderer. Every spread is authored in cqw/cqh against a
+   page; the linear reader can only offer an inline-axis container, so its cqh
+   values silently resolve against the viewport. Here they resolve against the
+   paper, exactly as they do in the book. */
+
+.single {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  /* Small-viewport units, deliberately: a size container measured in dvh
+     re-resolves all 114 cqh declarations every time iOS animates the URL bar.
+     svh never moves. */
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--void);
+  /* A horizontal pull is a page turn; vertical panning and pinch-zoom stay
+     with the browser, so a reader can always scroll and magnify the page. */
+  touch-action: pan-y pinch-zoom;
+  overscroll-behavior: none;
+}
+
+.single__chrome {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 14px;
+  color: var(--gray-warm);
+}
+
+/* Clears the work-in-progress banner, which is fixed over the top of the app. */
+.single__chrome--top {
+  padding-top: calc(40px + env(safe-area-inset-top));
+}
+
+.single__chrome--bottom {
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+
+.single__toc-open,
+.single__step {
+  color: var(--sumi-2);
+  /* A thumb needs 44px even when the glyph does not. */
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 10px;
+}
+
+.single__step[disabled] {
+  opacity: 0.28;
+}
+
+.single__folio {
+  color: var(--gray-warm);
+  letter-spacing: 0.1em;
+}
+
+/* ---- the paper ------------------------------------------------------- */
+
+.single__paper {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: min(100% - 20px, 560px);
+  margin: 0 auto;
+  perspective: 1600px;
+}
+
+/* Every page box: the under page, the neighbours waiting in the wings, and
+   the turning leaf's face. A definite size from the containing block is what
+   lets `container-type: size` apply at all. */
+.single__face,
+.single__leaf-front {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--washi);
+  container-type: size;
+  box-shadow:
+    0 10px 30px rgba(28, 26, 23, 0.12),
+    0 2px 8px rgba(28, 26, 23, 0.08);
+}
+
+/* A page whose composition overruns its box scrolls inside it rather than
+   shrinking its own type. The furniture stays pinned to the paper. */
+.single__face > *:not(.running-head):not(.folio),
+.single__leaf-front > *:not(.running-head):not(.folio) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+/* Mounted, not shown: a display:none image never starts fetching, so the next
+   turn would land on a blank plate. */
+.single__face--ready {
+  visibility: hidden;
+}
+
+.single__leaf {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: rotateY(calc(var(--flip, 0) * -180deg));
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.single__leaf-front,
+.single__leaf-back {
+  backface-visibility: hidden;
+}
+
+.single__leaf-back {
+  position: absolute;
+  inset: 0;
+  background: var(--washi);
+  transform: rotateY(180deg);
+}
+
+/* The gutter shadow deepens as the leaf lifts, so paper reads as paper rather
+   than as a rotating rectangle. */
+.single__leaf-front::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  background: linear-gradient(
+    to right,
+    rgba(14, 14, 12, 0.18),
+    rgba(14, 14, 12, 0) 38%
+  );
+  opacity: calc(var(--flip, 0) * 1.7);
+}
+
+/* Nothing on a moving page is clickable. */
+.single[data-busy] .single__face,
+.single[data-busy] .single__leaf-front {
+  pointer-events: none;
+}
+
+/* ---- contents -------------------------------------------------------- */
+
+.single__toc {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: calc(48px + env(safe-area-inset-top)) 22px
+    calc(22px + env(safe-area-inset-bottom));
+  background: var(--void);
+}
+
+.single__toc ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.single__toc li + li {
+  border-top: 1px solid var(--hairline);
+}
+
+.single__toc button {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 0;
+  color: var(--sumi);
+  text-align: left;
+}
+
+.single__toc button:last-child span:last-child,
+.single__toc li span:last-child {
+  color: var(--gray-warm);
+}
+
+.single__toc-modes {
+  display: flex;
+  gap: 18px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+}
+
+.single__toc-modes button {
+  color: var(--sumi-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  min-height: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .single__leaf {
+    will-change: auto;
+  }
+}

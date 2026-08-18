@@ -15,6 +15,10 @@ const BookStage = lazy(() =>
 const Blaze = lazy(() =>
   import("./components/canvasui/Blaze").then((m) => ({ default: m.Blaze })),
 );
+/* The touch reader is the phone's home, so it loads without three.js. */
+const SinglePageView = lazy(() =>
+  import("./single/SinglePageView").then((m) => ({ default: m.SinglePageView })),
+);
 import { useViewportMode } from "./magazine/useViewportMode";
 import { ReaderView } from "./routes/ReaderView";
 import { WritingPage } from "./routes/WritingPage";
@@ -31,18 +35,66 @@ import { DriftCursor } from "./components/DriftCursor";
 
 function IssueView() {
   const location = useLocation();
-  const [mode, setPreference] = useViewportMode();
+  const { mode, setPreference, canOpenBook } = useViewportMode();
 
   if (!isKnownRoute(location.pathname)) return <NotFound />;
   if (mode === "reader") {
     return (
       <ReaderView
-        canOpenBook={window.innerWidth >= 900}
+        canOpenBook={canOpenBook}
         onOpenBook={() => setPreference("book")}
       />
     );
   }
+  if (mode === "single") {
+    return (
+      <SingleView
+        canOpenBook={canOpenBook}
+        onOpenBook={() => setPreference("book")}
+        onOpenReader={() => setPreference("reader")}
+      />
+    );
+  }
   return <BookView />;
+}
+
+function SingleView({
+  canOpenBook,
+  onOpenBook,
+  onOpenReader,
+}: {
+  canOpenBook: boolean;
+  onOpenBook: () => void;
+  onOpenReader: () => void;
+}) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const target = spreadForBookLocation(location.pathname, location.state);
+
+  const onSettled = useCallback(
+    (index: number) => {
+      const destination = bookLocationForSpread(index);
+      if (destination.pathname !== location.pathname || target !== index) {
+        navigate(destination.pathname, {
+          replace: true,
+          state: destination.state,
+        });
+      }
+    },
+    [location.pathname, navigate, target],
+  );
+
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#fff" }} />}>
+      <SinglePageView
+        targetSpread={target}
+        onSpreadSettled={onSettled}
+        canOpenBook={canOpenBook}
+        onOpenBook={onOpenBook}
+        onOpenReader={onOpenReader}
+      />
+    </Suspense>
+  );
 }
 
 function BookView() {
@@ -110,10 +162,10 @@ function BookView() {
 
 function ReaderRoute() {
   const navigate = useNavigate();
-  const [, setPreference] = useViewportMode();
+  const { setPreference, canOpenBook } = useViewportMode();
   return (
     <ReaderView
-      canOpenBook={window.innerWidth >= 900}
+      canOpenBook={canOpenBook}
       onOpenBook={() => {
         setPreference("book");
         navigate("/");
