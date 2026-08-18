@@ -79,9 +79,9 @@ jobs:
       # never see the snapshot and alantai.me would keep serving the previous
       # one. workflow_dispatch is the documented exception to that rule, so
       # ask Pages to rebuild explicitly. Without this step the library stops
-      # updating even though the commits keep landing.
-      # deploy.yml publishes to production Pages, so only the branch it
-      # already deploys from may dispatch it (matches its `branches: [main]`).
+      # updating even though the commits keep landing. Only main may dispatch
+      # it: deploy.yml publishes to production Pages and already restricts
+      # itself to that branch.
       - name: Deploy the new snapshot
         if: steps.commit.outputs.changed == 'true' && github.ref_name == 'main'
         env:
