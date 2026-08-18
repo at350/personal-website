@@ -1,0 +1,133 @@
+{
+  "provider": "AnyAPI",
+  "costUsd": 0.00075,
+  "items": 8,
+  "output": {
+    "found": true,
+    "data": {
+      "tweets": [
+        {
+          "bookmarks": 0,
+          "createdUtc": 1787071196,
+          "id": "2089754178868650209",
+          "isPinned": false,
+          "isReply": false,
+          "lang": "en",
+          "likes": 0,
+          "quotes": 0,
+          "replies": 0,
+          "retweets": 26,
+          "text": "RT @Robertg761_: My entire feed is just people complaining about Codex limits",
+          "url": "https://x.com/alan_tai1/status/2089754178868650209",
+          "views": 0
+        },
+        {
+          "bookmarks": 0,
+          "createdUtc": 1787008275,
+          "id": "2089490269695877177",
+          "isPinned": false,
+          "isReply": false,
+          "lang": "en",
+          "likes": 0,
+          "quotes": 0,
+          "replies": 0,
+          "retweets": 0,
+          "text": "claude down? https://t.co/Jv4DiA6LET",
+          "url": "https://x.com/alan_tai1/status/2089490269695877177",
+          "views": 204
+        },
+        {
+          "bookmarks": 0,
+          "createdUtc": 1786841470,
+          "id": "2088790636627710356",
+          "isPinned": false,
+          "isReply": false,
+          "lang": "en",
+          "likes": 0,
+          "quotes": 0,
+          "replies": 0,
+          "retweets": 22,
+          "text": "RT @snowmaker: Hosted the first YC Intern Expo today with 1,400 college students &amp; 52 YC companies hiring interns. \n\nMany of YC's best foun…",
+          "url": "https://x.com/alan_tai1/status/2088790636627710356",
+          "views": 0
+        },
+        {
+          "bookmarks": 0,
+          "createdUtc": 1786687753,
+          "id": "2088145901445599539",
+          "isPinned": false,
+          "isReply": false,
+          "lang": "en",
+          "likes": 3,
+          "quotes": 0,
+          "replies": 0,
+          "retweets": 0,
+          "text": "these are some of the best UI elements that i've seen on the web\n\nhttps://canvasui.dev/",
+          "url": "https://x.com/alan_tai1/status/2088145901445599539",
+          "views": 99
+        },
+        {
+          "bookmarks": 0,
+          "createdUtc": 1786630873,
+          "id": "2087907329144725704",
+          "isPinned": false,
+          "isReply": false,
+          "lang": "en",
+          "likes": 1,
+          "quotes": 0,
+          "replies": 1,
+          "retweets": 0,
+          "text": "might as well just use @Cloudflare for everything\n- security\n- networking\n- compute\n- storage\n- AI\n- media\n- web3\n- domains\n- payments\n\nwhat can't they do??",
+          "url": "https://x.com/alan_tai1/status/2087907329144725704",
+          "views": 51
+        },
+        {
+          "bookmarks": 0,
+          "createdUtc": 1786585317,
+          "id": "2087716252676771992",
+          "isPinned": false,
+          "isReply": false,
+          "lang": "en",
+          "likes": 2,
+          "quotes": 0,
+          "replies": 0,
+          "retweets": 0,
+          "text": "my fav https://t.co/Zl2bNy4Ru6",
+          "url": "https://x.com/alan_tai1/status/2087716252676771992",
+          "views": 28
+        },
+        {
+          "bookmarks": 0,
+          "createdUtc": 1786581267,
+          "id": "2087699267309932610",
+          "isPinned": false,
+          "isReply": true,
+          "lang": "en",
+          "likes": 0,
+          "quotes": 0,
+          "replies": 0,
+          "retweets": 0,
+          "text": "basically saying Databricks is the real winner of the AI race 😛",
+          "url": "https://x.com/alan_tai1/status/2087699267309932610",
+          "views": 6
+        },
+        {
+          "bookmarks": 0,
+          "createdUtc": 1786563902,
+          "id": "2087626434592620899",
+          "isPinned": false,
+          "isReply": false,
+          "lang": "en",
+          "likes": 0,
+          "quotes": 0,
+          "replies": 0,
+          "retweets": 0,
+          "text": "startup idea: hedge fund for domains. people invest, we acquire premium digital real estate, and sell or lease it for higher returns.\n\nalso kinda like a betting market where people are betting on what the next big extension/company name is.",
+          "url": "https://x.com/alan_tai1/status/2087626434592620899",
+          "views": 37
+        }
+      ],
+      "nextCursor": "DAABCgABExampleCursorGAAA"
+    }
+  }
+}

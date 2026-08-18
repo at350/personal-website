@@ -9,7 +9,12 @@
 # something new.
 #
 # Configure repository secrets (all optional — unset feeds are skipped):
-#   LETTERBOXD_USER, SUBSTACK_RSS_URL, X_BEARER_TOKEN, X_USER_ID
+#   LETTERBOXD_USER, SUBSTACK_RSS_URL, ANYAPI_KEY, X_HANDLE,
+#   X_BEARER_TOKEN, X_USER_ID
+#
+# ANYAPI_KEY turns on the X posts feed (getanyapi.com, a flat $0.00075 a run —
+# about 27 cents a month at 12 runs a day). Without it the script falls back
+# to the direct X API, which needs X_BEARER_TOKEN + X_USER_ID and a paid plan.
 name: refresh media
 
 on:
@@ -46,6 +51,13 @@ jobs:
           # (DEFAULT_LETTERBOXD_USER). Set the secret only to point elsewhere.
           LETTERBOXD_USER: ${{ secrets.LETTERBOXD_USER }}
           SUBSTACK_RSS_URL: ${{ secrets.SUBSTACK_RSS_URL }}
+          # Preferred source for recent X posts. Also unset-safe: the handle
+          # falls back to DEFAULT_X_HANDLE, and with no key the feed is simply
+          # skipped and the previous snapshot's posts carry forward.
+          ANYAPI_KEY: ${{ secrets.ANYAPI_KEY }}
+          X_HANDLE: ${{ secrets.X_HANDLE }}
+          # Only consulted when ANYAPI_KEY is absent — never both, since two
+          # feeds named "x" would double-count and corrupt carry-forward.
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           X_USER_ID: ${{ secrets.X_USER_ID }}
 

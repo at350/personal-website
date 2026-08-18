@@ -62,16 +62,20 @@ function firstImgSrc(html: string | undefined): string | undefined {
   return match?.[1];
 }
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
+/** Decode the handful of entities feeds actually emit, in a fixed order. */
+function decodeEntities(text: string): string {
+  return text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#0?39;|&apos;/g, "'")
     .replace(/&(?:nbsp|#160);/g, " ")
-    .replace(/&(?:mdash|#8212);/g, "—")
+    .replace(/&(?:mdash|#8212);/g, "—");
+}
+
+function stripHtml(html: string): string {
+  return decodeEntities(html.replace(/<[^>]*>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -92,6 +96,50 @@ function splitPostCopy(text: string): { title: string; excerpt?: string } {
     title,
     excerpt: remainder ? truncate(remainder, 500) : undefined,
   };
+}
+
+/**
+ * AnyAPI timestamps a post as a UTC epoch in *seconds*. `isoDate` cannot read
+ * that — `new Date("1787071196")` is not a date — so the number needs its own
+ * converter. Without one every post silently loses `publishedAt` and sinks to
+ * the bottom of the library instead of leading it.
+ */
+function epochSecondsToIso(value: unknown): string | undefined {
+  const seconds = typeof value === "number" ? value : Number(textOf(value));
+  if (!Number.isFinite(seconds) || seconds <= 0) return undefined;
+  const date = new Date(seconds * 1000);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+/** `https://x.com/<handle>/status/<id>` — where the byline is stated. */
+const X_STATUS_URL =
+  /^https?:\/\/(?:www\.)?(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})\/status\/\d+/i;
+
+function handleFromStatusUrl(url: string | undefined): string | undefined {
+  return url ? X_STATUS_URL.exec(url)?.[1] : undefined;
+}
+
+/**
+ * X appends a t.co shortlink for any attached photo, video, or quoted post.
+ * That link is furniture, not copy — left in, it becomes the headline of a
+ * short post ("my fav https://t.co/…"). Only a trailing run is dropped, so a
+ * link someone wrote mid-sentence still reads as written.
+ */
+const TRAILING_TCO = /(?:\s*https?:\/\/t\.co\/[A-Za-z0-9]+)+\s*$/i;
+
+/**
+ * A repost is someone else's words under our byline, and every item this
+ * normalizer emits is authored by the account it fetched. Dropping them keeps
+ * the library from attributing a stranger's post to Alan.
+ */
+const RETWEET_PREFIX = /^RT @[A-Za-z0-9_]{1,15}:/;
+
+/** Post copy as written: entities decoded, X's trailing furniture removed. */
+function postText(raw: string): string {
+  return decodeEntities(raw)
+    .replace(TRAILING_TCO, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function rssItems(xml: string): XmlNode[] {
@@ -249,6 +297,53 @@ export function fromXApi(json: unknown): MediaItem[] {
         },
       ];
     });
+    return validateItems(candidates);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Normalize AnyAPI's `twitter.user_posts` body (`POST /v1/run/…`), whose
+ * timeline sits at `output.data.tweets`. Accepts the full response envelope or
+ * a bare `output`. The byline is read back out of each post's canonical URL
+ * rather than assumed; `fallbackHandle` only covers a record that arrives
+ * without one.
+ */
+export function fromAnyApiX(
+  json: unknown,
+  fallbackHandle?: string,
+): MediaItem[] {
+  try {
+    const envelope = asRecord(json);
+    const output = asRecord(envelope?.output) ?? envelope;
+    const candidates = toArray(asRecord(output?.data)?.tweets).flatMap(
+      (entry) => {
+        const record = asRecord(entry);
+        const id = textOf(record?.id);
+        const raw = textOf(record?.text);
+        if (!record || !id || !raw) return [];
+        const text = postText(raw);
+        // A media-only post has no copy left once the furniture is gone, and
+        // a repost is not ours to print under this byline.
+        if (!text || RETWEET_PREFIX.test(text)) return [];
+        const url = textOf(record.url);
+        const handle = handleFromStatusUrl(url) ?? fallbackHandle;
+        return [
+          {
+            id: `x:${id}`,
+            source: "x",
+            kind: "post",
+            ...splitPostCopy(text),
+            url:
+              url ??
+              (handle ? `https://x.com/${handle}/status/${id}` : undefined),
+            author: handle ? `@${handle}` : undefined,
+            publishedAt: epochSecondsToIso(record.createdUtc),
+          },
+        ];
+      },
+    );
     return validateItems(candidates);
   } catch {
     return [];

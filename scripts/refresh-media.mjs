@@ -18,10 +18,15 @@
 //                              defaults to DEFAULT_LETTERBOXD_USER below, so
 //                              `npm run refresh-media` works with no env at all
 //   SUBSTACK_RSS_URL           full substack feed url
-//   X_BEARER_TOKEN + X_USER_ID X API v2 recent posts
+//   ANYAPI_KEY                 anyapi.com key -> recent X posts (preferred)
+//   X_HANDLE                   X handle for the anyapi lookup, no leading @;
+//                              defaults to DEFAULT_X_HANDLE below
+//   X_BEARER_TOKEN + X_USER_ID X API v2 recent posts (fallback, only used
+//                              when ANYAPI_KEY is absent)
 
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import process from "node:process";
 import { XMLParser } from "fast-xml-parser";
 
@@ -29,11 +34,20 @@ const LIVE_JSON_URL = new URL("../src/lib/media/live.json", import.meta.url);
 const THUMBS_DIR_URL = new URL("../public/media/thumbs/", import.meta.url);
 const THUMBS_PUBLIC_PATH = "/media/thumbs/";
 const FETCH_TIMEOUT_MS = 10_000;
+// AnyAPI proxies a live scrape rather than serving a cached file: its
+// published p99 for this SKU is ~9.8s, which the shared 10s budget would clip
+// into a spurious failure most nights. Give that one call room.
+const ANYAPI_RUN_URL = "https://api.getanyapi.com/v1/run/twitter.user_posts";
+const ANYAPI_TIMEOUT_MS = 20_000;
 
 // This site's own letterboxd account. A username is public, so it belongs in
 // the repo rather than in a secret: the film log then keeps refreshing without
 // any configuration at all. LETTERBOXD_USER overrides it (say, on a fork).
 const DEFAULT_LETTERBOXD_USER = "alantai";
+
+// Same reasoning for the X handle: it is public, so baking it in keeps the
+// posts flowing with only ANYAPI_KEY set. X_HANDLE overrides it.
+const DEFAULT_X_HANDLE = "alan_tai1";
 
 // --- minimal helpers (mirror src/lib/media/normalize.ts) --------------------
 
@@ -82,16 +96,19 @@ function firstImgSrc(html) {
   return match?.[1];
 }
 
-function stripHtml(html) {
-  return html
-    .replace(/<[^>]*>/g, " ")
+function decodeEntities(text) {
+  return text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#0?39;|&apos;/g, "'")
     .replace(/&(?:nbsp|#160);/g, " ")
-    .replace(/&(?:mdash|#8212);/g, "—")
+    .replace(/&(?:mdash|#8212);/g, "—");
+}
+
+function stripHtml(html) {
+  return decodeEntities(html.replace(/<[^>]*>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -110,6 +127,37 @@ function splitPostCopy(text) {
     title,
     excerpt: remainder ? truncate(remainder, 500) : undefined,
   };
+}
+
+// AnyAPI timestamps a post as a UTC epoch in *seconds*; isoDate cannot read
+// that (`new Date("1787071196")` is not a date), so it needs its own
+// converter or every post silently loses publishedAt.
+function epochSecondsToIso(value) {
+  const seconds = typeof value === "number" ? value : Number(textOf(value));
+  if (!Number.isFinite(seconds) || seconds <= 0) return undefined;
+  const date = new Date(seconds * 1000);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+const X_STATUS_URL =
+  /^https?:\/\/(?:www\.)?(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})\/status\/\d+/i;
+
+function handleFromStatusUrl(url) {
+  return url ? X_STATUS_URL.exec(url)?.[1] : undefined;
+}
+
+// X appends a t.co shortlink for any attached photo, video, or quoted post;
+// it is furniture, not copy. Only a trailing run is dropped.
+const TRAILING_TCO = /(?:\s*https?:\/\/t\.co\/[A-Za-z0-9]+)+\s*$/i;
+
+// A repost is someone else's words under our byline.
+const RETWEET_PREFIX = /^RT @[A-Za-z0-9_]{1,15}:/;
+
+function postText(raw) {
+  return decodeEntities(raw)
+    .replace(TRAILING_TCO, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function rssItems(xml) {
@@ -250,11 +298,42 @@ function fromXApi(json) {
     .filter(isUsable);
 }
 
+function fromAnyApiX(json, fallbackHandle) {
+  const envelope = asRecord(json);
+  const output = asRecord(envelope?.output) ?? envelope;
+  return toArray(asRecord(output?.data)?.tweets)
+    .flatMap((entry) => {
+      const record = asRecord(entry);
+      const id = textOf(record?.id);
+      const raw = textOf(record?.text);
+      if (!record || !id || !raw) return [];
+      const text = postText(raw);
+      // Media-only posts keep no copy once the furniture goes, and a repost
+      // is not ours to print under this byline.
+      if (!text || RETWEET_PREFIX.test(text)) return [];
+      const url = textOf(record.url);
+      const handle = handleFromStatusUrl(url) ?? fallbackHandle;
+      return [
+        {
+          id: `x:${id}`,
+          source: "x",
+          kind: "post",
+          ...splitPostCopy(text),
+          url:
+            url ?? (handle ? `https://x.com/${handle}/status/${id}` : undefined),
+          author: handle ? `@${handle}` : undefined,
+          publishedAt: epochSecondsToIso(record.createdUtc),
+        },
+      ];
+    })
+    .filter(isUsable);
+}
+
 // --- fetching ---------------------------------------------------------------
 
-async function fetchWithTimeout(url, options = {}) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
@@ -282,7 +361,34 @@ function configuredFeeds(env) {
         fromSubstackRss(await (await fetchWithTimeout(env.SUBSTACK_RSS_URL)).text()),
     });
   }
-  if (env.X_BEARER_TOKEN && env.X_USER_ID) {
+  // Exactly one feed may be named "x". The name doubles as the `source` its
+  // items carry, and carry-forward reclaims a failed feed by matching that
+  // name — so a second "x" would double-count every post and leave
+  // carry-forward restoring the wrong half. AnyAPI wins where it is
+  // configured; the direct (paid) X API stays reachable only without it.
+  const xHandle = env.X_HANDLE || DEFAULT_X_HANDLE;
+  if (env.ANYAPI_KEY && xHandle) {
+    feeds.push({
+      name: "x",
+      run: async () => {
+        const response = await fetchWithTimeout(
+          ANYAPI_RUN_URL,
+          {
+            method: "POST",
+            headers: {
+              // The key travels in the header only; it is never logged, and
+              // the error path below prints the URL, not the request.
+              Authorization: `Bearer ${env.ANYAPI_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ handle: xHandle }),
+          },
+          ANYAPI_TIMEOUT_MS,
+        );
+        return fromAnyApiX(await response.json(), xHandle);
+      },
+    });
+  } else if (env.X_BEARER_TOKEN && env.X_USER_ID) {
     const url =
       `https://api.x.com/2/users/${encodeURIComponent(env.X_USER_ID)}` +
       `/tweets?max_results=25&tweet.fields=created_at`;
@@ -384,8 +490,8 @@ async function main() {
   if (feeds.length === 0) {
     console.log(
       "refresh-media: no feeds configured " +
-        "(set LETTERBOXD_USER, SUBSTACK_RSS_URL, or X_BEARER_TOKEN+X_USER_ID); " +
-        "leaving live.json untouched.",
+        "(set LETTERBOXD_USER, SUBSTACK_RSS_URL, ANYAPI_KEY, or " +
+        "X_BEARER_TOKEN+X_USER_ID); leaving live.json untouched.",
     );
     return;
   }
@@ -449,6 +555,18 @@ async function main() {
 }
 
 // Exit 0 always: a failed refresh must never fail the cron job or a build.
-main().catch((error) => {
-  console.warn(`refresh-media: unexpected failure (${error?.message ?? error})`);
-});
+//
+// Guarded on being the entry point so the test suite can import the
+// normalizers above — and prove they still agree with src/lib/media/
+// normalize.ts — without kicking off a live refresh on import.
+// `node scripts/refresh-media.mjs` is unaffected.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.warn(
+      `refresh-media: unexpected failure (${error?.message ?? error})`,
+    );
+  });
+}
+
+// Exported for the parity test only; the script's real interface is the CLI.
+export { fromAnyApiX };

@@ -90,7 +90,24 @@ repo secrets, none required:
 |---|---|
 | `LETTERBOXD_USER` | Point the film log at a different account |
 | `SUBSTACK_RSS_URL` | Substack feed URL once the newsletter exists |
-| `X_BEARER_TOKEN` + `X_USER_ID` | Recent posts via the X API |
+| `ANYAPI_KEY` | Recent X posts via [AnyAPI](https://getanyapi.com) — the preferred source |
+| `X_HANDLE` | Point the X feed at a different handle (defaults to `DEFAULT_X_HANDLE`) |
+| `X_BEARER_TOKEN` + `X_USER_ID` | Recent posts via X's own API — fallback, only read when `ANYAPI_KEY` is unset |
+
+### Recent X posts
+
+`ANYAPI_KEY` lights up the posts lane without an X developer plan. The refresh
+calls AnyAPI's `twitter.user_posts` SKU once per run — a flat **$0.00075**,
+so about **27¢ a month** at twelve runs a day — and reads the account's
+Posts tab. Reposts are dropped (a repost is someone else's words,
+and every item carries Alan's byline) and the t.co shortlink X appends for
+attached media is stripped, since left in it becomes the headline. That
+endpoint returns no media URLs, so X posts land without a thumbnail.
+
+Only ever one feed is registered under the name `x`: AnyAPI when the key is
+present, X's own API otherwise. The name doubles as the `source` its items
+carry and carry-forward reclaims a failed feed by matching it, so a second
+`x` would double-count every post and restore the wrong half after a failure.
 
 ## Type
 
