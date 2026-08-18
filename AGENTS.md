@@ -28,6 +28,8 @@ Non-obvious notes:
   textures (via `html-to-image`) before it becomes interactive, so allow ~8-10s
   before the 3D book responds. Turn pages with the Right/Left Arrow keys, the
   space bar, or by dragging horizontally across the book.
-- `npm run refresh-media` and the media-refresh GitHub workflow use optional
-  feed secrets (see `README.md`); they are not required — the verified seed keeps
-  the library populated without them.
+- `npm run refresh-media` pulls the letterboxd film log with no configuration
+  (the account is baked into the script) and needs network access; the substack
+  and X feeds stay off until their optional secrets are set (see `README.md`).
+  The GitHub workflow runs it every two hours and then dispatches `deploy.yml`
+  itself, because a `GITHUB_TOKEN` push cannot trigger another workflow.

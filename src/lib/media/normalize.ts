@@ -112,6 +112,25 @@ function validateItems(candidates: unknown[]): MediaItem[] {
   });
 }
 
+/**
+ * Letterboxd packs the poster and a "Watched on <date>." line into every
+ * entry's description; a review adds the member's own copy alongside them.
+ * Strip the furniture so only that copy survives (verbatim or absent).
+ */
+const LETTERBOXD_DIARY_LINE = /^(?:re)?watched on\b/iu;
+
+function letterboxdReview(html: string | undefined): string | undefined {
+  if (!html) return undefined;
+  const copy = html
+    .replace(/<img[^>]*>/gi, " ")
+    .split(/<\/p\s*>/i)
+    .map((chunk) => stripHtml(chunk))
+    .filter((text) => text.length > 0 && !LETTERBOXD_DIARY_LINE.test(text))
+    .join(" ")
+    .trim();
+  return copy ? truncate(copy, 280) : undefined;
+}
+
 const LETTERBOXD_TITLE =
   /^(?<title>.+?)(?:,\s*(?<year>\d{4}))?(?:\s*-\s*(?<stars>[★½]+))?\s*$/u;
 
@@ -146,16 +165,21 @@ export function fromLetterboxdRss(xml: string): MediaItem[] {
       const title = textOf(item["letterboxd:filmTitle"]) ?? fromTitle.title;
       const link = textOf(item.link);
       const guid = textOf(item.guid);
-      const poster = firstImgSrc(textOf(item.description));
+      const description = textOf(item.description);
+      const poster = firstImgSrc(description);
       return {
         id: `letterboxd:${guid ?? link ?? title}`,
         source: "letterboxd",
         kind: "film",
         title,
         url: link,
+        excerpt: letterboxdReview(description),
         publishedAt: isoDate(item.pubDate),
+        watchedAt: isoDate(item["letterboxd:watchedDate"]),
         year: numOf(item["letterboxd:filmYear"]) ?? fromTitle.year,
         rating: numOf(item["letterboxd:memberRating"]) ?? fromTitle.rating,
+        isRewatch:
+          textOf(item["letterboxd:rewatch"])?.toLowerCase() === "yes",
         image: poster
           ? { src: poster, alt: `Poster for ${title}` }
           : undefined,

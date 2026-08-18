@@ -22,7 +22,7 @@ describe("fromLetterboxdRss", () => {
   const items = fromLetterboxdRss(fixture("letterboxd.rss.xml"));
 
   it("parses every item with source and kind", () => {
-    expect(items).toHaveLength(2);
+    expect(items).toHaveLength(3);
     for (const item of items) {
       expect(item.source).toBe("letterboxd");
       expect(item.kind).toBe("film");
@@ -45,6 +45,51 @@ describe("fromLetterboxdRss", () => {
       year: 2023,
       rating: 3.5,
     });
+  });
+
+  it("records the night it was watched, not just when the entry posted", () => {
+    // Both dates are kept: the diary's watched date is the fact the plate
+    // prints, and it can sit days behind the post date (see the review below).
+    expect(items[0]).toMatchObject({
+      publishedAt: "2026-08-01T08:04:12.000Z",
+      watchedAt: "2026-08-01T00:00:00.000Z",
+      isRewatch: false,
+    });
+    expect(items[1]?.watchedAt).toBe("2026-07-19T00:00:00.000Z");
+  });
+
+  it("keeps a review verbatim and flags the rewatch", () => {
+    expect(items[2]).toMatchObject({
+      title: "In the Mood for Love",
+      year: 2000,
+      rating: 5,
+      isRewatch: true,
+      watchedAt: "2026-07-12T00:00:00.000Z",
+      excerpt: "Every frame is a held breath & the score does the rest.",
+    });
+  });
+
+  it("leaves a plain watch with no excerpt to print", () => {
+    // Description is only the poster and "Watched on …" furniture.
+    expect(items[0]?.excerpt).toBeUndefined();
+    expect(items[1]?.excerpt).toBeUndefined();
+  });
+
+  it("truncates a long review to 280 characters", () => {
+    const body = Array.from({ length: 80 }, (_, i) => `word${i}`).join(" ");
+    const xml = `<?xml version="1.0"?>
+      <rss xmlns:letterboxd="https://letterboxd.com"><channel>
+        <item>
+          <title>Long One, 2021 - ★★★★</title>
+          <link>https://letterboxd.com/alantai/film/long-one/</link>
+          <description><![CDATA[ <p><img src="https://a.ltrbxd.com/p.jpg"/></p> <p>${body}</p> ]]></description>
+        </item>
+      </channel></rss>`;
+    const excerpt = fromLetterboxdRss(xml)[0]?.excerpt ?? "";
+    expect(excerpt.length).toBeLessThanOrEqual(280);
+    expect(excerpt.endsWith("…")).toBe(true);
+    expect(excerpt).not.toContain("<");
+    expect(excerpt).not.toContain("ltrbxd");
   });
 
   it("pulls the poster out of the description html", () => {
@@ -75,7 +120,9 @@ describe("fromLetterboxdRss", () => {
       title: "Good Film",
       year: 2020,
       rating: 3,
+      isRewatch: false,
     });
+    expect(parsed[0]?.watchedAt).toBeUndefined();
   });
 });
 

@@ -2,9 +2,11 @@
 //
 // For each configured feed it fetches, normalizes, and collects items; the
 // snapshot is rewritten only when at least one feed succeeded, so a bad cron
-// run can never blank the library. The site merges this snapshot with the
-// hand-verified seed at load time (seed wins on id collisions — see
-// src/lib/media/store.ts). Always exits 0 (cron-safe).
+// run can never blank the library. A feed that fails — or answers with no
+// usable items — keeps whatever it contributed to the previous snapshot, so
+// one source going dark never deletes another source's history. The site
+// merges this snapshot with the hand-verified seed at load time (seed wins on
+// id collisions — see src/lib/media/store.ts). Always exits 0 (cron-safe).
 //
 // NOTE: the tiny normalizers below INTENTIONALLY duplicate the logic in
 // src/lib/media/normalize.ts. That module is the source of truth for the app,
@@ -13,10 +15,12 @@
 //
 // Env (every feed is optional; unconfigured feeds are skipped):
 //   LETTERBOXD_USER            letterboxd username -> https://letterboxd.com/<user>/rss/
+//                              defaults to DEFAULT_LETTERBOXD_USER below, so
+//                              `npm run refresh-media` works with no env at all
 //   SUBSTACK_RSS_URL           full substack feed url
 //   X_BEARER_TOKEN + X_USER_ID X API v2 recent posts
 
-import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import process from "node:process";
 import { XMLParser } from "fast-xml-parser";
@@ -25,6 +29,11 @@ const LIVE_JSON_URL = new URL("../src/lib/media/live.json", import.meta.url);
 const THUMBS_DIR_URL = new URL("../public/media/thumbs/", import.meta.url);
 const THUMBS_PUBLIC_PATH = "/media/thumbs/";
 const FETCH_TIMEOUT_MS = 10_000;
+
+// This site's own letterboxd account. A username is public, so it belongs in
+// the repo rather than in a secret: the film log then keeps refreshing without
+// any configuration at all. LETTERBOXD_USER overrides it (say, on a fork).
+const DEFAULT_LETTERBOXD_USER = "alantai";
 
 // --- minimal helpers (mirror src/lib/media/normalize.ts) --------------------
 
@@ -122,6 +131,20 @@ const isUsable = (item) =>
 
 // --- minimal normalizers (mirror src/lib/media/normalize.ts) ----------------
 
+const LETTERBOXD_DIARY_LINE = /^(?:re)?watched on\b/iu;
+
+function letterboxdReview(html) {
+  if (!html) return undefined;
+  const copy = html
+    .replace(/<img[^>]*>/gi, " ")
+    .split(/<\/p\s*>/i)
+    .map((chunk) => stripHtml(chunk))
+    .filter((text) => text.length > 0 && !LETTERBOXD_DIARY_LINE.test(text))
+    .join(" ")
+    .trim();
+  return copy ? truncate(copy, 280) : undefined;
+}
+
 const LETTERBOXD_TITLE =
   /^(?<title>.+?)(?:,\s*(?<year>\d{4}))?(?:\s*-\s*(?<stars>[★½]+))?\s*$/u;
 
@@ -145,19 +168,26 @@ function fromLetterboxdRss(xml) {
         textOf(item.title) ??
         "";
       const link = textOf(item.link);
-      const poster = firstImgSrc(textOf(item.description));
+      const description = textOf(item.description);
+      const poster = firstImgSrc(description);
+      // Undefined keys drop out of JSON.stringify, keeping the snapshot terse.
+      const rewatch =
+        textOf(item["letterboxd:rewatch"])?.toLowerCase() === "yes" || undefined;
       return {
         id: `letterboxd:${textOf(item.guid) ?? link ?? title}`,
         source: "letterboxd",
         kind: "film",
         title,
         url: link,
+        excerpt: letterboxdReview(description),
         publishedAt: isoDate(item.pubDate),
+        watchedAt: isoDate(item["letterboxd:watchedDate"]),
         year:
           numOf(item["letterboxd:filmYear"]) ??
           (groups?.year ? Number(groups.year) : undefined),
         rating:
           numOf(item["letterboxd:memberRating"]) ?? starsToRating(groups?.stars),
+        isRewatch: rewatch,
         image: poster
           ? { src: poster, alt: `Poster for ${title}` }
           : undefined,
@@ -236,8 +266,10 @@ async function fetchWithTimeout(url, options = {}) {
 
 function configuredFeeds(env) {
   const feeds = [];
-  if (env.LETTERBOXD_USER) {
-    const url = `https://letterboxd.com/${encodeURIComponent(env.LETTERBOXD_USER)}/rss/`;
+  // `||`, not `??`: an unset repository secret arrives as an empty string.
+  const letterboxdUser = env.LETTERBOXD_USER || DEFAULT_LETTERBOXD_USER;
+  if (letterboxdUser) {
+    const url = `https://letterboxd.com/${encodeURIComponent(letterboxdUser)}/rss/`;
     feeds.push({
       name: "letterboxd",
       run: async () => fromLetterboxdRss(await (await fetchWithTimeout(url)).text()),
@@ -298,7 +330,6 @@ async function mirrorThumbnails(items) {
   await mkdir(THUMBS_DIR_URL, { recursive: true });
 
   let mirrored = 0;
-  const wanted = new Set();
   for (const item of remote) {
     const source = item.image.src;
     const fileName = thumbFileName(source);
@@ -308,7 +339,6 @@ async function mirrorThumbnails(items) {
       if (bytes.length === 0) throw new Error("empty body");
       await writeFile(new URL(fileName, THUMBS_DIR_URL), bytes);
       item.image.src = `${THUMBS_PUBLIC_PATH}${fileName}`;
-      wanted.add(fileName);
       mirrored += 1;
     } catch (error) {
       console.warn(
@@ -318,7 +348,16 @@ async function mirrorThumbnails(items) {
     }
   }
 
-  // Prune mirrored files no longer referenced by the new snapshot.
+  // Prune only files nothing in the new snapshot points at. This reads the
+  // final srcs rather than just this run's downloads, because an item carried
+  // forward from the previous snapshot already holds a local path and must
+  // keep the file behind it.
+  const wanted = new Set(
+    items
+      .map((item) => item.image?.src ?? "")
+      .filter((src) => src.startsWith(THUMBS_PUBLIC_PATH))
+      .map((src) => src.slice(THUMBS_PUBLIC_PATH.length)),
+  );
   try {
     for (const file of await readdir(THUMBS_DIR_URL)) {
       if (!wanted.has(file)) await unlink(new URL(file, THUMBS_DIR_URL));
@@ -328,6 +367,16 @@ async function mirrorThumbnails(items) {
   }
 
   return { mirrored, kept: remote.length - mirrored };
+}
+
+/** The previous snapshot's items, or [] when there is nothing readable yet. */
+async function previousItems() {
+  try {
+    const parsed = JSON.parse(await readFile(LIVE_JSON_URL, "utf8"));
+    return Array.isArray(parsed?.items) ? parsed.items : [];
+  } catch {
+    return [];
+  }
 }
 
 async function main() {
@@ -341,19 +390,44 @@ async function main() {
     return;
   }
 
+  // Each feed name doubles as the `source` its items carry, so a feed that
+  // fails this run can hand back exactly what it contributed last run.
+  const previous = await previousItems();
   const items = [];
   let succeeded = 0;
   for (const feed of feeds) {
+    let feedItems;
     try {
-      const feedItems = await feed.run();
-      items.push(...feedItems);
-      succeeded += 1;
-      console.log(`refresh-media: ${feed.name}: ok, ${feedItems.length} item(s)`);
+      feedItems = await feed.run();
     } catch (error) {
+      feedItems = undefined;
       console.warn(
         `refresh-media: ${feed.name}: failed (${error?.message ?? error})`,
       );
     }
+
+    // An empty result from a feed that answered is treated as a failure: a
+    // 200 that yields nothing is far more often an error page or a changed
+    // format than a genuinely emptied diary, and running with it would drop
+    // every film from the library.
+    if (feedItems !== undefined && feedItems.length === 0) {
+      console.warn(`refresh-media: ${feed.name}: answered with 0 usable item(s)`);
+      feedItems = undefined;
+    }
+
+    if (feedItems === undefined) {
+      const carried = previous.filter((item) => item?.source === feed.name);
+      items.push(...carried);
+      console.warn(
+        `refresh-media: ${feed.name}: carrying ${carried.length} item(s) ` +
+          "forward from the previous snapshot",
+      );
+      continue;
+    }
+
+    items.push(...feedItems);
+    succeeded += 1;
+    console.log(`refresh-media: ${feed.name}: ok, ${feedItems.length} item(s)`);
   }
 
   if (succeeded === 0) {
