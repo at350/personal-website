@@ -93,7 +93,11 @@ function Index({ mode }: { mode: SpreadMode }) {
                   onClick={() =>
                     togglePersistentInteractionOpenKey("features", project.id)
                   }
-                  onPointerEnter={() => setHoverId(project.id)}
+                  /* Only a mouse hovers. A finger's pointerenter would pin a
+                     row open that the pinned state could no longer close. */
+                  onPointerEnter={(event) => {
+                    if (event.pointerType === "mouse") setHoverId(project.id);
+                  }}
                 >
                   <span className="proj-index__no" aria-hidden>
                     {String(i + 1).padStart(2, "0")}

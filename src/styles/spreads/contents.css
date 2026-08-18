@@ -92,6 +92,15 @@
   transition: clip-path 280ms var(--ease-settle);
 }
 
+/* Without hover there is nothing to preview against, so the band would be
+   dead space for two fifths of the page. Show the first feature until a press
+   picks another. */
+@media (hover: none) {
+  .contents2__band:not(:has([data-open])) .contents2__plate:first-child {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
 .contents2__plate[data-open] {
   clip-path: inset(0 0 0 0);
   transition-duration: 540ms;

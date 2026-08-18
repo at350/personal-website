@@ -155,6 +155,7 @@
 }
 
 .marginalia__mark {
+  position: relative;
   font-family: var(--font-mono);
   font-size: max(11px, 0.72em);
   font-feature-settings: "lnum" 1;
@@ -167,9 +168,39 @@
   transition: border-color 200ms ease;
 }
 
-.marginalia:hover .marginalia__mark,
+/* The printed mark is a superscript numeral, roughly 16×15px — half the 24px
+   a finger needs, and there are thirteen of them threaded through the resume
+   rows. A transparent slop area carries the tap target without altering a
+   single printed pixel. Kept modest rather than a full 44px so it does not
+   blanket the row's own links. */
+.marginalia__mark::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 36px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+}
+
 .marginalia[data-open] .marginalia__mark {
   border-bottom-color: var(--red);
+}
+
+/* Hover opens the note only where hover is a real state. On a touch screen
+   the sticky :hover left behind by a tap would strand a note open with no
+   way to dismiss it. */
+@media (hover: hover) and (pointer: fine) {
+  .marginalia:hover .marginalia__mark {
+    border-bottom-color: var(--red);
+  }
+
+  .marginalia:hover .marginalia__note {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(0);
+    transition-delay: 120ms, 120ms, 120ms;
+  }
 }
 
 .marginalia__note {
@@ -195,7 +226,6 @@
     visibility 0ms 0ms;
 }
 
-.marginalia:hover .marginalia__note,
 .marginalia:focus-within .marginalia__note,
 .marginalia[data-open] .marginalia__note {
   opacity: 1;

@@ -439,6 +439,12 @@
     padding: max(4px, 0.7cqh) 0;
   }
 
+  /* 46cqw is 168px of a phone page: too narrow for a sentence, and hung off
+     a mark near the fore-edge it would be clipped besides. */
+  .resume2 .marginalia__note {
+    width: min(280px, 84cqw);
+  }
+
   .resume2__rec {
     padding: max(7px, 1.1cqh) 0 max(5px, 0.8cqh);
   }

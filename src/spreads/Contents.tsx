@@ -69,7 +69,9 @@ function FeaturesPage() {
       <nav
         className="contents2__rows"
         aria-label="Features"
-        onMouseLeave={() => setActive(null)}
+        onPointerLeave={(event) => {
+          if (event.pointerType === "mouse") setActive(null);
+        }}
         onBlur={clearUnlessInside}
       >
         {FEATURES.map((feature, index) => (
@@ -79,7 +81,8 @@ function FeaturesPage() {
             className="contents2__row"
             data-active={active === index || undefined}
             onClick={() => navigate(feature.route)}
-            onMouseEnter={() => setActive(index)}
+            onPointerEnter={() => setActive(index)}
+            onPointerDown={() => setActive(index)}
             onFocus={() => setActive(index)}
           >
             <span className="contents2__no" aria-hidden>
