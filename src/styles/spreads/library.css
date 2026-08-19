@@ -38,7 +38,8 @@
   transition: color 200ms var(--ease-settle);
 }
 
-.library__chip:hover {
+.library__chip:hover,
+.library__chip:focus-visible {
   color: var(--ink);
 }
 

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { SpreadFaceProps } from "@/magazine/spread-types";
+import { hasSpine, type SpreadFaceProps } from "@/magazine/spread-types";
 import type { ResumeEntry } from "@/lib/content-types";
 import { resume } from "@/lib/content";
 import { Marginalia } from "@/components/furniture/Marginalia";
@@ -47,7 +47,7 @@ function DateStamp({ text, row }: { text: string; row: number }) {
    centered on its gutter edge. The reader keeps the whole word on the verso
    and drops the recto fragment. */
 function SpreadWord({ face, mode }: SpreadFaceProps) {
-  if (face === "recto" && mode === "reader") return null;
+  if (face === "recto" && !hasSpine(mode)) return null;
   return (
     <header className="resume2__head">
       {face === "verso" ? (

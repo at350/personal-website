@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from "react";
-import type { SpreadFaceProps } from "@/magazine/spread-types";
+import type { SpreadFaceProps, SpreadMode } from "@/magazine/spread-types";
 import {
   togglePersistentInteractionOpenKey,
   usePersistentInteraction,
@@ -49,7 +49,7 @@ function Count() {
 
 /* p.9 — the index. Rows expand in place; one open at a time.
    Pointer hover previews; activation pins for mouse, touch, and keyboard. */
-function Index({ mode }: { mode: "book" | "reader" }) {
+function Index({ mode }: { mode: SpreadMode }) {
   const { openKey: pinnedId } = usePersistentInteraction("features");
   const [hoverId, setHoverId] = useState<string | null>(null);
   const baseId = useId();
@@ -93,7 +93,11 @@ function Index({ mode }: { mode: "book" | "reader" }) {
                   onClick={() =>
                     togglePersistentInteractionOpenKey("features", project.id)
                   }
-                  onPointerEnter={() => setHoverId(project.id)}
+                  /* Only a mouse hovers. A finger's pointerenter would pin a
+                     row open that the pinned state could no longer close. */
+                  onPointerEnter={(event) => {
+                    if (event.pointerType === "mouse") setHoverId(project.id);
+                  }}
                 >
                   <span className="proj-index__no" aria-hidden>
                     {String(i + 1).padStart(2, "0")}

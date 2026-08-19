@@ -7,10 +7,8 @@
 import { useEffect } from "react";
 import * as THREE from "three";
 import { toCanvas } from "html-to-image";
-import { SPREADS, spreadPages } from "@/magazine/folio";
-import { ISSUE } from "@/magazine/issue-map";
-import { Folio } from "@/components/furniture/Folio";
-import { RunningHead } from "@/components/furniture/RunningHead";
+import { FACES, SPREADS } from "@/magazine/folio";
+import { PageFace, hasPageFace } from "@/magazine/PageFace";
 
 export const CAPTURE_W = 640;
 export const CAPTURE_H = (CAPTURE_W * 4) / 3;
@@ -80,19 +78,9 @@ export function onTexturesChanged(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
-function isRenderableFace(spread: number, face: "verso" | "recto") {
-  const kind = SPREADS[spread]?.kind;
-  return !(
-    (kind === "cover" && face === "verso") ||
-    (kind === "back" && face === "recto")
-  );
-}
-
-export const ALL_PAGE_KEYS = SPREADS.flatMap((_, spread) =>
-  (["verso", "recto"] as const)
-    .filter((face) => isRenderableFace(spread, face))
-    .map((face) => pageKey(spread, face)),
-);
+/* The readable-face sequence lives in folio.ts so the book, the capture farm,
+   and the single-page reader all rasterize and turn the same twenty faces. */
+export const ALL_PAGE_KEYS = FACES.map((face) => pageKey(face.spread, face.side));
 
 export function getTextureProgress(): TextureProgress {
   return {
@@ -333,15 +321,7 @@ export function FarmFace({
   spread: number;
   face: "verso" | "recto";
 }) {
-  const def = SPREADS[spread]!;
-  const binding = ISSUE[spread]!;
-  const pages = spreadPages(spread);
-  const page = pages ? (face === "verso" ? pages[0] : pages[1]) : null;
-  const fullBleed = binding.fullBleed?.[face] ?? false;
-  const { Component } = binding;
-  if ((def.kind === "cover" && face === "verso") || (def.kind === "back" && face === "recto")) {
-    return null;
-  }
+  if (!hasPageFace(spread, face)) return null;
   return (
     <div
       className={`page-face page-face--${face}`}
@@ -355,9 +335,7 @@ export function FarmFace({
         containerType: "size",
       }}
     >
-      <Component face={face} mode="book" />
-      {!fullBleed && def.runningHead ? <RunningHead text={def.runningHead} side={face} /> : null}
-      {!fullBleed && page !== null ? <Folio page={page} side={face} /> : null}
+      <PageFace spread={spread} side={face} mode="book" />
     </div>
   );
 }

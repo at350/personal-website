@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { ALL_PAGE_KEYS } from "@/book3d/pageTextures";
 import {
+  FACES,
   SPREADS,
   bookLocationForSpread,
+  faceForSpread,
+  isRenderableFace,
+  spreadForFace,
   pageLabel,
   routeForSpread,
   spreadForBookLocation,
@@ -74,5 +79,58 @@ describe("folio arithmetic", () => {
   it("the resume lives at pages 12-13 as printed on the cover lines", () => {
     const resume = SPREADS.findIndex((s) => s.id === "resume");
     expect(spreadPages(resume)).toEqual([12, 13]);
+  });
+});
+
+describe("the readable-face sequence", () => {
+  it("is the twenty faces the capture farm rasterizes", () => {
+    // Two of the 22 spread/side pairs are the outside of the issue: the cover
+    // has no verso and the back cover no recto.
+    expect(FACES).toHaveLength(SPREADS.length * 2 - 2);
+    expect(ALL_PAGE_KEYS).toHaveLength(FACES.length);
+    expect(ALL_PAGE_KEYS).toEqual(
+      FACES.map((face) => `${face.spread}:${face.side}`),
+    );
+  });
+
+  it("opens on the cover's recto and closes on the back's verso", () => {
+    expect(FACES[0]).toMatchObject({ spread: 0, side: "recto" });
+    expect(FACES.at(-1)).toMatchObject({
+      spread: SPREADS.length - 1,
+      side: "verso",
+    });
+    expect(isRenderableFace(0, "verso")).toBe(false);
+    expect(isRenderableFace(SPREADS.length - 1, "recto")).toBe(false);
+  });
+
+  it("carries the same printed page numbers the spread prints", () => {
+    const resume = SPREADS.findIndex((s) => s.id === "resume");
+    const [verso, recto] = FACES.filter((face) => face.spread === resume);
+    expect([verso?.page, recto?.page]).toEqual(spreadPages(resume));
+    // The cover and back are paper, but unnumbered paper.
+    expect(FACES[0]?.page).toBeNull();
+    expect(FACES.at(-1)?.page).toBeNull();
+  });
+
+  it("faces stay in physical order, so turning one advances at most one spread", () => {
+    const spreads = FACES.map((face) => face.spread);
+    expect(spreads).toEqual([...spreads].sort((a, b) => a - b));
+    for (let i = 1; i < spreads.length; i += 1) {
+      expect(spreads[i]! - spreads[i - 1]!).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("a route lands on its spread's first face and reads back as that spread", () => {
+    SPREADS.forEach((_, spread) => {
+      const face = faceForSpread(spread);
+      expect(spreadForFace(face)).toBe(spread);
+      // First face: no earlier face belongs to the same spread.
+      expect(FACES.slice(0, face).some((f) => f.spread === spread)).toBe(false);
+    });
+  });
+
+  it("clamps a face index that falls off either end of the issue", () => {
+    expect(spreadForFace(-1)).toBe(0);
+    expect(spreadForFace(FACES.length + 99)).toBe(SPREADS.length - 1);
   });
 });

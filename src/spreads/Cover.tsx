@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router";
 import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
-import type { SpreadFaceProps } from "@/magazine/spread-types";
+import { isLiveMode, type SpreadFaceProps } from "@/magazine/spread-types";
 import { withBasePath } from "@/lib/basePath";
 import { Barcode } from "@/components/furniture/Barcode";
 import { EditorialTerminal } from "@/components/brand/EditorialTerminal";
@@ -26,7 +26,7 @@ export function Cover({ face, mode }: SpreadFaceProps) {
     // A moving book face is a still texture, so its live DOM twin must also be
     // settled. Keep the entrance for the linear reader, where there is no
     // raster handoff to match.
-    if (mode === "book" || !motionOK() || !rootRef.current) return;
+    if (!isLiveMode(mode) || !motionOK() || !rootRef.current) return;
     const lines = rootRef.current.querySelectorAll(".cover2__word");
     const split = new SplitText(lines, {
       type: "chars",
@@ -64,7 +64,7 @@ export function Cover({ face, mode }: SpreadFaceProps) {
     };
   }, [mode]);
 
-  if (face === "verso" && mode === "book") return null;
+  if (face === "verso") return null;
 
   return (
     <div className="cover2" ref={rootRef}>
@@ -113,8 +113,8 @@ export function Cover({ face, mode }: SpreadFaceProps) {
   );
 }
 
-export function BackCover({ face, mode }: SpreadFaceProps) {
-  if (face === "recto" && mode === "book") return null;
+export function BackCover({ face }: SpreadFaceProps) {
+  if (face === "recto") return null;
   return (
     <div className="back2">
       <p className="back2__mark" aria-hidden>

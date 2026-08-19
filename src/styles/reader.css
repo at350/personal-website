@@ -33,6 +33,9 @@
 
 .reader__spread {
   width: 100%;
+  /* Clears the sticky mast and the fixed work-in-progress banner, which
+     scrollIntoView knows nothing about. */
+  scroll-margin-top: 96px;
   max-width: 680px;
   display: flex;
   flex-direction: column;

@@ -1,9 +1,7 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router";
-import { ISSUE } from "@/magazine/issue-map";
-import { SPREADS, spreadForRoute, spreadPages } from "@/magazine/folio";
-import { Folio } from "@/components/furniture/Folio";
-import { RunningHead } from "@/components/furniture/RunningHead";
+import { SPREADS, isRenderableFace, spreadForRoute } from "@/magazine/folio";
+import { PageFace } from "@/magazine/PageFace";
 import "@/styles/reader.css";
 
 interface ReaderViewProps {
@@ -37,15 +35,9 @@ export function ReaderView({ canOpenBook, onOpenBook }: ReaderViewProps) {
       </header>
 
       {SPREADS.map((def, index) => {
-        const binding = ISSUE[index]!;
-        const pages = spreadPages(index);
-        const { Component } = binding;
-        const faces =
-          def.kind === "cover"
-            ? (["recto"] as const)
-            : def.kind === "back"
-              ? (["verso"] as const)
-              : (["verso", "recto"] as const);
+        const faces = (["verso", "recto"] as const).filter((side) =>
+          isRenderableFace(index, side),
+        );
         return (
           <section
             key={def.id}
@@ -53,19 +45,11 @@ export function ReaderView({ canOpenBook, onOpenBook }: ReaderViewProps) {
             className="reader__spread"
             aria-label={def.label}
           >
-            {faces.map((face) => {
-              const page = pages ? (face === "verso" ? pages[0] : pages[1]) : null;
-              const fullBleed = binding.fullBleed?.[face] ?? false;
-              return (
-                <div key={face} className="reader__page">
-                  <Component face={face} mode="reader" />
-                  {!fullBleed && def.runningHead ? (
-                    <RunningHead text={def.runningHead} side={face} />
-                  ) : null}
-                  {!fullBleed && page !== null ? <Folio page={page} side={face} /> : null}
-                </div>
-              );
-            })}
+            {faces.map((face) => (
+              <div key={face} className="reader__page">
+                <PageFace spread={index} side={face} mode="reader" />
+              </div>
+            ))}
           </section>
         );
       })}

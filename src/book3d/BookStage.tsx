@@ -6,7 +6,6 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useReducer,
 import { Canvas } from "@react-three/fiber";
 import { useReducedMotion } from "motion/react";
 import * as THREE from "three";
-import { ISSUE } from "@/magazine/issue-map";
 import { SPREADS, pageLabel, spreadPages } from "@/magazine/folio";
 import {
   initialEngineState,
@@ -36,9 +35,8 @@ import {
   usePersistentInteraction,
   type PersistentInteractionSpread,
 } from "@/magazine/persistent-interactions";
-import { Folio } from "@/components/furniture/Folio";
-import { RunningHead } from "@/components/furniture/RunningHead";
 import { GridOverlay } from "@/components/furniture/GridOverlay";
+import { PageFace, hasPageFace } from "@/magazine/PageFace";
 import type { ExperienceMode } from "@/components/ExperienceDock";
 import type { IgnitePointerState } from "@/ignite/types";
 import type { DriftPointerState } from "@/drift/types";
@@ -112,22 +110,12 @@ export function OverlayFace({
   face: "verso" | "recto";
   showGrid: boolean;
 }) {
-  const def = SPREADS[spread];
-  const binding = ISSUE[spread];
-  if (!def || !binding) return <div className="ov-face ov-face--void" />;
-  if ((def.kind === "cover" && face === "verso") || (def.kind === "back" && face === "recto")) {
-    return <div className="ov-face ov-face--void" />;
-  }
-  const pages = spreadPages(spread);
-  const page = pages ? (face === "verso" ? pages[0] : pages[1]) : null;
-  const fullBleed = binding.fullBleed?.[face] ?? false;
-  const { Component } = binding;
+  if (!hasPageFace(spread, face)) return <div className="ov-face ov-face--void" />;
   return (
     <div className={`page-face page-face--${face} ov-face ov-face--${face}`}>
-      <Component face={face} mode="book" />
-      {!fullBleed && def.runningHead ? <RunningHead text={def.runningHead} side={face} /> : null}
-      {!fullBleed && page !== null ? <Folio page={page} side={face} /> : null}
-      {showGrid ? <GridOverlay /> : null}
+      <PageFace spread={spread} side={face} mode="book">
+        {showGrid ? <GridOverlay /> : null}
+      </PageFace>
     </div>
   );
 }
