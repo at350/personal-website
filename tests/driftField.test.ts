@@ -441,6 +441,89 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
     expect(farShift).toBeLessThan(nearShift);
   });
 
+  /** Total speed and spin across the field — how hard a gust actually hit. */
+  const energy = (field: DriftField) => {
+    let linear = 0;
+    let angular = 0;
+    for (const leaf of field.leaves) {
+      linear += Math.hypot(leaf.vx, leaf.vy, leaf.vz);
+      angular += Math.hypot(leaf.wx, leaf.wy, leaf.wz);
+    }
+    return { linear, angular };
+  };
+
+  /** Aims the pointer at a leaf's centre, in viewport-centred screen px. */
+  const aimAt = (field: DriftField, index: number, over: Partial<DriftPointerInput> = {}) => {
+    const leaf = field.leaves[index]!;
+    const base = makeInput(over);
+    const scale = base.cameraDistance / (base.cameraDistance - leaf.z);
+    return {
+      ...base,
+      screenX: (leaf.x + base.shift) * scale,
+      screenY: leaf.y * scale,
+    };
+  };
+
+  it("gusts the page a tap lands on, dead centre included", () => {
+    // The reported bug: clicking the middle of a page grabbed it instead of
+    // blowing it, so the page sat still while the cursor played a gust.
+    const field = makeField();
+    const idle = makeInput();
+    run(field, 200, idle);
+    let front = 0;
+    for (const leaf of field.leaves) {
+      if (leaf.z > field.leaves[front]!.z) front = leaf.index;
+    }
+    const aim = aimAt(field, front, { inside: true });
+
+    stepDriftField(field, DT, { ...aim, pressed: true });
+    expect(field.grabIndex).toBe(front);
+    const before = energy(field);
+
+    // Release without travelling: a tap.
+    stepDriftField(field, DT, { ...aim, pressed: false });
+    expect(field.puffed).toBe(true);
+    expect(field.grabIndex).toBe(-1);
+
+    const after = energy(field);
+    expect(after.linear).toBeGreaterThan(before.linear + 40);
+    // The tapped sheet itself is shoved and set tumbling — the centre hit
+    // has no lever arm, so the gust must supply the spin directly.
+    const leaf = field.leaves[front]!;
+    expect(Math.hypot(leaf.vx, leaf.vy, leaf.vz)).toBeGreaterThan(20);
+    expect(Math.hypot(leaf.wx, leaf.wy, leaf.wz)).toBeGreaterThan(0.1);
+  });
+
+  it("carries a leaf on a drag without blasting it", () => {
+    const field = makeField();
+    const idle = makeInput();
+    run(field, 200, idle);
+    let front = 0;
+    for (const leaf of field.leaves) {
+      if (leaf.z > field.leaves[front]!.z) front = leaf.index;
+    }
+    const aim = aimAt(field, front, { inside: true });
+
+    stepDriftField(field, DT, { ...aim, pressed: true });
+    expect(field.grabIndex).toBe(front);
+    // Travel well past the tap slop, then let go.
+    for (let frame = 1; frame <= 8; frame += 1) {
+      stepDriftField(field, DT, {
+        ...aim,
+        pressed: true,
+        screenX: aim.screenX + frame * 12,
+      });
+    }
+    stepDriftField(field, DT, {
+      ...aim,
+      pressed: false,
+      screenX: aim.screenX + 96,
+    });
+    // A drag is a carry, not a gust: no puff fires on its release.
+    expect(field.puffed).toBe(false);
+    expect(field.grabIndex).toBe(-1);
+  });
+
   it("treats a click on open air as a stronger gust", () => {
     const calm = makeField();
     const gusted = makeField();
@@ -451,7 +534,9 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
     // Bottom-left viewport corner: far from where the pile loosens.
     const corner = makeInput({ inside: true, screenX: -700, screenY: -430 });
     stepDriftField(gusted, DT, { ...corner, pressed: true });
+    stepDriftField(gusted, DT, { ...corner, pressed: false });
     expect(gusted.puffed).toBe(true);
+    stepDriftField(calm, DT, corner);
     stepDriftField(calm, DT, corner);
 
     let calmSpeed = 0;

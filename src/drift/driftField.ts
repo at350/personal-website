@@ -118,7 +118,12 @@ export interface DriftField {
   grabLocalX: number;
   grabLocalY: number;
   wasPressed: boolean;
-  /** Set for one step when a click lands on open air. */
+  /** Where the press began, and how far it has strayed since — a tap gusts,
+      a drag carries a leaf. */
+  pressX: number;
+  pressY: number;
+  pressTravel: number;
+  /** Set for one step when a tap releases its gust. */
   puffed: boolean;
   /** Last pointer position on the page plane, for the gust wake. */
   pointerWX: number;
@@ -222,6 +227,13 @@ export const DRIFT_CURRENT_ACCEL = 900;
 export const DRIFT_CURRENT_RADIUS_RATIO = 0.75;
 export const DRIFT_PUFF_SPEED = 420;
 export const DRIFT_PUFF_RADIUS_RATIO = 1.1;
+/** Pointer travel (px) within which a press still counts as a tap. Beyond
+    it the press was a drag, and dragging a leaf must not also blast it. */
+export const DRIFT_TAP_SLOP = 6;
+/** Tumble imparted by a gust. A sheet hit dead centre has no lever arm for
+    the radial shove, so without this the very case that should react most —
+    a click in the middle of a page — would barely move at all. */
+const PUFF_TUMBLE = 1.5;
 /** The cursor's own motion is the wind. Its velocity across the page plane
     couples into every nearby leaf, so a fast sweep fans the pile in the
     sweep direction instead of merely parting it radially. */
@@ -390,6 +402,9 @@ export function createDriftField(params: DriftFieldParams): DriftField {
     grabLocalX: 0,
     grabLocalY: 0,
     wasPressed: false,
+    pressX: 0,
+    pressY: 0,
+    pressTravel: 0,
     puffed: false,
     pointerWX: 0,
     pointerWY: 0,
@@ -492,15 +507,22 @@ function applyPuff(field: DriftField, input: DriftPointerInput) {
     const dx = leaf.x - pointScratch.x;
     const dy = leaf.y - pointScratch.y;
     const distance = Math.hypot(dx, dy);
-    if (distance < 1e-3) {
-      leaf.vz += DRIFT_PUFF_SPEED * field.pageScale * leaf.release;
-      continue;
-    }
     const falloff = Math.exp(-(distance * distance) / (radius * radius));
     const impulse =
       DRIFT_PUFF_SPEED * field.pageScale * falloff * leaf.release;
-    const jx = (dx / distance) * impulse;
-    const jy = (dy / distance) * impulse;
+    // A hit square in the middle of a sheet has no radial direction to push
+    // along; give it a seeded one so the strongest hit is never the stillest.
+    const away = distance > 1e-3
+      ? { x: dx / distance, y: dy / distance }
+      : { x: Math.cos(leaf.seedA * TAU), y: Math.sin(leaf.seedA * TAU) };
+    const jx = away.x * impulse;
+    const jy = away.y * impulse;
+    // Air catching a sheet sets it tumbling; the lever arm below cannot do
+    // this for a centred hit, so the gust supplies the spin directly.
+    const tumble = PUFF_TUMBLE * falloff * leaf.release;
+    leaf.wx += (leaf.seedB - 0.5) * tumble;
+    leaf.wy += (leaf.seedC - 0.5) * tumble;
+    leaf.wz += (leaf.seedA - 0.5) * tumble;
     // A gust also catches the sheet off-center: the closest point on the
     // leaf to the pointer carries the impulse, so nearby leaves tumble away
     // instead of translating like pushed cards.
@@ -672,15 +694,33 @@ export function stepDriftField(
   }
 
   const pressedEdge = input.pressed && !field.wasPressed;
-  if (pressedEdge && input.inside) {
-    const hit = pickDriftLeaf(field, input);
-    if (hit >= 0) {
-      field.grabIndex = hit;
-      field.grabLocalX = field.pickLocalX;
-      field.grabLocalY = field.pickLocalY;
-    } else {
-      applyPuff(field, input);
+  const releasedEdge = !input.pressed && field.wasPressed;
+  if (pressedEdge) {
+    field.pressX = input.screenX;
+    field.pressY = input.screenY;
+    field.pressTravel = 0;
+    // The grab still engages on the press itself, so dragging a leaf stays
+    // immediate; only the gust waits to see whether this was a tap.
+    if (input.inside) {
+      const hit = pickDriftLeaf(field, input);
+      if (hit >= 0) {
+        field.grabIndex = hit;
+        field.grabLocalX = field.pickLocalX;
+        field.grabLocalY = field.pickLocalY;
+      }
     }
+  } else if (input.pressed) {
+    field.pressTravel = Math.max(
+      field.pressTravel,
+      Math.hypot(input.screenX - field.pressX, input.screenY - field.pressY),
+    );
+  }
+  if (releasedEdge) {
+    const tapped = field.pressTravel <= DRIFT_TAP_SLOP;
+    // Let the held leaf go BEFORE the gust, so a tap on a page shoves that
+    // page too rather than gusting everything except the one clicked.
+    field.grabIndex = -1;
+    if (tapped && input.inside) applyPuff(field, input);
   }
   if (!input.pressed) field.grabIndex = -1;
   field.wasPressed = input.pressed;
