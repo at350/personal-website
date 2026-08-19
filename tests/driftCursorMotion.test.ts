@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
+  DRIFT_BURST_PUFFS,
   DRIFT_BURST_START_RADIUS,
+  DRIFT_SWIRL_IMPULSE,
   DRIFT_PUFF_LIFETIME,
   DRIFT_PUFF_SPACING,
   DRIFT_TRAIL_CAPACITY,
   DRIFT_TRAIL_SPAN,
   ageDriftTrail,
+  burstDriftTrail,
   collectDriftTrail,
   createDriftTrail,
+  decayDriftSwirlBoost,
   driftCursorGust,
   driftGustBurst,
   driftPuffRender,
+  driftSwirlRate,
   resetDriftTrail,
   shedDriftTrail,
 } from "@/drift/cursorMotion";
@@ -208,6 +213,72 @@ describe("drift cursor motion", () => {
     // And the next sample near the new position sheds nothing, so no parcel
     // is stranded across the jump.
     expect(shedDriftTrail(trail, 903, 402, 0.7)).toBe(0);
+  });
+
+  it("spins the vortex up on a click and eases it back down", () => {
+    // The glyph reacts to its own gust rather than only emitting a ring.
+    const idle = driftSwirlRate(0, 0);
+    const gusting = driftSwirlRate(0, DRIFT_SWIRL_IMPULSE);
+    expect(gusting).toBeGreaterThan(idle * 4);
+    // Moving the hand also turns the arms, but far less than a click.
+    expect(driftSwirlRate(1, 0)).toBeGreaterThan(idle);
+    expect(driftSwirlRate(1, 0)).toBeLessThan(gusting);
+
+    // The spin-up decays smoothly and lands exactly on zero.
+    let boost = DRIFT_SWIRL_IMPULSE;
+    let previous = boost;
+    for (let frame = 0; frame < 12; frame += 1) {
+      boost = decayDriftSwirlBoost(boost, 1 / 60);
+      expect(boost).toBeLessThan(previous);
+      previous = boost;
+    }
+    let settled = boost;
+    for (let frame = 0; frame < 200; frame += 1) {
+      settled = decayDriftSwirlBoost(settled, 1 / 60);
+    }
+    expect(settled).toBe(0);
+
+    // Frame-rate independent, like every other curve here.
+    let sixty = DRIFT_SWIRL_IMPULSE;
+    let oneTwenty = DRIFT_SWIRL_IMPULSE;
+    for (let frame = 0; frame < 12; frame += 1) {
+      sixty = decayDriftSwirlBoost(sixty, 1 / 60);
+    }
+    for (let frame = 0; frame < 24; frame += 1) {
+      oneTwenty = decayDriftSwirlBoost(oneTwenty, 1 / 120);
+    }
+    expect(sixty).toBeCloseTo(oneTwenty, 8);
+  });
+
+  it("throws a ring of real air parcels on a click", () => {
+    const trail = createDriftTrail();
+    resetDriftTrail(trail, 400, 300);
+    burstDriftTrail(trail, 400, 300, 26);
+
+    const shed = live(trail);
+    expect(shed).toHaveLength(DRIFT_BURST_PUFFS);
+    for (const puff of shed) {
+      // Thrown outward to a common radius, at full force.
+      expect(Math.hypot(puff.x - 400, puff.y - 300)).toBeCloseTo(26, 6);
+      expect(puff.force).toBe(1);
+      expect(puff.age).toBe(0);
+    }
+    // Spread all the way around, not clustered on one side.
+    const angles = shed.map((puff) =>
+      Math.atan2(puff.y - 300, puff.x - 400),
+    );
+    expect(new Set(angles.map((a) => a.toFixed(3))).size).toBe(
+      DRIFT_BURST_PUFFS,
+    );
+
+    // And they are ordinary shed air: they stay put and dissipate.
+    const first = shed[0]!;
+    const bornAt = { x: first.x, y: first.y };
+    ageDriftTrail(trail, DRIFT_PUFF_LIFETIME * 0.6);
+    expect(first.x).toBe(bornAt.x);
+    expect(first.y).toBe(bornAt.y);
+    ageDriftTrail(trail, DRIFT_PUFF_LIFETIME);
+    expect(live(trail)).toHaveLength(0);
   });
 
   it("grows and fades the click-gust ring like the leaf shove it mirrors", () => {
