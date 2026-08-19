@@ -4,7 +4,9 @@ import { PaperSheet } from "@/book3d/paperPhysics";
 import {
   DRIFT_SHEET_MAX_DEVIATION,
   createDriftField,
+  DRIFT_PAGE_SCALE,
   driftLeafFlex,
+  pairTilt,
   recordDriftDeviation,
   stepDriftField,
   writeDriftLeafGuide,
@@ -214,5 +216,54 @@ describe("drift page collision", { timeout: 60_000 }, () => {
 
     for (let i = 0; i < b.length; i += 1) b[i]!.z += 5000;
     expect(worstCrossing(rig.field, rig.solved)).toBe(0);
+  });
+  it("charges enough depth when one page sits right on top of another", () => {
+    // Two pages leaning OPPOSITE ways, near concentric, at slightly different
+    // depths — so their projected outlines nest rather than cross. Their
+    // surfaces converge fast and they need real room. This is the arrangement
+    // a clearance model is most likely to get wrong, because the geometry it
+    // reasons about (where two outlines meet) degenerates exactly here.
+    const field = createDriftField({
+      pw: PW, ph: PH, totalLeaves: 11, currentSpread: 5, seed: 7,
+    });
+    const lower = field.leaves[0]!;
+    const upper = field.leaves[1]!;
+    const tilt = Math.PI / 6;
+    const cos = Math.cos(tilt);
+    const sin = Math.sin(tilt);
+    const camera = 2300;
+    const place = (
+      leaf: typeof lower, lean: number, x: number, z: number, scale: number,
+    ) => {
+      leaf.release = 1;
+      leaf.x = x; leaf.y = 0; leaf.z = z; leaf.scale = scale;
+      leaf.axisUX = 1; leaf.axisUY = 0; leaf.axisUZ = 0;
+      leaf.axisVX = 0; leaf.axisVY = cos; leaf.axisVZ = lean * sin;
+      leaf.axisNX = 0; leaf.axisNY = -lean * sin; leaf.axisNZ = cos;
+    };
+    const lowerScale = DRIFT_PAGE_SCALE;
+    const upperScale = (DRIFT_PAGE_SCALE * (camera - 100)) / camera;
+    place(lower, +1, 0, 0, lowerScale);
+    place(upper, -1, 5, 100, upperScale);
+
+    // Over the shared area the two surfaces close at the sum of their slopes,
+    // so the gap has to cover that closure across the overlap's full height.
+    const overlapHalfHeight = Math.min(
+      (PH / 2) * lowerScale * cos,
+      (PH / 2) * upperScale * cos,
+    );
+    const needed = overlapHalfHeight * 2 * Math.tan(tilt);
+    expect(pairTilt(field, lower, upper)).toBeGreaterThan(needed * 0.9);
+
+    // And the charge must not fall off a cliff the moment the pages stop
+    // being exactly stacked. Sliding one a little sideways barely changes how
+    // much of it lies over the other, so it cannot buy a large discount —
+    // the arrangement is still two pages face to face.
+    upper.x = 0;
+    const stacked = pairTilt(field, lower, upper);
+    for (let apart = 0; apart <= 40; apart += 2) {
+      upper.x = apart;
+      expect(pairTilt(field, lower, upper)).toBeGreaterThan(stacked * 0.75);
+    }
   });
 });
