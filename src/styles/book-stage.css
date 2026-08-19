@@ -296,10 +296,18 @@
 }
 
 /* Book faces must be FINISHED pages. A moving face is a still texture, so the
-   live DOM twin cannot run an independent entrance animation at either end of
-   the handoff. Reader-mode pages are outside `.page-face` and keep their
-   editorial entrances. */
-.page-face *,
+   live DOM twin cannot run an independent ENTRANCE animation at either end of
+   the handoff — a plate that fades in would disagree with the texture it just
+   replaced. Reader-mode pages are outside `.page-face` and keep their
+   editorial entrances.
+
+   The library's drifting columns are the one exception, and they are exempted
+   by name rather than by loosening the rule. The drift is not an entrance: it
+   is the page's standing state, it never settles, and there is no "finished"
+   frame for it to disagree with. Everything inside a track — the plates, their
+   thumbnails, every ::before and ::after — stays frozen as before; only the
+   track's own travel is allowed to continue. */
+.page-face *:not(.media-col__track),
 .page-face *::before,
 .page-face *::after {
   animation: none !important;
