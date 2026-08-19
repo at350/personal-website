@@ -146,6 +146,22 @@ function isPositiveInt(value: number | undefined): value is number {
   return value !== undefined && Number.isInteger(value) && value > 0;
 }
 
+/** One plate image, with only the dimensions the schema will accept. */
+function plateImage(
+  src: string | undefined,
+  width: number | undefined,
+  height: number | undefined,
+  title: string,
+): MediaItem["image"] | undefined {
+  if (!src) return undefined;
+  return {
+    src,
+    alt: truncate(`Image from the post “${title}”`, 240),
+    width: isPositiveInt(width) ? width : undefined,
+    height: isPositiveInt(height) ? height : undefined,
+  };
+}
+
 /** First usable still from a post: an attached image, else a video poster. */
 function postImage(
   images: unknown,
@@ -153,16 +169,12 @@ function postImage(
   title: string,
 ): MediaItem["image"] | undefined {
   const first = asRecord(toArray(images)[0]);
-  const src = textOf(first?.url) ?? textOf(videoThumbnail);
-  if (!src) return undefined;
-  const width = numOf(first?.width);
-  const height = numOf(first?.height);
-  return {
-    src,
-    alt: truncate(`Image from the post “${title}”`, 240),
-    width: isPositiveInt(width) ? width : undefined,
-    height: isPositiveInt(height) ? height : undefined,
-  };
+  return plateImage(
+    textOf(first?.url) ?? textOf(videoThumbnail),
+    numOf(first?.width),
+    numOf(first?.height),
+    title,
+  );
 }
 
 function rssItems(xml: string): XmlNode[] {
@@ -412,4 +424,28 @@ export function fromAnyApiLinkedIn(json: unknown): MediaItem[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Pull a post's attached media out of X's public syndication payload — the
+ * same one embedded tweets read.
+ *
+ * No AnyAPI X SKU returns media URLs at all: `twitter.user_posts`,
+ * `twitter.user_tweets` and `twitter.tweet` were each checked against a post
+ * that demonstrably has a photo, and none of them carry a media field. This
+ * endpoint needs no key and no credential — the `token` is derived from the
+ * post id — so it stays the one way to give an X post its picture.
+ */
+export function xMediaFromSyndication(
+  json: unknown,
+  title: string,
+): MediaItem["image"] | undefined {
+  const first = asRecord(toArray(asRecord(json)?.mediaDetails)[0]);
+  const info = asRecord(first?.original_info);
+  return plateImage(
+    textOf(first?.media_url_https),
+    numOf(info?.width),
+    numOf(info?.height),
+    title,
+  );
 }

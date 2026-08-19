@@ -287,95 +287,123 @@ a.media-plate:focus-visible .media-plate__title {
 /* ————— Mosaic layout (supersedes the column wall) ————— */
 
 .media-wall--mosaic {
+  --mosaic-gap: 3px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-auto-rows: 10.5cqh;
-  grid-auto-flow: dense;
-  gap: 3px;
-  align-items: stretch;
+  /* One row, exactly the wall's height. Without the explicit minmax the row
+     sizes to its content — and the content is deliberately twice as tall as
+     the page — so the whole spread would stretch instead of clipping. */
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--mosaic-gap);
+}
+
+/* ————— The drift —————
+   Each column is a window onto a track that holds its plates twice over. The
+   loop travels exactly one copy's height, so the second copy arrives in the
+   first's place and the seam never shows. The track is 2 copies plus one gap
+   tall, so half of it overshoots by half a gap — hence the correction. */
+
+.media-col {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The track is taken out of flow on purpose. It is deliberately about twice
+   the height of the page, and in flow it would push the column — and with it
+   the whole face — to its own size. The reader stacks faces at their natural
+   height, so that inflated one spread to four screens tall. Out of flow it
+   contributes nothing, the wall keeps the leftover space `flex: 1` gives it,
+   and the column clips the travel. */
+.media-col__track {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mosaic-gap);
+  animation: mosaic-drift var(--column-seconds, 80s) linear infinite;
+  will-change: transform;
+}
+
+.media-col[data-drift="down"] .media-col__track {
+  animation-direction: reverse;
+}
+
+@keyframes mosaic-drift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-50% - (var(--mosaic-gap) / 2)));
+  }
+}
+
+/* The page is paper first. If the reader would rather it held still, it
+   holds still — and the plates simply stack as a static mosaic. */
+@media (prefers-reduced-motion: reduce) {
+  .media-col__track {
+    animation: none;
+  }
+}
+
+/* The capture farm rasterizes each face into the page texture the book shows
+   while paper is turning. A column mid-flight rasterizes badly — the drifting
+   layer is still compositing, and its thumbnails come out blank — so the farm
+   gets the wall standing still. The visible spread is real DOM and keeps
+   moving; only the frozen copy behind a page turn is held. */
+[data-capture-key] .media-col__track {
+  animation: none;
+  will-change: auto;
 }
 
 .media-wall--mosaic .media-cell {
   position: relative;
+  flex: none;
   overflow: hidden;
-  animation: plate-in 240ms var(--ease-settle) both;
-  animation-delay: calc(var(--order) * 45ms);
 }
 
-/* Tile shapes: images command space, words fill the seams. */
-.media-cell--photo {
-  grid-column: span 2;
-  grid-row: span 3;
-}
-
-.media-cell--film {
-  grid-row: span 3;
-}
-
-.media-cell--video {
-  grid-column: span 2;
-  grid-row: span 2;
-}
-
-.media-cell--article {
-  grid-row: span 2;
-}
-
-.media-cell--post {
-  grid-row: span 2;
-}
-
-.media-cell--link {
-  grid-row: span 2;
-}
+/* Nothing sets a tile height: a picture plate is as tall as its own aspect
+   ratio makes it and a text plate stays tight, which is what gives the
+   column its uneven, mosaic rhythm as it travels. */
 
 /* Image tiles keep their metadata and captions on paper, outside the image.
    Live-feed thumbnails often contain their own type; overlaying more type on
    top made unrelated words read as collisions. */
-.media-cell--photo .media-plate,
-.media-cell--video .media-plate,
-.media-cell--film .media-plate {
-  position: absolute;
-  inset: 0;
+.media-cell:has(.media-plate__media) .media-plate {
+  position: static;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: max(4px, 0.7cqh);
   border: 1px solid var(--hairline);
   padding: max(6px, 1.1cqw);
   overflow: hidden;
 }
 
-.media-cell--photo .media-plate__media,
-.media-cell--video .media-plate__media,
-.media-cell--film .media-plate__media {
+/* The plate keeps the ratio PlateThumb set inline from the real pixel size,
+   so portraits stay tall and stills stay wide — capped so one banner cannot
+   swallow a whole column. */
+.media-cell:has(.media-plate__media) .media-plate__media {
   position: relative;
   inset: auto;
   min-height: 0;
-  max-height: none;
+  max-height: 24cqh;
   margin: 0;
-  aspect-ratio: auto !important;
 }
 
-.media-cell--photo .media-plate__thumb,
-.media-cell--video .media-plate__thumb,
-.media-cell--film .media-plate__thumb {
+.media-cell:has(.media-plate__media) .media-plate__thumb {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.media-cell--photo .media-plate__meta,
-.media-cell--video .media-plate__meta,
-.media-cell--film .media-plate__meta {
+.media-cell:has(.media-plate__media) .media-plate__meta {
   position: static;
   background: transparent;
   padding: 0;
   margin: 0;
 }
 
-.media-cell--photo .media-plate__title,
-.media-cell--video .media-plate__title,
-.media-cell--film .media-plate__title {
+.media-cell:has(.media-plate__media) .media-plate__title {
   position: static;
   background: transparent;
   width: auto;
