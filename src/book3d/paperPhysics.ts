@@ -41,6 +41,11 @@ export interface DriftSheetOptions {
   flutterZ?: number;
   /** Advances the travelling wave; seed it per leaf so no two ripple alike. */
   flutterPhase?: number;
+  /** Hard ceiling on how far any vertex may sit from its carrier guide. The
+      depth clearance between leaves is computed from the rigid carriers, so
+      the drawn sheet has to stay inside a known shell around one or pages
+      whose carriers are properly separated can still intersect on screen. */
+  maxDeviation?: number;
 }
 
 interface Constraint {
@@ -343,6 +348,34 @@ export class PaperSheet {
       for (const constraint of this.structuralConstraints) this.solveConstraint(constraint);
       for (const constraint of this.curvatureConstraints) {
         this.solveCurvatureConstraint(constraint, target, curvatureScale);
+      }
+    }
+
+    const maxDeviation = options.maxDeviation ?? 0;
+    if (maxDeviation > 0) {
+      const maxSquared = maxDeviation * maxDeviation;
+      for (let index = 0; index < this.positions.length; index += 1) {
+        const point = this.positions[index]!;
+        const guide = target[index]!;
+        const dx = point.x - guide.x;
+        const dy = point.y - guide.y;
+        const dz = point.z - guide.z;
+        const squared = dx * dx + dy * dy + dz * dz;
+        if (squared <= maxSquared) continue;
+        // Pull the vertex back onto the shell, co-moving `previous` so the
+        // correction carries no velocity — the same inelastic handling the
+        // stack floor uses, or the clamp would fling the sheet back.
+        const shrink = maxDeviation / Math.sqrt(squared) - 1;
+        const moveX = dx * shrink;
+        const moveY = dy * shrink;
+        const moveZ = dz * shrink;
+        point.x += moveX;
+        point.y += moveY;
+        point.z += moveZ;
+        const previous = this.previous[index]!;
+        previous.x += moveX;
+        previous.y += moveY;
+        previous.z += moveZ;
       }
     }
 
