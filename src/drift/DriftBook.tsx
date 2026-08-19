@@ -27,11 +27,11 @@ export const DRIFT_TOTAL_LEAVES = SPREADS.length - 1;
     pinned spine column plus the structural web are what actually carry the
     sheet; keeping this rate low is what lets air and motion visibly bend the
     paper instead of ironing every vertex back onto the flat guide. */
-export const DRIFT_SHEET_FOLLOW_RATE = 0.9;
+export const DRIFT_SHEET_FOLLOW_RATE = 2.4;
 export const DRIFT_SHEET_DAMPING = 0.955;
 /** Floating paper holds a real bow: the page-turn regime's bend-flattening
     runs at a fraction of its strength out here. */
-export const DRIFT_SHEET_CURVATURE_SCALE = 0.3;
+export const DRIFT_SHEET_CURVATURE_SCALE = 0.22;
 /** Sheet-level radial current at the pointer (px/s² at its center). The rigid
     carriers get their own current inside driftField; this term is what makes
     the paper itself belly away from a close pass. */
@@ -41,6 +41,19 @@ const SHEET_CURRENT_RADIUS_RATIO = 0.5;
     its own velocity, so a dragged or gusted sheet trails and bows instead of
     translating rigidly. Acceleration per px/s of carrier speed. */
 const MOTION_FLEX = 3.2;
+/** Flutter: the ripple that runs across a sheet held in moving air. A free
+    leaf cannot bend under uniform wind — that only shifts it — so this is
+    what actually curves the paper, and it works on every part of the sheet
+    rather than hinging it at one edge. */
+/* Sized against measurement, not taste: this solver answers a flutter
+   acceleration with roughly amplitude/142 pixels of out-of-plane travel on a
+   528px page, so a base of 2400 buys ~17px of visible bow at rest and motion
+   carries it to ~25px — real curvature that still sits inside the 54px flex
+   budget the depth-clearance projection allows between sheets. */
+const FLUTTER_BASE = 2400;
+const FLUTTER_MOTION = 4;
+const FLUTTER_RATE = 2.3;
+const TAU = Math.PI * 2;
 const FIELD_SEED = 0xd21f7;
 
 interface DriftBookProps {
@@ -230,6 +243,10 @@ export function DriftBook({
     damping: DRIFT_SHEET_DAMPING,
     curvatureScale: DRIFT_SHEET_CURVATURE_SCALE,
     restScale: 1,
+    flutterX: 0,
+    flutterY: 0,
+    flutterZ: 0,
+    flutterPhase: 0,
   });
   const currentScratch = useRef<DriftVec>({ x: 0, y: 0, z: 0 });
   const reportedLoosened = useRef(false);
@@ -274,15 +291,25 @@ export function DriftBook({
       options.restScale = leaf.scale;
 
       if (active) {
-        // Apparent airflow: the faster a carrier moves, the harder its free
-        // paper trails behind the pinned spine column.
+        // Apparent airflow: a moving carrier drags its paper through the air.
         options.windX = -leaf.vx * MOTION_FLEX;
         options.windY = -leaf.vy * MOTION_FLEX;
         options.windZ = -leaf.vz * MOTION_FLEX;
+        // Flutter along the sheet's own normal, harder the faster it flies.
+        const carrierSpeed = Math.hypot(leaf.vx, leaf.vy, leaf.vz);
+        const amplitude =
+          (FLUTTER_BASE + carrierSpeed * FLUTTER_MOTION) * leaf.release;
+        options.flutterX = leaf.axisNX * amplitude;
+        options.flutterY = leaf.axisNY * amplitude;
+        options.flutterZ = leaf.axisNZ * amplitude;
+        options.flutterPhase = field.time * FLUTTER_RATE + leaf.seedA * TAU;
       } else {
         options.windX = 0;
         options.windY = 0;
         options.windZ = 0;
+        options.flutterX = 0;
+        options.flutterY = 0;
+        options.flutterZ = 0;
       }
       if (active && frame.inside && field.grabIndex !== leaf.index) {
         pointerPointAtDepth(frame, leaf.z, currentScratch.current);

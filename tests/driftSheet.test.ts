@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { LEAF_ROWS, LEAF_SEGMENTS, type LeafVertex } from "../src/book3d/bend";
+import {
+  LEAF_ROWS,
+  LEAF_SEGMENTS,
+  leafSurface,
+  type LeafVertex,
+} from "../src/book3d/bend";
 import { PaperSheet, type DriftSheetOptions } from "../src/book3d/paperPhysics";
 
 const PW = 400;
@@ -29,6 +34,21 @@ const flatGuide = (cx = 0, cy = 0, cz = 0): LeafVertex[] => {
   return vertices;
 };
 
+/** Total bending along the middle row: the second difference of z, which a
+    pure translation leaves at zero however far the sheet has moved. */
+const curvature = (vertices: readonly LeafVertex[]) => {
+  const row = LEAF_ROWS / 2;
+  let total = 0;
+  for (let column = 1; column < LEAF_SEGMENTS; column += 1) {
+    total += Math.abs(
+      vertices[indexOf(row, column - 1)]!.z -
+        2 * vertices[indexOf(row, column)]!.z +
+        vertices[indexOf(row, column + 1)]!.z,
+    );
+  }
+  return total;
+};
+
 const options = (over: Partial<DriftSheetOptions> = {}): DriftSheetOptions => ({
   dt: 1 / 60,
   windX: 0,
@@ -48,38 +68,97 @@ const options = (over: Partial<DriftSheetOptions> = {}): DriftSheetOptions => ({
 /* Multi-hundred-frame solver runs; same wall-clock allowance as the page-turn
    sheet suite. */
 describe("weightless drift sheet regime", { timeout: 30_000 }, () => {
-  it("pins the spine column to the carrier guide exactly", () => {
+  it("floats free — no edge is pinned, so the sheet bends on every side", () => {
+    // The page-turn regime binds column 0 to the spine. A drifting leaf is
+    // loose in the air: pinning an edge there reads as a hinge, with every
+    // deformation pushed onto the far side of the page.
     const sheet = new PaperSheet(PW, PH, LEAF_SEGMENTS, LEAF_ROWS);
     const guide = flatGuide();
     sheet.reset(guide);
     let current: readonly LeafVertex[] = guide;
-    for (let frame = 0; frame < 40; frame += 1) {
-      current = sheet.stepDrift(guide, options({ windZ: 600 }));
+    for (let frame = 0; frame < 90; frame += 1) {
+      current = sheet.stepDrift(
+        guide,
+        options({ flutterZ: 900, flutterPhase: frame * 0.14 }),
+      );
+    }
+
+    const edgeDeviation = (column: number) => {
+      let worst = 0;
+      for (let row = 0; row <= LEAF_ROWS; row += 1) {
+        worst = Math.max(
+          worst,
+          Math.abs(
+            current[indexOf(row, column)]!.z - guide[indexOf(row, column)]!.z,
+          ),
+        );
+      }
+      return worst;
+    };
+    const spine = edgeDeviation(0);
+    const fore = edgeDeviation(LEAF_SEGMENTS);
+
+    // The spine edge used to be clamped to exactly the guide; it now moves.
+    expect(spine).toBeGreaterThan(1);
+    expect(fore).toBeGreaterThan(1);
+    // And neither side dominates the way a hinged sheet's free edge would.
+    expect(Math.max(spine, fore) / Math.min(spine, fore)).toBeLessThan(8);
+  });
+
+  it("shifts under a uniform wind, but only bends under a varying one", () => {
+    // A free sheet cannot bend under a force applied equally everywhere —
+    // that only moves it. Spatial variation is what actually curves paper,
+    // which is why the flutter wave exists at all.
+    const shifted = new PaperSheet(PW, PH, LEAF_SEGMENTS, LEAF_ROWS);
+    const rippled = new PaperSheet(PW, PH, LEAF_SEGMENTS, LEAF_ROWS);
+    const guide = flatGuide();
+    shifted.reset(guide);
+    rippled.reset(guide);
+    let uniform: readonly LeafVertex[] = guide;
+    let varying: readonly LeafVertex[] = guide;
+    for (let frame = 0; frame < 90; frame += 1) {
+      uniform = shifted.stepDrift(guide, options({ windZ: 900 }));
+      varying = rippled.stepDrift(
+        guide,
+        options({ flutterZ: 900, flutterPhase: frame * 0.14 }),
+      );
+    }
+
+    // The uniform push does move the sheet off its guide...
+    const drift = Math.abs(
+      uniform[indexOf(LEAF_ROWS / 2, LEAF_SEGMENTS / 2)]!.z -
+        guide[indexOf(LEAF_ROWS / 2, LEAF_SEGMENTS / 2)]!.z,
+    );
+    expect(drift).toBeGreaterThan(1);
+    // ...but barely curves it, while the same magnitude applied as a wave
+    // ripples it many times harder.
+    expect(curvature(varying)).toBeGreaterThan(curvature(uniform) * 4);
+  });
+
+  it("leaves the page-turn regime's pinned spine untouched", () => {
+    // The reading book binds its leaf at the spine; loosening the drift
+    // regime must not have loosened the solver for everyone.
+    const sheet = new PaperSheet(PW, PH, LEAF_SEGMENTS, LEAF_ROWS);
+    const flat = leafSurface(0, PW, PH, 0, 0.8, 1);
+    const target = leafSurface(0.45, PW, PH, 2.4, 0.8, 1);
+    sheet.reset(flat);
+    let current: readonly LeafVertex[] = flat;
+    for (let frame = 0; frame < 20; frame += 1) {
+      current = sheet.step(target, {
+        dt: 1 / 60,
+        dragging: true,
+        grabY: 0.8,
+        handleOffsetY: 12,
+        velocity: 2.4,
+      });
     }
     for (let row = 0; row <= LEAF_ROWS; row += 1) {
       const pinned = current[indexOf(row, 0)]!;
-      const target = guide[indexOf(row, 0)]!;
-      expect(pinned.x).toBe(target.x);
-      expect(pinned.y).toBe(target.y);
-      expect(pinned.z).toBe(target.z);
+      const anchor = target[indexOf(row, 0)]!;
+      expect(pinned.x).toBe(anchor.x);
+      expect(pinned.y).toBe(anchor.y);
+      expect(pinned.z).toBe(anchor.z);
     }
-  });
-
-  it("bends the free area downwind while the spine holds", () => {
-    const sheet = new PaperSheet(PW, PH, LEAF_SEGMENTS, LEAF_ROWS);
-    const guide = flatGuide();
-    sheet.reset(guide);
-    let current: readonly LeafVertex[] = guide;
-    for (let frame = 0; frame < 40; frame += 1) {
-      current = sheet.stepDrift(guide, options({ windZ: 900 }));
-    }
-    const midRow = LEAF_ROWS / 2;
-    const tip = current[indexOf(midRow, LEAF_SEGMENTS)]!;
-    const middle = current[indexOf(midRow, LEAF_SEGMENTS / 2)]!;
-    // Deflection grows toward the fore-edge: paper flexing, not a card.
-    expect(tip.z).toBeGreaterThan(4);
-    expect(tip.z).toBeGreaterThan(middle.z);
-    expect(middle.z).toBeGreaterThan(0.2);
   });
 
   it("lets a pointed gust carve real local curvature when relaxed", () => {

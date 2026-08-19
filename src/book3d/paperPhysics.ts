@@ -32,6 +32,15 @@ export interface DriftSheetOptions {
   /** Scales the structural rest lengths to match a uniformly scaled guide
       (drift's perspective counter-scale). The page-turn regime is always 1. */
   restScale?: number;
+  /** Out-of-plane flutter: the sheet's own normal times an amplitude, rippled
+      across the sheet by a travelling wave. A free sheet cannot bend under a
+      uniform wind — that only shifts it — so this spatial variation is what
+      actually curves floating paper. */
+  flutterX?: number;
+  flutterY?: number;
+  flutterZ?: number;
+  /** Advances the travelling wave; seed it per leaf so no two ripple alike. */
+  flutterPhase?: number;
 }
 
 interface Constraint {
@@ -95,6 +104,11 @@ export class PaperSheet {
   private energy = 0;
   /** Drift's uniform guide scale; every other regime runs at 1. */
   private restScale = 1;
+  /** The page-turn regime binds column 0 to the spine. Drift's leaves are
+      loose in the air, where a fixed edge would read as a hinge: all the
+      deformation would appear on the far side, which is exactly what a
+      floating sheet must not do. */
+  private spinePinned = true;
 
   constructor(
     width: number,
@@ -170,6 +184,7 @@ export class PaperSheet {
   step(target: readonly LeafVertex[], options: PaperStepOptions): LeafVertex[] {
     if (!this.initialized) this.reset(target);
     this.restScale = 1;
+    this.spinePinned = true;
     const dt = Math.min(1 / 30, Math.max(1 / 240, options.dt));
     const frameScale = dt * 60;
     const damping = Math.pow(
@@ -262,6 +277,8 @@ export class PaperSheet {
   ): LeafVertex[] {
     if (!this.initialized) this.reset(target);
     this.restScale = options.restScale ?? 1;
+    // Nothing is pinned out here: the sheet floats free and bends everywhere.
+    this.spinePinned = false;
     const dt = Math.min(1 / 30, Math.max(1 / 240, options.dt));
     const frameScale = dt * 60;
     const damping = Math.pow(options.damping, frameScale);
@@ -269,6 +286,11 @@ export class PaperSheet {
     const dtSquared = dt * dt;
     const radius = Math.max(1, options.puffRadius);
     const curvatureScale = options.curvatureScale ?? 1;
+    const flutterX = options.flutterX ?? 0;
+    const flutterY = options.flutterY ?? 0;
+    const flutterZ = options.flutterZ ?? 0;
+    const flutterPhase = options.flutterPhase ?? 0;
+    const columns = this.segments + 1;
 
     for (let index = 0; index < this.positions.length; index += 1) {
       const point = this.positions[index]!;
@@ -279,6 +301,18 @@ export class PaperSheet {
       let accelX = options.windX;
       let accelY = options.windY;
       let accelZ = options.windZ;
+
+      // Two travelling waves across the sheet, one along each axis, so the
+      // ripple crosses the whole page instead of standing still.
+      const column = index % columns;
+      const u = column / this.segments;
+      const v = (index - column) / columns / this.rows;
+      const wave =
+        Math.sin(u * 5.6 + flutterPhase) * 0.62 +
+        Math.sin(v * 4.3 - flutterPhase * 0.83 + 1.7) * 0.38;
+      accelX += flutterX * wave;
+      accelY += flutterY * wave;
+      accelZ += flutterZ * wave;
       if (options.puffStrength !== 0) {
         const dx = point.x - options.puffX;
         const dy = point.y - options.puffY;
@@ -310,7 +344,6 @@ export class PaperSheet {
       for (const constraint of this.curvatureConstraints) {
         this.solveCurvatureConstraint(constraint, target, curvatureScale);
       }
-      this.pinSpine(target);
     }
 
     let travel = 0;
@@ -334,7 +367,7 @@ export class PaperSheet {
   }
 
   private isPinned(index: number) {
-    return index % (this.segments + 1) === 0;
+    return this.spinePinned && index % (this.segments + 1) === 0;
   }
 
   private pinSpine(target: readonly LeafVertex[]) {
