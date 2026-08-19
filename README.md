@@ -117,6 +117,10 @@ about **18¢ a month** for the pair. Letterboxd keeps its two-hour cadence.
 ANYAPI_KEY=... ANYAPI_ALWAYS=1 npm run refresh-media
 ```
 
+From the Actions tab, run **refresh media** and tick **force_social** for the
+same effect — otherwise a manual run still honours the twice-weekly gate and
+the two social lanes just carry forward.
+
 Neither lane republishes anyone else's words. An X repost (`RT @…`) is
 dropped outright, and a LinkedIn quote post keeps only the author's own
 `text` — never the `repostText` of whoever was quoted. The t.co shortlink X

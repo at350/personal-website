@@ -24,6 +24,13 @@ on:
   schedule:
     - cron: "17 */2 * * *"
   workflow_dispatch:
+    inputs:
+      force_social:
+        description: >-
+          Fetch the paid X and LinkedIn lanes even when they are not due.
+          They normally refresh twice a week; tick this to pull them now.
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -59,6 +66,9 @@ jobs:
           # defaults baked into the script, and with no key both feeds are
           # simply skipped and the previous snapshot's posts carry forward.
           ANYAPI_KEY: ${{ secrets.ANYAPI_KEY }}
+          # Empty on a scheduled run, so the twice-weekly gate applies; "1"
+          # only when a human ticks the box on a manual dispatch.
+          ANYAPI_ALWAYS: ${{ inputs.force_social && '1' || '' }}
           X_HANDLE: ${{ secrets.X_HANDLE }}
           LINKEDIN_PROFILE_URL: ${{ secrets.LINKEDIN_PROFILE_URL }}
           # Only consulted when ANYAPI_KEY is absent — never both, since two
