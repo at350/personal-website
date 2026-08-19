@@ -46,6 +46,13 @@ export interface DriftLeafState {
   wz: number;
   /** 0 = still bound to the closed book, 1 = fully adrift. */
   release: number;
+  /** How flat this page is currently pressed by its neighbours. Driven by the
+      overlaps the solver actually fails to clear, so a page jammed into the
+      pile flattens while one with open air around it keeps its lean. */
+  crowdCap: number;
+  /** Worst unmet clearance this page was party to last frame; scratch for the
+      cap above, kept on the leaf so the loop allocates nothing. */
+  crowdResidual: number;
   /** Seconds after entry before this leaf starts loosening. */
   releaseDelay: number;
   /** Landing glide rate variation so the pile reassembles organically. */
@@ -73,6 +80,12 @@ export interface DriftLeafState {
       size shrinks by exactly the factor perspective would magnify it, so a
       floating page never looks zoomed and lands at exactly full size. */
   scale: number;
+  /** The drawn sheet's z-deviation from its carrier plane, measured per cell
+      over the page. This is what turns clearance from a worst-case constant
+      into real collision: two sheets rippling the same way locally need
+      almost no gap, while the gap grows exactly where they would touch. */
+  devMax: Float32Array;
+  devMin: Float32Array;
   sepX: number;
   sepY: number;
   sepZ: number;
@@ -133,6 +146,7 @@ export interface DriftField {
       pass so every pairwise correction agrees on one stacking order. */
   readonly order: number[];
   readonly rank: number[];
+
   /** Rotational inertia of one leaf (unit mass thin plate). */
   readonly inertia: number;
   /** Linear force scale so motion feels page-relative on every viewport. */
@@ -170,7 +184,7 @@ const ALIGN_TORQUE = 0.4;
     paper wheeling through the air, bounded enough that the depth projection
     can always price a gap that fits the containment volume. In-plane roll
     stays unlimited — pages spin freely. */
-const SWING_CAP = 0.95;
+const SWING_CAP = 0.8;
 /** A pinched page stays flat in the hand: the held leaf keeps a shallow
     tilt so the pile it is swept through only ever needs modest gaps to
     part around it — the grabbed leaf barely yields in the projection. */
@@ -205,24 +219,38 @@ const PAIR_HARD_Y_RATIO = 1.15;
     projection reasons about, so that displacement has to be bounded for the
     guarantee to mean anything on screen. Measured before the clamp existed:
     a still page bowed ~17px and a fast one reached 38px. */
-export const DRIFT_SHEET_MAX_DEVIATION = 13;
-/** Extra slack over the exact geometric requirement. Two sheets can bow
-    TOWARD each other at once, so this has to cover both clamps — the old
-    flat 34 covered barely one, which let pages whose carriers were properly
-    separated still cross on screen — plus a little for solver discreteness. */
-const PAIR_HARD_MARGIN = DRIFT_SHEET_MAX_DEVIATION * 2 + 8;
+/** Resolution of the measured deviation grid over each page. Sheets are
+    curvature-constrained and therefore smooth, so a coarse grid captures
+    their shape; each cell stores the extremes of every vertex inside it, so
+    sampling stays conservative rather than missing a local spike. */
+export const DRIFT_DEV_GRID = 4;
+export const DRIFT_DEV_CELLS = DRIFT_DEV_GRID * DRIFT_DEV_GRID;
+/** A safety bound on sheet deviation. With clearance now measured from the
+    real surfaces this no longer buys gap — it only keeps one pathological
+    frame from outrunning the one-frame-stale measurement below. */
+export const DRIFT_SHEET_MAX_DEVIATION = 46;
+/** Slack over the measured surface separation: one frame of staleness (the
+    grids describe last frame's sheets) plus solver discreteness. It no
+    longer has to cover the worst bow imaginable, because the requirement
+    now measures the bow that is actually there. */
+const PAIR_FLEX_SLACK = 12;
 /** Sweeps of the final floor-only pass; it converges fast because the floor
     it enforces is small enough to always fit the depth range. */
 const FLEX_FLOOR_SWEEPS = 4;
+/** Sweeps of the two-sided stack relaxation per frame. */
+const STACK_RELAXATIONS = 3;
+/** Closed loop on the crowd flattening. Residual violation the solver may
+    leave before the pile is pressed flatter, and the rates it tightens and
+    releases at — fast enough to answer a gust, slow enough that pages are
+    not visibly snapped flat. */
+const CROWD_TOLERANCE = 0.5;
+const CROWD_TIGHTEN = 0.8;
+const CROWD_RELEASE = 1.015;
+const CROWD_MIN_CAP = 0.05;
 /** Depth corrections are nearly invisible on screen — the perspective
     counter-scale holds apparent size constant — so the stack passes may
     move leaves briskly along z without reading as snaps. */
 const PAIR_HARD_PANIC_STEP = 9000;
-/** When the stacking chain demands more depth than the range holds (a gust
-    herding the whole pile into one column), gaps scale down to fit — and
-    the residual pressure escapes sideways: crowded pages slide apart in the
-    viewing plane like real sheets squirting out of a squeezed stack. */
-const PAIR_CHAIN_FILL = 0.92;
 const PAIR_LATERAL_RELIEF = 0.9;
 /** Crowded pages press flat: each overlapping neighbour multiplies the
     broadside restoring torque, cutting the tilt reach that drives the
@@ -372,6 +400,8 @@ export function createDriftField(params: DriftFieldParams): DriftField {
       wy: 0,
       wz: 0,
       release: 0,
+      crowdCap: SWING_CAP,
+      crowdResidual: 0,
       // Top sheets loosen first: the book peels open from its exposed faces.
       releaseDelay:
         (layer / Math.max(1, total - 1)) * DRIFT_RELEASE_STAGGER * 0.6 +
@@ -400,6 +430,8 @@ export function createDriftField(params: DriftFieldParams): DriftField {
       spinX: (seedA - 0.5) * SEPARATION_SPIN * 0.3,
       spinY: (seedB - 0.5) * SEPARATION_SPIN * 0.3,
       spinZ: (seedC - 0.5) * SEPARATION_SPIN * 1.6,
+      devMax: new Float32Array(DRIFT_DEV_CELLS),
+      devMin: new Float32Array(DRIFT_DEV_CELLS),
       seedA,
       seedB,
       seedC,
@@ -1030,6 +1062,159 @@ export function stepDriftField(
   }
 }
 
+/** Whether two leaves overlap enough in the viewing plane to matter. */
+/** Do the two pages cover any common ground on screen? Answered from the
+    footprints the carriers actually project — a rotated page reaches out to
+    its half-DIAGONAL, so two centres far enough apart to look clear can still
+    have their corners over one another — widened by how far a solved sheet is
+    allowed to stray outside its carrier. Conservative on purpose: a pair
+    wrongly called clear gets no clearance enforced at all, which is the one
+    error that shows up as pages passing through each other. */
+function pairOverlaps(
+  field: DriftField,
+  a: DriftLeafState,
+  b: DriftLeafState,
+) {
+  const halfW = field.pw / 2;
+  const halfH = field.ph / 2;
+  const margin = DRIFT_SHEET_MAX_DEVIATION;
+  const ax =
+    halfW * a.scale * Math.abs(a.axisUX) +
+    halfH * a.scale * Math.abs(a.axisVX);
+  const ay =
+    halfW * a.scale * Math.abs(a.axisUY) +
+    halfH * a.scale * Math.abs(a.axisVY);
+  const bx =
+    halfW * b.scale * Math.abs(b.axisUX) +
+    halfH * b.scale * Math.abs(b.axisVX);
+  const by =
+    halfW * b.scale * Math.abs(b.axisUY) +
+    halfH * b.scale * Math.abs(b.axisVY);
+  return (
+    Math.abs(b.x - a.x) < ax + bx + margin &&
+    Math.abs(b.y - a.y) < ay + by + margin
+  );
+}
+
+/**
+ * Depth a pair's two carrier PLANES need between them. Exact and continuous:
+ * |dz| covering the sum of both sheets' true z-extents makes the depth axis
+ * a separating axis — airtight by SAT sufficiency, whatever the orientation.
+ */
+export function pairTilt(
+  field: DriftField,
+  a: DriftLeafState,
+  b: DriftLeafState,
+) {
+  if (!pairOverlaps(field, a, b)) return 0;
+  const extA =
+    (field.pw / 2) * a.scale * Math.abs(a.axisUZ) +
+    (field.ph / 2) * a.scale * Math.abs(a.axisVZ);
+  const extB =
+    (field.pw / 2) * b.scale * Math.abs(b.axisUZ) +
+    (field.ph / 2) * b.scale * Math.abs(b.axisVZ);
+  return a.release * b.release * (extA + extB);
+}
+
+/**
+ * Real collision between the DRAWN sheets, rather than a worst-case
+ * allowance for how far they might bend. Walk the lower sheet's cells, find
+ * where each sits on the upper sheet, and ask how far the two surfaces
+ * actually close on each other there. Pages rippling the same way locally
+ * need almost nothing; the gap grows only where they would genuinely meet —
+ * which is what lets a page bend freely without paying for it in clearance
+ * everywhere else.
+ */
+export function pairFlex(
+  field: DriftField,
+  lower: DriftLeafState,
+  upper: DriftLeafState,
+) {
+  if (!pairOverlaps(field, lower, upper)) return 0;
+  const gate = lower.release * upper.release;
+  if (gate <= 0) return 0;
+
+  const N = DRIFT_DEV_GRID;
+  const halfWL = (field.pw / 2) * lower.scale;
+  const halfHL = (field.ph / 2) * lower.scale;
+  const halfWU = (field.pw / 2) * upper.scale;
+  const halfHU = (field.ph / 2) * upper.scale;
+  // Half-diagonal of a lower cell, expressed in the upper's normalized uv.
+  // The diagonal is used because the cell arrives rotated by the pair's
+  // relative orientation, and over-reaching is the safe direction here.
+  const cellHalf = Math.hypot(halfWL / N, halfHL / N);
+  const cellHalfU = cellHalf / halfWU;
+  const cellHalfV = cellHalf / halfHU;
+  let closure = 0;
+
+  for (let j = 0; j < N; j += 1) {
+    const tv = ((j + 0.5) / N) * 2 - 1;
+    for (let i = 0; i < N; i += 1) {
+      const tu = ((i + 0.5) / N) * 2 - 1;
+      const du = tu * halfWL;
+      const dv = tv * halfHL;
+      // Where this cell of the lower sheet sits in the viewing plane...
+      const wx = lower.x + lower.axisUX * du + lower.axisVX * dv;
+      const wy = lower.y + lower.axisUY * du + lower.axisVY * dv;
+      // ...and where that lands on the upper sheet.
+      const rx = wx - upper.x;
+      const ry = wy - upper.y;
+      const su = (rx * upper.axisUX + ry * upper.axisUY) / halfWU;
+      const sv = (rx * upper.axisVX + ry * upper.axisVY) / halfHU;
+      // The sample stands for a whole CELL, not a point: its devMax is the
+      // crest of a quarter-page. Testing only the centre for containment
+      // would blind the scan to the outer half-cell of every page — the
+      // band where two sheets most often overlap edge-on — and report no
+      // closure at all there. Test the cell's reach, then clamp the lookup
+      // back into the neighbour.
+      if (su + cellHalfU < -1 || su - cellHalfU > 1) continue;
+      if (sv + cellHalfV < -1 || sv - cellHalfV > 1) continue;
+      const clampedU = clamp(su, -1, 1);
+      const clampedV = clamp(sv, -1, 1);
+
+      // Conservative: take the deepest dip of every cell the sample could
+      // fall in, so sampling can never under-report an approach.
+      const ci = clamp(Math.floor(((clampedU + 1) / 2) * N), 0, N - 1);
+      const cj = clamp(Math.floor(((clampedV + 1) / 2) * N), 0, N - 1);
+      let dipUpper = Infinity;
+      for (let nj = Math.max(0, cj - 1); nj <= Math.min(N - 1, cj + 1); nj += 1) {
+        for (let ni = Math.max(0, ci - 1); ni <= Math.min(N - 1, ci + 1); ni += 1) {
+          const value = upper.devMin[nj * N + ni]!;
+          if (value < dipUpper) dipUpper = value;
+        }
+      }
+      if (dipUpper === Infinity) continue;
+      const here = lower.devMax[j * N + i]! - dipUpper;
+      if (here > closure) closure = here;
+    }
+  }
+
+  return gate * (closure + PAIR_FLEX_SLACK);
+}
+
+/** Total depth a pair needs: their planes, plus their sheets' real shapes. */
+/** Floor on how much a crowded page may still bend. */
+const DRIFT_FLEX_FLOOR = 0.3;
+
+/** How freely this page may bend right now, 0..1. A page with open air around
+    it flexes fully; one pressed into the pile stiffens. The pile's depth
+    simply cannot hold every page bulging at full amplitude at once, and the
+    two ways out of that are a page that flexes less or a page that passes
+    through its neighbour — the second reads far worse than the first. */
+export function driftLeafFlex(leaf: DriftLeafState) {
+  return (
+    DRIFT_FLEX_FLOOR + (1 - DRIFT_FLEX_FLOOR) * (leaf.crowdCap / SWING_CAP)
+  );
+}
+
+export function driftPairClearance(
+  field: DriftField,
+  lower: DriftLeafState,
+  upper: DriftLeafState,
+) {
+  return pairTilt(field, lower, upper) + pairFlex(field, lower, upper);
+}
+
 /** Hard tilt ceiling: rotate the leaf back toward its nearest camera-facing
     pole just enough to stay inside the cap. Applied about the world axis
     n × pole, which never disturbs in-plane roll. */
@@ -1065,8 +1250,6 @@ function clampSwing(leaf: DriftLeafState, cap: number) {
     constant block above for the contract. Gauss-Seidel over all pairs — a
     few sweeps settle an eleven-leaf chain. */
 function projectDepthClearance(field: DriftField, dt: number) {
-  const reachX = field.pw * PAIR_HARD_X_RATIO;
-  const reachY = field.ph * PAIR_HARD_Y_RATIO;
   const zFloor = field.ph * HARD_Z_FLOOR_RATIO;
   const zCeil = field.ph * CONTAIN_Z_MAX_RATIO + HARD_Z_HEADROOM;
   const refreshAxes = (leaf: DriftLeafState) => {
@@ -1115,69 +1298,21 @@ function projectDepthClearance(field: DriftField, dt: number) {
   // does not shrink just because the pile is crowded — scaling it away is
   // exactly how pages whose carriers were properly spaced still crossed on
   // screen. So the flex margin is a floor the scaler may never touch.
-  const tiltFor = (a: DriftLeafState, b: DriftLeafState) => {
-    const ox = (b.x - a.x) / reachX;
-    const oy = (b.y - a.y) / reachY;
-    if (ox * ox + oy * oy >= 1) return 0;
-    // Exact and continuous: |dz| covering the sum of both sheets' true
-    // z-extents makes the depth axis a separating axis — airtight by SAT
-    // sufficiency, whatever the pair's orientation.
-    const extA =
-      (field.pw / 2) * a.scale * Math.abs(a.axisUZ) +
-      (field.ph / 2) * a.scale * Math.abs(a.axisVZ);
-    const extB =
-      (field.pw / 2) * b.scale * Math.abs(b.axisUZ) +
-      (field.ph / 2) * b.scale * Math.abs(b.axisVZ);
-    return a.release * b.release * (extA + extB);
-  };
-  const flexFor = (a: DriftLeafState, b: DriftLeafState) => {
-    const ox = (b.x - a.x) / reachX;
-    const oy = (b.y - a.y) / reachY;
-    if (ox * ox + oy * oy >= 1) return 0;
-    return a.release * b.release * PAIR_HARD_MARGIN;
-  };
+  const tiltFor = (a: DriftLeafState, b: DriftLeafState) =>
+    pairTilt(field, a, b);
+  const flexFor = (lower: DriftLeafState, upper: DriftLeafState) =>
+    pairFlex(field, lower, upper);
 
-  // A gust can herd every leaf into one column whose stacking chain wants
-  // more depth than the range holds. The tilt half scales down to fit; the
-  // flex floor is subtracted from the room first, never scaled.
-  const chainRoom = (zCeil - zFloor) * PAIR_CHAIN_FILL;
-  const measureChain = () => {
-    let tilt = 0;
-    let flex = 0;
-    for (let position = 1; position < order.length; position += 1) {
-      const a = field.leaves[order[position - 1]!]!;
-      const b = field.leaves[order[position]!]!;
-      tilt += tiltFor(a, b);
-      flex += flexFor(a, b);
-    }
-    return { tilt, flex };
-  };
-  let chain = measureChain();
-  const tiltScaleFor = (measured: { tilt: number; flex: number }) => {
-    if (measured.tilt <= 0) return 1;
-    const spare = chainRoom - measured.flex;
-    if (spare <= 0) return 0;
-    return Math.min(1, spare / measured.tilt);
-  };
-  let tiltScale = tiltScaleFor(chain);
-
-  // If the tilts themselves are what cannot fit, the crowd pressure
-  // physically flattens the pages until the chain fits again — wind-pressed
-  // paper in a squeezed stack lies nearly flat. The cap walks down
-  // geometrically until demand actually fits (flat pages always do), so a
-  // feasible layout exists every frame; free play (an unsaturated chain)
-  // never enters this loop and keeps the full cap.
-  let crowdCap = SWING_CAP;
-  for (let pass = 0; pass < 6 && tiltScale < 1; pass += 1) {
-    crowdCap = Math.max(0.04, crowdCap * 0.55);
-    for (const leaf of field.leaves) {
-      if (leaf.index === field.grabIndex) continue;
-      clampSwing(leaf, crowdCap);
-      refreshAxes(leaf);
-    }
-    chain = measureChain();
-    tiltScale = tiltScaleFor(chain);
+  // Press the pile as flat as it currently needs to be. The cap is carried
+  // between frames and driven by the violations the previous frame actually
+  // left behind, so it tightens under a gust and eases off as the pages
+  // spread out again — no feasibility estimate to be wrong about.
+  for (const leaf of field.leaves) {
+    if (leaf.index === field.grabIndex) continue;
+    clampSwing(leaf, leaf.crowdCap);
+    refreshAxes(leaf);
   }
+  const tiltScale = 1;
 
   const requiredFor = (a: DriftLeafState, b: DriftLeafState) =>
     tiltFor(a, b) * tiltScale + flexFor(a, b);
@@ -1217,50 +1352,95 @@ function projectDepthClearance(field: DriftField, dt: number) {
     return ceilZ;
   };
 
-  // Two budgeted, two-sided stack passes instead of pairwise sweeps:
-  // extent-based requirements obey the triangle inequality, so satisfying
-  // every leaf against its neighbours in rank order covers all pairs, and
-  // each move stays inside the leaf's own feasible interval so the passes
-  // can never fling a leaf through the constraint it was escaping.
-  for (let position = 1; position < order.length; position += 1) {
-    const leaf = field.leaves[order[position]!]!;
-    if (leaf.release <= 0) continue;
-    const { floorZ, binding } = floorFor(position);
-    if (binding === null || leaf.z >= floorZ) continue;
-    const ceilZ = Math.max(ceilFor(position), leaf.z);
-    const target = Math.min(floorZ, ceilZ);
-    const deficit = floorZ - leaf.z;
-    leaf.z = Math.min(leaf.z + Math.min(deficit, budget), target);
-    // Contact: closing depth speed dies with the squeeze.
-    if (leaf.vz < 0) leaf.vz *= 0.2;
-    if (binding.vz > 0) binding.vz *= 0.2;
-    // Squeezed pages escape sideways too, draining the very overlap that
-    // created the demand. Velocity, not position: containment and the
-    // speed cap stay in charge of the outcome.
-    const lateralX = leaf.x - binding.x;
-    const lateralY = leaf.y - binding.y;
-    const lateralLength = Math.hypot(lateralX, lateralY);
-    if (lateralLength > 1e-3) {
-      const slide = Math.min(deficit * PAIR_LATERAL_RELIEF, 1400) * dt * 0.5;
-      leaf.vx += (lateralX / lateralLength) * slide;
-      leaf.vy += (lateralY / lateralLength) * slide;
-      binding.vx -= (lateralX / lateralLength) * slide;
-      binding.vy -= (lateralY / lateralLength) * slide;
+  // The stack passes are a relaxation, so a single sweep leaves fast motion
+  // half-resolved; repeating them costs a few dozen comparisons and lets the
+  // pile actually settle within the frame.
+  for (let relax = 0; relax < STACK_RELAXATIONS; relax += 1) {
+    // Two budgeted, two-sided stack passes instead of pairwise sweeps:
+    // extent-based requirements obey the triangle inequality, so satisfying
+    // every leaf against its neighbours in rank order covers all pairs, and
+    // each move stays inside the leaf's own feasible interval so the passes
+    // can never fling a leaf through the constraint it was escaping.
+    for (let position = 1; position < order.length; position += 1) {
+      const leaf = field.leaves[order[position]!]!;
+      if (leaf.release <= 0) continue;
+      const { floorZ, binding } = floorFor(position);
+      if (binding === null || leaf.z >= floorZ) continue;
+      const ceilZ = Math.max(ceilFor(position), leaf.z);
+      const target = Math.min(floorZ, ceilZ);
+      const deficit = floorZ - leaf.z;
+      leaf.z = Math.min(leaf.z + Math.min(deficit, budget), target);
+      // Contact: closing depth speed dies with the squeeze. Only on the
+      // first sweep — the relaxation repeats the POSITION solve, and a
+      // pinched leaf that cannot move would otherwise be damped again and
+      // again for the same single contact.
+      if (relax === 0) {
+        if (leaf.vz < 0) leaf.vz *= 0.2;
+        if (binding.vz > 0) binding.vz *= 0.2;
+      }
+      // Squeezed pages escape sideways too, draining the very overlap that
+      // created the demand. Velocity, not position: containment and the
+      // speed cap stay in charge of the outcome.
+      const lateralX = leaf.x - binding.x;
+      const lateralY = leaf.y - binding.y;
+      const lateralLength = Math.hypot(lateralX, lateralY);
+      if (relax === 0 && lateralLength > 1e-3) {
+        const slide = Math.min(deficit * PAIR_LATERAL_RELIEF, 1400) * dt * 0.5;
+        leaf.vx += (lateralX / lateralLength) * slide;
+        leaf.vy += (lateralY / lateralLength) * slide;
+        binding.vx -= (lateralX / lateralLength) * slide;
+        binding.vy -= (lateralY / lateralLength) * slide;
+      }
+    }
+    for (let position = order.length - 1; position >= 0; position -= 1) {
+      const leaf = field.leaves[order[position]!]!;
+      if (leaf.release <= 0) continue;
+      const ceilZ = ceilFor(position);
+      if (leaf.z > ceilZ) {
+        const { floorZ } = floorFor(position);
+        const target = Math.max(ceilZ, Math.min(floorZ, leaf.z));
+        leaf.z = Math.max(leaf.z - budget, target);
+        if (leaf.vz > 0) leaf.vz *= 0.2;
+      }
+      if (leaf.z < zFloor) {
+        leaf.z = zFloor;
+        if (leaf.vz < 0) leaf.vz = 0;
+      }
     }
   }
-  for (let position = order.length - 1; position >= 0; position -= 1) {
-    const leaf = field.leaves[order[position]!]!;
-    if (leaf.release <= 0) continue;
-    const ceilZ = ceilFor(position);
-    if (leaf.z > ceilZ) {
-      const { floorZ } = floorFor(position);
-      const target = Math.max(ceilZ, Math.min(floorZ, leaf.z));
-      leaf.z = Math.max(leaf.z - budget, target);
-      if (leaf.vz > 0) leaf.vz *= 0.2;
+
+  // What did the passes actually fail to satisfy? That residual — over every
+  // overlapping pair, not just the consecutive depth chain — is the signal
+  // each page's crowd cap is steered by. Charging it to the two pages in the
+  // pair keeps the flattening local: a jam in one corner of the pile does not
+  // press the pages drifting freely on the other side.
+  for (const leaf of field.leaves) leaf.crowdResidual = 0;
+  for (let i = 0; i < field.leaves.length; i += 1) {
+    const a = field.leaves[i]!;
+    if (a.release <= 0) continue;
+    for (let j = i + 1; j < field.leaves.length; j += 1) {
+      const b = field.leaves[j]!;
+      if (b.release <= 0) continue;
+      const lower = a.z <= b.z ? a : b;
+      const upper = a.z <= b.z ? b : a;
+      const need = requiredFor(lower, upper);
+      if (need <= 0) continue;
+      const shortfall = need - (upper.z - lower.z);
+      if (shortfall > a.crowdResidual) a.crowdResidual = shortfall;
+      if (shortfall > b.crowdResidual) b.crowdResidual = shortfall;
     }
-    if (leaf.z < zFloor) {
-      leaf.z = zFloor;
-      if (leaf.vz < 0) leaf.vz = 0;
+  }
+  for (const leaf of field.leaves) {
+    leaf.crowdCap =
+      leaf.crowdResidual > CROWD_TOLERANCE
+        ? Math.max(CROWD_MIN_CAP, leaf.crowdCap * CROWD_TIGHTEN)
+        : Math.min(SWING_CAP, leaf.crowdCap * CROWD_RELEASE);
+    // Spend the tightened cap now rather than next frame. Waiting a frame
+    // would leave the overlap that provoked it on screen for that frame,
+    // which is exactly the crossing this is meant to prevent.
+    if (leaf.index !== field.grabIndex && leaf.crowdResidual > CROWD_TOLERANCE) {
+      clampSwing(leaf, leaf.crowdCap);
+      refreshAxes(leaf);
     }
   }
 
@@ -1276,9 +1456,11 @@ function projectDepthClearance(field: DriftField, dt: number) {
       for (let j = i + 1; j < field.leaves.length; j += 1) {
         const b = field.leaves[j]!;
         if (b.release <= 0) continue;
-        const need = flexFor(a, b);
-        if (need <= 0) continue;
         const direction = rank[b.index]! > rank[a.index]! ? 1 : -1;
+        // flexFor reads the LOWER sheet's crests against the UPPER sheet's
+        // dips, so the pair has to be handed over in depth order.
+        const need = direction === 1 ? flexFor(a, b) : flexFor(b, a);
+        if (need <= 0) continue;
         const gap = (b.z - a.z) * direction;
         if (gap >= need) continue;
         settled = false;
@@ -1309,6 +1491,51 @@ export function driftLeafPoint(
   out.x += leaf.x;
   out.y += leaf.y;
   out.z += leaf.z;
+}
+
+/**
+ * Records how far a solved sheet rises above and dips below its carrier
+ * plane, per cell of the page. The clearance between leaves is computed from
+ * these numbers, so what the eye sees is what collides: two pages rippling
+ * the same way locally need almost no gap, while the gap opens exactly where
+ * their surfaces would meet. Grid order matches the guide: rows top to
+ * bottom, column 0 the spine.
+ */
+export function recordDriftDeviation(
+  leaf: DriftLeafState,
+  vertices: readonly DriftVec[],
+  guide: readonly DriftVec[],
+  segments: number,
+  rows: number,
+) {
+  const { devMax, devMin } = leaf;
+  devMax.fill(-Infinity);
+  devMin.fill(Infinity);
+  const columns = segments + 1;
+  for (let index = 0; index < vertices.length; index += 1) {
+    const column = index % columns;
+    const row = (index - column) / columns;
+    const u = -1 + (2 * column) / segments;
+    const v = 1 - (2 * row) / rows;
+    const cellI = clamp(
+      Math.floor(((u + 1) / 2) * DRIFT_DEV_GRID),
+      0,
+      DRIFT_DEV_GRID - 1,
+    );
+    const cellJ = clamp(
+      Math.floor(((v + 1) / 2) * DRIFT_DEV_GRID),
+      0,
+      DRIFT_DEV_GRID - 1,
+    );
+    const cell = cellJ * DRIFT_DEV_GRID + cellI;
+    const deviation = vertices[index]!.z - guide[index]!.z;
+    if (deviation > devMax[cell]!) devMax[cell] = deviation;
+    if (deviation < devMin[cell]!) devMin[cell] = deviation;
+  }
+  for (let cell = 0; cell < devMax.length; cell += 1) {
+    if (devMax[cell] === -Infinity) devMax[cell] = 0;
+    if (devMin[cell] === Infinity) devMin[cell] = 0;
+  }
 }
 
 /**
