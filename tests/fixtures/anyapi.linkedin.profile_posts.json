@@ -1,0 +1,459 @@
+{
+  "provider": "AnyAPI",
+  "costUsd": 0.01951,
+  "items": 6,
+  "output": {
+    "found": true,
+    "data": {
+      "items": [
+        {
+          "author": {
+            "handle": "alan-tai-nu",
+            "headline": "GTM @ WingRep | Full-stack, Machine Learning & Agentic AI | 5x Hackathon Winner, Published ML Researcher | #1 Debater and Journalist | Industrial Engineering @ Northwestern",
+            "id": "ACoAAA_SCRUBBED_MEMBER_URN",
+            "image": "https://media.licdn.com/dms/image/v2/D5603AQE9P-9a5zcnmA/profile-displayphoto-crop_800_800/B56Z.I0VsDIgAI-/0/1784706853486?e=1788393600&v=beta&t=74Wp0_HUaLlnLz8i6vjj1KgrLvuGESSN-zBHuCM0Jvk",
+            "imageHeight": 800,
+            "imageWidth": 800,
+            "name": "Alan Tai",
+            "profileUrl": "https://www.linkedin.com/in/alan-tai-nu",
+            "type": "profile"
+          },
+          "contentAnnotations": [
+            {
+              "companyId": "18454930",
+              "companyName": "Los Altos Hacks",
+              "companyUrl": "https://www.linkedin.com/company/losaltoshacks/",
+              "length": 15,
+              "start": 601,
+              "type": "COMPANY_NAME"
+            }
+          ],
+          "createdUtc": 1781138598,
+          "engagement": {
+            "breakdown": [
+              {
+                "count": 32,
+                "type": "LIKE"
+              },
+              {
+                "count": 4,
+                "type": "EMPATHY"
+              },
+              {
+                "count": 1,
+                "type": "INTEREST"
+              }
+            ],
+            "comments": 2,
+            "reactions": 37,
+            "reposts": 0
+          },
+          "id": "7470636748868603905",
+          "images": [
+            {
+              "height": 1696,
+              "url": "https://media.licdn.com/dms/image/v2/D5622AQERd0mVRUclFQ/feedshare-shrink_1280/B56Z60IiWCGkAM-/0/1781138597616?e=1788393600&v=beta&t=usqTt6fIaYUj52RbdSlYQjrKyZRCofjJP4mWc38wojo",
+              "width": 954
+            }
+          ],
+          "publicationUrl": "https://www.linkedin.com/feed/update/urn:li:share:7470636747790426112",
+          "repostImages": [],
+          "socialContent": {
+            "hideCommentAction": false,
+            "hideCommentsCount": false,
+            "hideReactAction": false,
+            "hideReactionsCount": false,
+            "hideRepostsCount": false,
+            "hideSendAction": false,
+            "hideShareAction": false,
+            "hideSocialActivityCounts": false,
+            "hideViewsCount": false,
+            "shareUrl": "https://www.linkedin.com/posts/alan-tai-nu_ive-won-5-hackathons-and-never-taken-a-sales-activity-7470636748868603905-mFPK",
+            "showContributionExperience": false,
+            "showSocialDetail": true
+          },
+          "text": "I've won 5 hackathons and never taken a sales class.\n\nTurns out they're the same skill.\n\nA hackathon is 24 hours to make a stranger care about something that didn't exist yesterday. So is a cold email.\n\nBoth reward the exact same move: cut everything that isn't the point, lead with what they'd actually care about, and earn the next ten seconds before you try to earn the next ten minutes.\n\nThe demo that wins isn't the one with the most features. The email that gets a reply isn't the one with the most words.\n\nSelling is just demoing to one person.\n\nP.S. throwback to one of my first hackathons -- Los Altos Hacks",
+          "type": "post",
+          "url": "https://www.linkedin.com/posts/alan-tai-nu_ive-won-5-hackathons-and-never-taken-a-sales-activity-7470636748868603905-mFPK"
+        },
+        {
+          "author": {
+            "handle": "alan-tai-nu",
+            "headline": "GTM @ WingRep | Full-stack, Machine Learning & Agentic AI | 5x Hackathon Winner, Published ML Researcher | #1 Debater and Journalist | Industrial Engineering @ Northwestern",
+            "id": "ACoAAA_SCRUBBED_MEMBER_URN",
+            "image": "https://media.licdn.com/dms/image/v2/D5603AQE9P-9a5zcnmA/profile-displayphoto-crop_800_800/B56Z.I0VsDIgAI-/0/1784706853486?e=1788393600&v=beta&t=74Wp0_HUaLlnLz8i6vjj1KgrLvuGESSN-zBHuCM0Jvk",
+            "imageHeight": 800,
+            "imageWidth": 800,
+            "name": "Alan Tai",
+            "profileUrl": "https://www.linkedin.com/in/alan-tai-nu",
+            "type": "profile"
+          },
+          "contentAnnotations": [
+            {
+              "companyId": "66586693",
+              "companyName": "HackMIT",
+              "companyUrl": "https://www.linkedin.com/company/hackmit/",
+              "length": 7,
+              "start": 33,
+              "type": "COMPANY_NAME"
+            },
+            {
+              "companyId": "3021482",
+              "companyName": "MHacks",
+              "companyUrl": "https://www.linkedin.com/company/mhacks/",
+              "length": 6,
+              "start": 45,
+              "type": "COMPANY_NAME"
+            }
+          ],
+          "createdUtc": 1786849087,
+          "engagement": {
+            "breakdown": [
+              {
+                "count": 48,
+                "type": "LIKE"
+              },
+              {
+                "count": 5,
+                "type": "PRAISE"
+              },
+              {
+                "count": 2,
+                "type": "EMPATHY"
+              }
+            ],
+            "comments": 16,
+            "reactions": 55,
+            "reposts": 0
+          },
+          "id": "7494588276977074176",
+          "images": [
+            {
+              "height": 1316,
+              "url": "https://media.licdn.com/dms/image/v2/D5622AQFuPE_Yg5I5Fw/feedshare-shrink_1280/B56aAIgUpjHIAM-/0/1786849086384?e=1788393600&v=beta&t=N9bnDSrJGgvL3jZ43X1E3j9CkwSqs2NevqLZ-6HIEEs",
+              "width": 1250
+            },
+            {
+              "height": 1080,
+              "url": "https://media.licdn.com/dms/image/v2/D5622AQFVc43vE3Ixow/feedshare-shrink_1280/B56aAIgU1JIcAM-/0/1786849087091?e=1788393600&v=beta&t=JBrbRbzhsVRsbrVkerCyU7UD9Drpsz3aFCVc2xOZw6I",
+              "width": 1080
+            }
+          ],
+          "publicationUrl": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7494588276121559050",
+          "repostImages": [],
+          "socialContent": {
+            "hideCommentAction": false,
+            "hideCommentsCount": false,
+            "hideReactAction": false,
+            "hideReactionsCount": false,
+            "hideRepostsCount": false,
+            "hideSendAction": false,
+            "hideShareAction": false,
+            "hideSocialActivityCounts": false,
+            "hideViewsCount": false,
+            "shareUrl": "https://www.linkedin.com/posts/alan-tai-nu_nosleep-activity-7494588276977074176-h7_c",
+            "showContributionExperience": false,
+            "showSocialDetail": true
+          },
+          "text": "Excited to share that I'll be at HackMIT and MHacks this fall!\n\nIf you're going to either hackathon, let me know. I'm looking forward to building in two cities that I've never built in before: Boston and Ann Arbor. Very grateful for the opportunity to make big things 😄.\n\n#nosleep",
+          "type": "post",
+          "url": "https://www.linkedin.com/posts/alan-tai-nu_nosleep-activity-7494588276977074176-h7_c"
+        },
+        {
+          "author": {
+            "handle": "alan-tai-nu",
+            "headline": "GTM @ WingRep | Full-stack, Machine Learning & Agentic AI | 5x Hackathon Winner, Published ML Researcher | #1 Debater and Journalist | Industrial Engineering @ Northwestern",
+            "id": "ACoAAA_SCRUBBED_MEMBER_URN",
+            "image": "https://media.licdn.com/dms/image/v2/D5603AQE9P-9a5zcnmA/profile-displayphoto-crop_800_800/B56Z.I0VsDIgAI-/0/1784706853486?e=1788393600&v=beta&t=74Wp0_HUaLlnLz8i6vjj1KgrLvuGESSN-zBHuCM0Jvk",
+            "imageHeight": 800,
+            "imageWidth": 800,
+            "name": "Alan Tai",
+            "profileUrl": "https://www.linkedin.com/in/alan-tai-nu",
+            "type": "profile"
+          },
+          "contentAnnotations": [
+            {
+              "companyId": "1441",
+              "companyName": "Google",
+              "companyUrl": "https://www.linkedin.com/company/google/",
+              "length": 6,
+              "start": 8,
+              "type": "COMPANY_NAME"
+            },
+            {
+              "length": 11,
+              "profileFirstName": "Dave",
+              "profileHandle": "drensin",
+              "profileId": "ACoAAAAALmQBD7w3xWCpz_8zwvztFp5O2gRnmiI",
+              "profileLastName": "Rensin",
+              "profileUrl": "https://www.linkedin.com/in/drensin",
+              "start": 79,
+              "type": "PROFILE_MENTION"
+            },
+            {
+              "length": 18,
+              "profileFirstName": "Shayla",
+              "profileHandle": "shaylamclin",
+              "profileId": "ACoAAALDqL0B4aBof-SRKgGm2BxdyIBTJdZxCk0",
+              "profileLastName": "McLin Green",
+              "profileUrl": "https://www.linkedin.com/in/shaylamclin",
+              "start": 904,
+              "type": "PROFILE_MENTION"
+            }
+          ],
+          "createdUtc": 1786769318,
+          "engagement": {
+            "breakdown": [
+              {
+                "count": 21,
+                "type": "LIKE"
+              },
+              {
+                "count": 2,
+                "type": "PRAISE"
+              }
+            ],
+            "comments": 1,
+            "reactions": 23,
+            "reposts": 0
+          },
+          "id": "7494253699486072833",
+          "images": [
+            {
+              "height": 1700,
+              "url": "https://media.licdn.com/dms/image/v2/D5622AQGI-jGHY1OVuA/feedshare-shrink_1280/B56aADwA_hHcAM-/0/1786769314349?e=1788393600&v=beta&t=_nL-uUVu1OTMqU2OQ-j_8mjs_rCOAgYGuitXP0KQxTE",
+              "width": 1280
+            },
+            {
+              "height": 1536,
+              "url": "https://media.licdn.com/dms/image/v2/D5622AQHsgwp2lKHt4A/feedshare-image-high-res/B56aADwBazKYAU-/0/1786769316048?e=1788393600&v=beta&t=ZDAA6BHuYv5tXRwkYgTJrg_E0y4C7-L4yWtmlHJ6nlk",
+              "width": 2040
+            },
+            {
+              "height": 1536,
+              "url": "https://media.licdn.com/dms/image/v2/D5622AQGuast86PftFQ/feedshare-image-high-res/B56aADwBglHcAY-/0/1786769316537?e=1788393600&v=beta&t=RLgLjPS2cRUDjeHnl6D_YuUJNe8AxlP0DQwAuuFv7Zc",
+              "width": 2040
+            }
+          ],
+          "publicationUrl": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7494253696248107008",
+          "repostImages": [],
+          "socialContent": {
+            "hideCommentAction": false,
+            "hideCommentsCount": false,
+            "hideReactAction": false,
+            "hideReactionsCount": false,
+            "hideRepostsCount": false,
+            "hideSendAction": false,
+            "hideShareAction": false,
+            "hideSocialActivityCounts": false,
+            "hideViewsCount": false,
+            "shareUrl": "https://www.linkedin.com/posts/alan-tai-nu_g2gbayarea2026-activity-7494253699486072833-PW5k",
+            "showContributionExperience": false,
+            "showSocialDetail": true
+          },
+          "text": "Went to Google's Genesis2Genesis conference today! Awesome speakers (including Dave Rensin for the keynote) and talking to people between sessions.\n\nA few things I took away:\n- Agents are changing how a lot of work gets done, including in roles that aren't engineering. All sorts of financial work can be automated if done right.\n- At a company like Google that rollout is well underway. My own read is that small and mid-sized businesses still have a lot of ground to cover before they're at the same level. This is probably one of the biggest opportunities of the next decade.\n- Nobody's career path was linear. A few of the speakers ended up where they are through opportunities they didn't plan for.\n\nIt's a huge team, but the culture came across as genuinely collaborative. I'm glad to have met a lot of interesting people and got a much better sense of where AI and finance are heading.\n\nThanks to Shayla McLin Green as well as all the Googlers who helped make this event possible!\n\n#G2GBAYAREA2026",
+          "type": "post",
+          "url": "https://www.linkedin.com/posts/alan-tai-nu_g2gbayarea2026-activity-7494253699486072833-PW5k"
+        },
+        {
+          "author": {
+            "handle": "alan-tai-nu",
+            "headline": "GTM @ WingRep | Full-stack, Machine Learning & Agentic AI | 5x Hackathon Winner, Published ML Researcher | #1 Debater and Journalist | Industrial Engineering @ Northwestern",
+            "id": "ACoAAA_SCRUBBED_MEMBER_URN",
+            "image": "https://media.licdn.com/dms/image/v2/D5603AQE9P-9a5zcnmA/profile-displayphoto-crop_800_800/B56Z.I0VsDIgAI-/0/1784706853486?e=1788393600&v=beta&t=74Wp0_HUaLlnLz8i6vjj1KgrLvuGESSN-zBHuCM0Jvk",
+            "imageHeight": 800,
+            "imageWidth": 800,
+            "name": "Alan Tai",
+            "profileUrl": "https://www.linkedin.com/in/alan-tai-nu",
+            "type": "profile"
+          },
+          "contentAnnotations": [
+            {
+              "length": 10,
+              "profileFirstName": "Jai",
+              "profileHandle": "jaieaston",
+              "profileId": "ACoAAD-t6bEBgbDmWx1i1oIKo0JFtP2pAZtkPOY",
+              "profileLastName": "Easton",
+              "profileUrl": "https://www.linkedin.com/in/jaieaston",
+              "start": 392,
+              "type": "PROFILE_MENTION"
+            }
+          ],
+          "createdUtc": 1786469007,
+          "engagement": {
+            "breakdown": [
+              {
+                "count": 9,
+                "type": "LIKE"
+              },
+              {
+                "count": 1,
+                "type": "PRAISE"
+              }
+            ],
+            "comments": 1,
+            "reactions": 10,
+            "reposts": 4
+          },
+          "id": "7492994105518718977",
+          "images": [],
+          "publicationUrl": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7492994058353565696",
+          "repostImages": [],
+          "socialContent": {
+            "hideCommentAction": false,
+            "hideCommentsCount": false,
+            "hideReactAction": false,
+            "hideReactionsCount": false,
+            "hideRepostsCount": false,
+            "hideSendAction": false,
+            "hideShareAction": false,
+            "hideSocialActivityCounts": false,
+            "hideViewsCount": false,
+            "shareUrl": "https://www.linkedin.com/posts/alan-tai-nu_live-claude-workshop-sales-teams-activity-7492994105518718977-yDGl",
+            "showContributionExperience": false,
+            "showSocialDetail": true
+          },
+          "text": "🚨 LIVE CLAUDE WORKSHOP 🚨\n\nSales teams, pay attention.\n\nMost teams already have the stack: CRM, call recorder, notetaker, prospecting tool, forecasting platform.\n\nWhat they don’t have is time back.\n\nEvery one of those tools captures information.\n\nNone of them do the work — the follow‑up still gets typed by hand, the prep still happens the night before, the CRM still gets updated manually.\n\nJai Easton and I are building a Claude‑powered deal assistant, start to finish, in one hour:\n✅ remembers every call automatically — nobody’s guessing what they told which prospect\n✅ briefs reps before the call: context, risks, the exact questions to ask\n✅ writes the follow‑up and updates the CRM after — no manual entry\n✅ zero new dashboards for reps to check\n\nWe build the whole thing in Claude Desktop while you watch, and you leave with the prompts, the file structure, and the full recording.\n\nStay to the end and grab one of a limited number of free 30‑minute working sessions. We’ll help you set it up for your own team.\n\n📅 Friday, August 14 · 12–1pm PT / 3–4pm ET  \n🔗 Register free: https://luma.com/hwrbxq4w",
+          "type": "post",
+          "url": "https://www.linkedin.com/posts/alan-tai-nu_live-claude-workshop-sales-teams-activity-7492994105518718977-yDGl",
+          "videoThumbnail": "https://media.licdn.com/dms/image/v2/D5605AQFKvGbEgVQjnQ/videocover-low/B56Z_x2ZkaG4BI-/0/1786468999038?e=1787695200&v=beta&t=wmIG670BbggaxsCMcNTFDiU6xXPNPlOens1ovo_yDms",
+          "videoUrl": "https://dms.licdn.com/playlist/vid/v2/D5605AQFKvGbEgVQjnQ/mp4-720p-30fp-crf28/B56Z_x2ZkaG4B8-/0/1786469001554?e=1787695200&v=beta&t=mihkVfNclPeub1dJJQxSzuVpLRrfa6SuHJ9n7s8dGaQ"
+        },
+        {
+          "author": {
+            "handle": "alan-tai-nu",
+            "headline": "GTM @ WingRep | Full-stack, Machine Learning & Agentic AI | 5x Hackathon Winner, Published ML Researcher | #1 Debater and Journalist | Industrial Engineering @ Northwestern",
+            "id": "ACoAAA_SCRUBBED_MEMBER_URN",
+            "image": "https://media.licdn.com/dms/image/v2/D5603AQE9P-9a5zcnmA/profile-displayphoto-crop_800_800/B56Z.I0VsDIgAI-/0/1784706853486?e=1788393600&v=beta&t=74Wp0_HUaLlnLz8i6vjj1KgrLvuGESSN-zBHuCM0Jvk",
+            "imageHeight": 800,
+            "imageWidth": 800,
+            "name": "Alan Tai",
+            "profileUrl": "https://www.linkedin.com/in/alan-tai-nu",
+            "type": "profile"
+          },
+          "contentAnnotations": [],
+          "createdUtc": 1781825383,
+          "engagement": {
+            "breakdown": [
+              {
+                "count": 17,
+                "type": "LIKE"
+              },
+              {
+                "count": 1,
+                "type": "EMPATHY"
+              }
+            ],
+            "comments": 1,
+            "reactions": 18,
+            "reposts": 0
+          },
+          "id": "7473517334754713600",
+          "images": [],
+          "publicationUrl": "https://www.linkedin.com/feed/update/urn:li:share:7473517333483839488",
+          "repostImages": [],
+          "socialContent": {
+            "hideCommentAction": false,
+            "hideCommentsCount": false,
+            "hideReactAction": false,
+            "hideReactionsCount": false,
+            "hideRepostsCount": false,
+            "hideSendAction": false,
+            "hideShareAction": false,
+            "hideSocialActivityCounts": false,
+            "hideViewsCount": false,
+            "shareUrl": "https://www.linkedin.com/posts/alan-tai-nu_the-us-government-just-handed-anthropic-the-activity-7473517334754713600-miXC",
+            "showContributionExperience": false,
+            "showSocialDetail": true
+          },
+          "text": "The US government just handed Anthropic the best marketing it could ask for, by banning their product.\n\nLast Friday, Fable 5 and Mythos 5, Anthropic's most powerful models, went dark. Not a bug. A federal directive. As far as I can tell, it's the first time a deployed AI model has been pulled offline because the government decided it was too capable to leave running.\n\nThink about what that actually signals.\n\nEvery other lab spends millions trying to convince people their model is the most powerful one out there. Anthropic just got the US government to say it for them, for free.\n\nAnd the name writes the rest. The family is literally called Mythos. When access comes back, and it will, it doesn't return as just another model. It returns with a story: forbidden, then restored. People line up for that.\n\nScarcity didn't kill the demand here. It built the myth.",
+          "type": "post",
+          "url": "https://www.linkedin.com/posts/alan-tai-nu_the-us-government-just-handed-anthropic-the-activity-7473517334754713600-miXC"
+        },
+        {
+          "author": {
+            "handle": "alan-tai-nu",
+            "headline": "GTM @ WingRep | Full-stack, Machine Learning & Agentic AI | 5x Hackathon Winner, Published ML Researcher | #1 Debater and Journalist | Industrial Engineering @ Northwestern",
+            "id": "ACoAAA_SCRUBBED_MEMBER_URN",
+            "image": "https://media.licdn.com/dms/image/v2/D5603AQE9P-9a5zcnmA/profile-displayphoto-crop_800_800/B56Z.I0VsDIgAI-/0/1784706853486?e=1788393600&v=beta&t=74Wp0_HUaLlnLz8i6vjj1KgrLvuGESSN-zBHuCM0Jvk",
+            "imageHeight": 800,
+            "imageWidth": 800,
+            "name": "Alan Tai",
+            "profileUrl": "https://www.linkedin.com/in/alan-tai-nu",
+            "type": "profile"
+          },
+          "contentAnnotations": [
+            {
+              "companyId": "108175240",
+              "companyName": "Institute of Foundation Models",
+              "companyUrl": "https://www.linkedin.com/showcase/institute-of-foundation-models/",
+              "length": 30,
+              "start": 63,
+              "type": "COMPANY_NAME"
+            }
+          ],
+          "createdUtc": 1784332254,
+          "engagement": {
+            "breakdown": [
+              {
+                "count": 16,
+                "type": "LIKE"
+              },
+              {
+                "count": 2,
+                "type": "EMPATHY"
+              },
+              {
+                "count": 2,
+                "type": "PRAISE"
+              },
+              {
+                "count": 1,
+                "type": "APPRECIATION"
+              },
+              {
+                "count": 1,
+                "type": "INTEREST"
+              }
+            ],
+            "comments": 2,
+            "reactions": 22,
+            "reposts": 0
+          },
+          "id": "7484031912714600448",
+          "images": [],
+          "publicationUrl": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7484031912198557696",
+          "repostAuthorHeadline": "5,603 followers",
+          "repostAuthorId": "108175240",
+          "repostAuthorImage": "https://media.licdn.com/dms/image/v2/D4D0BAQHfxT_qX5cHcw/company-logo_400_400/B4DZ2MpRhcJoAY-/0/1776181123827/institute_of_foundation_models_logo?e=1788393600&v=beta&t=CGFv9q4KLViCf3oDgo-z23WkHeN_0LpMhImP4zszboc",
+          "repostAuthorName": "Institute of Foundation Models",
+          "repostAuthorType": "company",
+          "repostAuthorUniversalName": "institute-of-foundation-models",
+          "repostAuthorUrl": "https://www.linkedin.com/showcase/institute-of-foundation-models/posts",
+          "repostCreatedUtc": 1784326510,
+          "repostId": "7484007819382304769",
+          "repostImages": [],
+          "repostText": "GreenChain, the winning team in our K2 Think V2 demo series at HackPrinceton, tackles a simple but hard problem: sustainable procurement shouldn’t be guesswork. 🪴\n\nTheir project uses K2 Think V2 to compare real manufacturers and surface lower-carbon options, turning complex supply-chain changes into scenarios the model can reason over. \n\nWatch the demo below to see how they made sustainability a first-class constraint in procurement, not an afterthought.",
+          "repostUrl": "https://www.linkedin.com/posts/institute-of-foundation-models_greenchain-the-winning-team-in-our-k2-think-activity-7484007819382304769-RBSi",
+          "socialContent": {
+            "hideCommentAction": false,
+            "hideCommentsCount": false,
+            "hideReactAction": false,
+            "hideReactionsCount": false,
+            "hideRepostsCount": false,
+            "hideSendAction": false,
+            "hideShareAction": false,
+            "hideSocialActivityCounts": false,
+            "hideViewsCount": false,
+            "shareUrl": "https://www.linkedin.com/posts/alan-tai-nu_greenchain-the-winning-team-in-our-k2-think-activity-7484031912714600448-mhiN",
+            "showContributionExperience": false,
+            "showSocialDetail": true
+          },
+          "text": "Excited to share that our project, GreenChain, was featured by Institute of Foundation Models as part of its hackathon series!\n\nYou no longer need a closed frontier model to ship something real. An open reasoning model paired with the right agent setup was enough to turn a pile of shipping and emissions data into actionable recommendations in minutes, not months.",
+          "type": "post",
+          "url": "https://www.linkedin.com/posts/alan-tai-nu_greenchain-the-winning-team-in-our-k2-think-activity-7484031912714600448-mhiN"
+        }
+      ]
+    }
+  }
+}

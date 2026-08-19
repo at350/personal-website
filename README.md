@@ -61,12 +61,14 @@ npm run lint
 
 ## Library refresh
 
-The film log restocks itself from [letterboxd.com/alantai](https://letterboxd.com/alantai/).
-`.github/workflows/refresh-media.yml` runs **every two hours**: it reads the
-public RSS feed, mirrors each poster into `public/media/thumbs/`, and commits a
-new `src/lib/media/live.json` when anything changed. A film logged on
-letterboxd is on the site within one cycle. Nothing needs configuring —
-the username lives in `scripts/refresh-media.mjs` as `DEFAULT_LETTERBOXD_USER`.
+The library restocks itself. `.github/workflows/refresh-media.yml` runs
+**every two hours**: it reads each configured feed, mirrors every remote image
+into `public/media/thumbs/`, and commits a new `src/lib/media/live.json` when
+anything changed. A film logged on [letterboxd.com/alantai](https://letterboxd.com/alantai/)
+is on the site within one cycle, and it needs no configuring at all — the
+username lives in `scripts/refresh-media.mjs` as `DEFAULT_LETTERBOXD_USER`.
+The X and LinkedIn lanes cost money per call, so they ride a slower clock;
+see [Social posts](#social-posts) below.
 
 Two details in that workflow are load-bearing:
 
@@ -90,7 +92,48 @@ repo secrets, none required:
 |---|---|
 | `LETTERBOXD_USER` | Point the film log at a different account |
 | `SUBSTACK_RSS_URL` | Substack feed URL once the newsletter exists |
-| `X_BEARER_TOKEN` + `X_USER_ID` | Recent posts via the X API |
+| `ANYAPI_KEY` | Recent X **and** LinkedIn posts via [AnyAPI](https://getanyapi.com) — one key, both lanes |
+| `X_HANDLE` | Point the X feed at a different handle (defaults to `DEFAULT_X_HANDLE`) |
+| `LINKEDIN_PROFILE_URL` | Point the LinkedIn feed at a different profile (defaults to `DEFAULT_LINKEDIN_URL`) |
+| `X_BEARER_TOKEN` + `X_USER_ID` | Recent posts via X's own API — fallback, only read when `ANYAPI_KEY` is unset |
+
+### Social posts
+
+One `ANYAPI_KEY` lights up both social lanes without an X developer plan:
+`twitter.user_posts` for the X account's Posts tab, and
+`linkedin.profile_posts_full` for the LinkedIn profile. Both land in the
+library as `post` items, so the **POSTS** chip shows them together.
+
+Neither is free, and unlike letterboxd's RSS they bill per call — X a flat
+$0.00075, LinkedIn ~$0.0195 because it charges per post returned. Since
+neither account posts more than a few times a week, refetching them on all
+twelve of the day's cycles would spend ~$7 a month re-reading identical data.
+**They refresh twice a week instead** — Monday and Thursday at 06:17 UTC —
+and carry their items forward untouched on every other cycle, which costs
+about **18¢ a month** for the pair. Letterboxd keeps its two-hour cadence.
+`ANYAPI_ALWAYS=1` forces a fetch, which is what a manual run wants:
+
+```bash
+ANYAPI_KEY=... ANYAPI_ALWAYS=1 npm run refresh-media
+```
+
+From the Actions tab, run **refresh media** and tick **force_social** for the
+same effect — otherwise a manual run still honours the twice-weekly gate and
+the two social lanes just carry forward.
+
+Neither lane republishes anyone else's words. An X repost (`RT @…`) is
+dropped outright, and a LinkedIn quote post keeps only the author's own
+`text` — never the `repostText` of whoever was quoted. The t.co shortlink X
+appends for attached media is stripped, since left in it becomes the
+headline; that rule is applied to X alone, because a trailing shortlink in a
+LinkedIn post is something the author actually typed. X exposes no media URLs
+at all, so those posts land without a thumbnail; LinkedIn images (and a
+video's poster frame) are mirrored into `public/media/thumbs/` like any other.
+
+Only ever one feed is registered under the name `x`: AnyAPI when the key is
+present, X's own API otherwise. The name doubles as the `source` its items
+carry and carry-forward reclaims a failed feed by matching it, so a second
+`x` would double-count every post and restore the wrong half after a failure.
 
 ## Type
 

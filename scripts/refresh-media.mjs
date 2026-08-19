@@ -18,10 +18,20 @@
 //                              defaults to DEFAULT_LETTERBOXD_USER below, so
 //                              `npm run refresh-media` works with no env at all
 //   SUBSTACK_RSS_URL           full substack feed url
-//   X_BEARER_TOKEN + X_USER_ID X API v2 recent posts
+//   ANYAPI_KEY                 anyapi.com key -> recent X posts AND linkedin
+//                              posts (preferred; one key serves both)
+//   X_HANDLE                   X handle for the anyapi lookup, no leading @;
+//                              defaults to DEFAULT_X_HANDLE below
+//   LINKEDIN_PROFILE_URL       full public linkedin profile url;
+//                              defaults to DEFAULT_LINKEDIN_URL below
+//   ANYAPI_ALWAYS=1            fetch the paid X and linkedin lanes even when
+//                              they are not due (they refresh twice a week)
+//   X_BEARER_TOKEN + X_USER_ID X API v2 recent posts (fallback, only used
+//                              when ANYAPI_KEY is absent)
 
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import process from "node:process";
 import { XMLParser } from "fast-xml-parser";
 
@@ -29,11 +39,49 @@ const LIVE_JSON_URL = new URL("../src/lib/media/live.json", import.meta.url);
 const THUMBS_DIR_URL = new URL("../public/media/thumbs/", import.meta.url);
 const THUMBS_PUBLIC_PATH = "/media/thumbs/";
 const FETCH_TIMEOUT_MS = 10_000;
+// AnyAPI proxies a live scrape rather than serving a cached file: its
+// published p99 for this SKU is ~9.8s, which the shared 10s budget would clip
+// into a spurious failure most nights. Give that one call room.
+const ANYAPI_RUN_URL = "https://api.getanyapi.com/v1/run/twitter.user_posts";
+const ANYAPI_LINKEDIN_URL =
+  "https://api.getanyapi.com/v1/run/linkedin.profile_posts_full";
+const ANYAPI_TIMEOUT_MS = 20_000;
+
+const LINKEDIN_POST_LIMIT = 10;
+
+// Both AnyAPI lanes cost money per call — X a flat $0.00075, LinkedIn ~$0.0195
+// for ten posts because it bills per post returned — while letterboxd's RSS is
+// free. Neither social feed changes more than a few times a week, so refetching
+// them on all twelve of the day's cycles would spend ~$7/month re-reading
+// identical data. They refresh twice a week instead and carry their items
+// forward on every other cycle. The cron fires at :17 on even UTC hours
+// (17 */2 * * *), so the hour below must be even for this to ever come due.
+const ANYAPI_REFRESH_UTC_DAYS = new Set([1, 4]); // Monday and Thursday
+const ANYAPI_REFRESH_UTC_HOUR = 6;
+
+/**
+ * Whether the paid AnyAPI lanes should actually fetch on this cycle.
+ * ANYAPI_ALWAYS=1 forces one, which is what a manual run wants.
+ */
+function anyapiDue(env, now = new Date()) {
+  if (env.ANYAPI_ALWAYS === "1") return true;
+  return (
+    ANYAPI_REFRESH_UTC_DAYS.has(now.getUTCDay()) &&
+    now.getUTCHours() === ANYAPI_REFRESH_UTC_HOUR
+  );
+}
 
 // This site's own letterboxd account. A username is public, so it belongs in
 // the repo rather than in a secret: the film log then keeps refreshing without
 // any configuration at all. LETTERBOXD_USER overrides it (say, on a fork).
 const DEFAULT_LETTERBOXD_USER = "alantai";
+
+// Same reasoning for the X handle: it is public, so baking it in keeps the
+// posts flowing with only ANYAPI_KEY set. X_HANDLE overrides it.
+const DEFAULT_X_HANDLE = "alan_tai1";
+
+// Public profile, same reasoning as the two above.
+const DEFAULT_LINKEDIN_URL = "https://www.linkedin.com/in/alan-tai-nu/";
 
 // --- minimal helpers (mirror src/lib/media/normalize.ts) --------------------
 
@@ -82,16 +130,19 @@ function firstImgSrc(html) {
   return match?.[1];
 }
 
-function stripHtml(html) {
-  return html
-    .replace(/<[^>]*>/g, " ")
+function decodeEntities(text) {
+  return text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#0?39;|&apos;/g, "'")
     .replace(/&(?:nbsp|#160);/g, " ")
-    .replace(/&(?:mdash|#8212);/g, "—")
+    .replace(/&(?:mdash|#8212);/g, "—");
+}
+
+function stripHtml(html) {
+  return decodeEntities(html.replace(/<[^>]*>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -109,6 +160,55 @@ function splitPostCopy(text) {
   return {
     title,
     excerpt: remainder ? truncate(remainder, 500) : undefined,
+  };
+}
+
+// AnyAPI timestamps a post as a UTC epoch in *seconds*; isoDate cannot read
+// that (`new Date("1787071196")` is not a date), so it needs its own
+// converter or every post silently loses publishedAt.
+function epochSecondsToIso(value) {
+  const seconds = typeof value === "number" ? value : Number(textOf(value));
+  if (!Number.isFinite(seconds) || seconds <= 0) return undefined;
+  const date = new Date(seconds * 1000);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+const X_STATUS_URL =
+  /^https?:\/\/(?:www\.)?(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})\/status\/\d+/i;
+
+function handleFromStatusUrl(url) {
+  return url ? X_STATUS_URL.exec(url)?.[1] : undefined;
+}
+
+// X — and only X — appends a t.co shortlink for any attached photo, video, or
+// quoted post; it is furniture, not copy. Applied at the X call site, never to
+// LinkedIn copy, where a trailing shortlink is something the author typed.
+const TRAILING_TCO = /(?:\s*https?:\/\/t\.co\/[A-Za-z0-9]+)+\s*$/i;
+
+// A repost is someone else's words under our byline.
+const RETWEET_PREFIX = /^RT @[A-Za-z0-9_]{1,15}:/;
+
+function postText(raw) {
+  return decodeEntities(raw).replace(/\s+/g, " ").trim();
+}
+
+// Only pass dimensions the schema will actually accept.
+function isPositiveInt(value) {
+  return value !== undefined && Number.isInteger(value) && value > 0;
+}
+
+// First usable still from a post: an attached image, else a video poster.
+function postImage(images, videoThumbnail, title) {
+  const first = asRecord(toArray(images)[0]);
+  const src = textOf(first?.url) ?? textOf(videoThumbnail);
+  if (!src) return undefined;
+  const width = numOf(first?.width);
+  const height = numOf(first?.height);
+  return {
+    src,
+    alt: truncate(`Image from the post “${title}”`, 240),
+    width: isPositiveInt(width) ? width : undefined,
+    height: isPositiveInt(height) ? height : undefined,
   };
 }
 
@@ -250,11 +350,73 @@ function fromXApi(json) {
     .filter(isUsable);
 }
 
+function fromAnyApiX(json, fallbackHandle) {
+  const envelope = asRecord(json);
+  const output = asRecord(envelope?.output) ?? envelope;
+  return toArray(asRecord(output?.data)?.tweets)
+    .flatMap((entry) => {
+      const record = asRecord(entry);
+      const id = textOf(record?.id);
+      const raw = textOf(record?.text);
+      if (!record || !id || !raw) return [];
+      const text = postText(raw.replace(TRAILING_TCO, ""));
+      // Media-only posts keep no copy once the furniture goes, and a repost
+      // is not ours to print under this byline.
+      if (!text || RETWEET_PREFIX.test(text)) return [];
+      const url = textOf(record.url);
+      const handle = handleFromStatusUrl(url) ?? fallbackHandle;
+      return [
+        {
+          id: `x:${id}`,
+          source: "x",
+          kind: "post",
+          ...splitPostCopy(text),
+          url:
+            url ?? (handle ? `https://x.com/${handle}/status/${id}` : undefined),
+          author: handle ? `@${handle}` : undefined,
+          publishedAt: epochSecondsToIso(record.createdUtc),
+        },
+      ];
+    })
+    .filter(isUsable);
+}
+
+function fromAnyApiLinkedIn(json) {
+  const envelope = asRecord(json);
+  const output = asRecord(envelope?.output) ?? envelope;
+  return toArray(asRecord(output?.data)?.items)
+    .flatMap((entry) => {
+      const record = asRecord(entry);
+      const id = textOf(record?.id);
+      const raw = textOf(record?.text);
+      // A bare repost carries no copy of its own, only the quoted author's —
+      // which is never ours to print. Read `text`, never `repostText`.
+      if (!record || !id || !raw) return [];
+      const text = postText(raw);
+      if (!text) return [];
+      const author = asRecord(record.author);
+      const copy = splitPostCopy(text);
+      return [
+        {
+          id: `linkedin:${id}`,
+          source: "linkedin",
+          kind: "post",
+          ...copy,
+          url: textOf(record.url),
+          author: textOf(author?.name) ?? textOf(author?.handle),
+          publishedAt: epochSecondsToIso(record.createdUtc),
+          image: postImage(record.images, record.videoThumbnail, copy.title),
+        },
+      ];
+    })
+    .filter(isUsable);
+}
+
 // --- fetching ---------------------------------------------------------------
 
-async function fetchWithTimeout(url, options = {}) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
@@ -282,7 +444,35 @@ function configuredFeeds(env) {
         fromSubstackRss(await (await fetchWithTimeout(env.SUBSTACK_RSS_URL)).text()),
     });
   }
-  if (env.X_BEARER_TOKEN && env.X_USER_ID) {
+  // Exactly one feed may be named "x". The name doubles as the `source` its
+  // items carry, and carry-forward reclaims a failed feed by matching that
+  // name — so a second "x" would double-count every post and leave
+  // carry-forward restoring the wrong half. AnyAPI wins where it is
+  // configured; the direct (paid) X API stays reachable only without it.
+  const xHandle = env.X_HANDLE || DEFAULT_X_HANDLE;
+  if (env.ANYAPI_KEY && xHandle) {
+    feeds.push({
+      name: "x",
+      due: anyapiDue(env),
+      run: async () => {
+        const response = await fetchWithTimeout(
+          ANYAPI_RUN_URL,
+          {
+            method: "POST",
+            headers: {
+              // The key travels in the header only; it is never logged, and
+              // the error path below prints the URL, not the request.
+              Authorization: `Bearer ${env.ANYAPI_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ handle: xHandle }),
+          },
+          ANYAPI_TIMEOUT_MS,
+        );
+        return fromAnyApiX(await response.json(), xHandle);
+      },
+    });
+  } else if (env.X_BEARER_TOKEN && env.X_USER_ID) {
     const url =
       `https://api.x.com/2/users/${encodeURIComponent(env.X_USER_ID)}` +
       `/tweets?max_results=25&tweet.fields=created_at`;
@@ -293,6 +483,34 @@ function configuredFeeds(env) {
           headers: { Authorization: `Bearer ${env.X_BEARER_TOKEN}` },
         });
         return fromXApi(await response.json());
+      },
+    });
+  }
+  // Reuses ANYAPI_KEY — no second credential.
+  const linkedinUrl = env.LINKEDIN_PROFILE_URL || DEFAULT_LINKEDIN_URL;
+  if (env.ANYAPI_KEY && linkedinUrl) {
+    feeds.push({
+      name: "linkedin",
+      due: anyapiDue(env),
+      run: async () => {
+        const response = await fetchWithTimeout(
+          ANYAPI_LINKEDIN_URL,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${env.ANYAPI_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              url: linkedinUrl,
+              limit: LINKEDIN_POST_LIMIT,
+              // A bare repost carries no copy of ours to print.
+              includeReposts: false,
+            }),
+          },
+          ANYAPI_TIMEOUT_MS,
+        );
+        return fromAnyApiLinkedIn(await response.json());
       },
     });
   }
@@ -384,8 +602,8 @@ async function main() {
   if (feeds.length === 0) {
     console.log(
       "refresh-media: no feeds configured " +
-        "(set LETTERBOXD_USER, SUBSTACK_RSS_URL, or X_BEARER_TOKEN+X_USER_ID); " +
-        "leaving live.json untouched.",
+        "(set LETTERBOXD_USER, SUBSTACK_RSS_URL, ANYAPI_KEY, or " +
+        "X_BEARER_TOKEN+X_USER_ID); leaving live.json untouched.",
     );
     return;
   }
@@ -396,6 +614,19 @@ async function main() {
   const items = [];
   let succeeded = 0;
   for (const feed of feeds) {
+    // A feed that is configured but not due this cycle is neither a success
+    // nor a failure: it keeps exactly what it contributed last run, and does
+    // not count toward the "at least one feed succeeded" gate below.
+    if (feed.due === false) {
+      const carried = previous.filter((item) => item?.source === feed.name);
+      items.push(...carried);
+      console.log(
+        `refresh-media: ${feed.name}: not due this cycle, ` +
+          `keeping ${carried.length} item(s)`,
+      );
+      continue;
+    }
+
     let feedItems;
     try {
       feedItems = await feed.run();
@@ -449,6 +680,18 @@ async function main() {
 }
 
 // Exit 0 always: a failed refresh must never fail the cron job or a build.
-main().catch((error) => {
-  console.warn(`refresh-media: unexpected failure (${error?.message ?? error})`);
-});
+//
+// Guarded on being the entry point so the test suite can import the
+// normalizers above — and prove they still agree with src/lib/media/
+// normalize.ts — without kicking off a live refresh on import.
+// `node scripts/refresh-media.mjs` is unaffected.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.warn(
+      `refresh-media: unexpected failure (${error?.message ?? error})`,
+    );
+  });
+}
+
+// Exported for the parity test only; the script's real interface is the CLI.
+export { anyapiDue, fromAnyApiLinkedIn, fromAnyApiX };

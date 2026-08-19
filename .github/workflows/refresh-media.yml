@@ -9,13 +9,28 @@
 # something new.
 #
 # Configure repository secrets (all optional — unset feeds are skipped):
-#   LETTERBOXD_USER, SUBSTACK_RSS_URL, X_BEARER_TOKEN, X_USER_ID
+#   LETTERBOXD_USER, SUBSTACK_RSS_URL, ANYAPI_KEY, X_HANDLE,
+#   LINKEDIN_PROFILE_URL, X_BEARER_TOKEN, X_USER_ID
+#
+# ANYAPI_KEY turns on BOTH social feeds (getanyapi.com) with one credential:
+# recent X posts and recent LinkedIn posts. Those two lanes cost money per
+# call, so unlike the free letterboxd RSS they refresh twice a week (Monday
+# and Thursday, 06:17 UTC) and carry their items forward on every other cycle
+# — together about 18 cents a month. Without the key the script falls back to
+# the direct X API, which needs X_BEARER_TOKEN + X_USER_ID and a paid plan.
 name: refresh media
 
 on:
   schedule:
     - cron: "17 */2 * * *"
   workflow_dispatch:
+    inputs:
+      force_social:
+        description: >-
+          Fetch the paid X and LinkedIn lanes even when they are not due.
+          They normally refresh twice a week; tick this to pull them now.
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -46,6 +61,18 @@ jobs:
           # (DEFAULT_LETTERBOXD_USER). Set the secret only to point elsewhere.
           LETTERBOXD_USER: ${{ secrets.LETTERBOXD_USER }}
           SUBSTACK_RSS_URL: ${{ secrets.SUBSTACK_RSS_URL }}
+          # Preferred source for recent X and LinkedIn posts — one key, both
+          # lanes. Also unset-safe: the handle and profile URL fall back to the
+          # defaults baked into the script, and with no key both feeds are
+          # simply skipped and the previous snapshot's posts carry forward.
+          ANYAPI_KEY: ${{ secrets.ANYAPI_KEY }}
+          # Empty on a scheduled run, so the twice-weekly gate applies; "1"
+          # only when a human ticks the box on a manual dispatch.
+          ANYAPI_ALWAYS: ${{ inputs.force_social && '1' || '' }}
+          X_HANDLE: ${{ secrets.X_HANDLE }}
+          LINKEDIN_PROFILE_URL: ${{ secrets.LINKEDIN_PROFILE_URL }}
+          # Only consulted when ANYAPI_KEY is absent — never both, since two
+          # feeds named "x" would double-count and corrupt carry-forward.
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           X_USER_ID: ${{ secrets.X_USER_ID }}
 
