@@ -56,8 +56,13 @@ const MOSAIC_COLUMNS = 3;
 const PLATES_PER_COLUMN = 7;
 
 /* Columns drift at slightly different speeds so the three never lock into a
-   marching grid. Prime-ish seconds keep them out of phase for a long while. */
-const COLUMN_SECONDS = [78, 97, 67] as const;
+   marching grid. Prime-ish seconds keep them out of phase for a long while.
+
+   These read as ~45px/s. The first pass at this ran nearly three times slower,
+   which was mathematically in motion and visually indistinguishable from a
+   still page — a plate crept less than its own height in half a minute, so
+   nobody watching ever caught it moving. Drift has to be seen to be drift. */
+const COLUMN_SECONDS = [31, 39, 26] as const;
 
 const SOURCE_LABELS: Record<MediaSource, string> = {
   x: "X",
