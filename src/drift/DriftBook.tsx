@@ -15,7 +15,9 @@ import {
   DRIFT_SHEET_MAX_DEVIATION,
   beginDriftLanding,
   createDriftField,
+  driftLeafFlex,
   pointerPointAtDepth,
+  recordDriftDeviation,
   stepDriftField,
   writeDriftLeafGuide,
   type DriftPointerInput,
@@ -48,12 +50,11 @@ const MOTION_FLEX = 3.2;
     rather than hinging it at one edge. */
 /* Sized against measurement, not taste: this solver answers a flutter
    acceleration with roughly amplitude/142 pixels of out-of-plane travel on a
-   528px page, so this base buys ~12px of bow at rest and motion carries it
-   toward the DRIFT_SHEET_MAX_DEVIATION clamp. That clamp is what the depth
-   clearance reserves room for between every overlapping pair, so the two
-   numbers move together: more bow costs gap, and gap is what stops sheets
-   from crossing on screen. */
-const FLUTTER_BASE = 1700;
+   528px page, so this base buys ~23px of bow at rest and motion carries it
+   further. Bend is no longer rationed: the clearance between leaves is
+   measured from the sheets' real shapes, so curving only costs gap where it
+   actually closes on a neighbour. */
+const FLUTTER_BASE = 3200;
 const FLUTTER_MOTION = 3;
 const FLUTTER_RATE = 2.3;
 const TAU = Math.PI * 2;
@@ -294,15 +295,21 @@ export function DriftBook({
       // constraints would fight the shrunken guide.
       options.restScale = leaf.scale;
 
+      // A page jammed into the pile stiffens; one in open air keeps its full
+      // flex. Without this the pile is asked to hold more bend than its depth
+      // has room for, and the surplus comes out as pages crossing.
+      const flex = driftLeafFlex(leaf);
+      options.maxDeviation = DRIFT_SHEET_MAX_DEVIATION * flex;
+
       if (active) {
         // Apparent airflow: a moving carrier drags its paper through the air.
-        options.windX = -leaf.vx * MOTION_FLEX;
-        options.windY = -leaf.vy * MOTION_FLEX;
-        options.windZ = -leaf.vz * MOTION_FLEX;
+        options.windX = -leaf.vx * MOTION_FLEX * flex;
+        options.windY = -leaf.vy * MOTION_FLEX * flex;
+        options.windZ = -leaf.vz * MOTION_FLEX * flex;
         // Flutter along the sheet's own normal, harder the faster it flies.
         const carrierSpeed = Math.hypot(leaf.vx, leaf.vy, leaf.vz);
         const amplitude =
-          (FLUTTER_BASE + carrierSpeed * FLUTTER_MOTION) * leaf.release;
+          (FLUTTER_BASE + carrierSpeed * FLUTTER_MOTION) * leaf.release * flex;
         options.flutterX = leaf.axisNX * amplitude;
         options.flutterY = leaf.axisNY * amplitude;
         options.flutterZ = leaf.axisNZ * amplitude;
@@ -338,6 +345,10 @@ export function DriftBook({
         const point = vertices[index]!;
         positions.setXYZ(index, point.x, point.y, point.z);
       }
+      // Measure the sheet's real shape: how far it rises above and dips
+      // below its carrier plane, per cell. The clearance between leaves is
+      // computed from these, so what the eye sees is what collides.
+      recordDriftDeviation(leaf, vertices, guide, LEAF_SEGMENTS, LEAF_ROWS);
       positions.needsUpdate = true;
       bound.geometry.computeVertexNormals();
 
