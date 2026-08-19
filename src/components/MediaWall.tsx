@@ -44,9 +44,25 @@ export function useLibraryFilter(): LibraryFilter {
 
 const PAGE_FOLIOS = { verso: "014", recto: "015" } as const;
 
-/* Verso cedes headroom to the chips row and the section mark;
-   recto cedes a plate to its dropped second column. */
-const PAGE_CAPACITY = { verso: 6, recto: 7 } as const;
+/* The wall is a drifting mosaic: three columns per face, each running its own
+   endless loop, alternate columns travelling opposite ways. Nothing here is
+   interactive scrolling — the column simply never stops, so a face that used
+   to seat six plates now shows a slow parade of the whole library.
+
+   Each column's track holds its plates TWICE. The loop translates by exactly
+   one copy, so the moment the first copy leaves the frame the second sits
+   precisely where it began and the seam never lands on screen. */
+const MOSAIC_COLUMNS = 3;
+const PLATES_PER_COLUMN = 7;
+
+/* Columns drift at slightly different speeds so the three never lock into a
+   marching grid. Prime-ish seconds keep them out of phase for a long while.
+
+   These read as ~45px/s. The first pass at this ran nearly three times slower,
+   which was mathematically in motion and visually indistinguishable from a
+   still page — a plate crept less than its own height in half a minute, so
+   nobody watching ever caught it moving. Drift has to be seen to be drift. */
+const COLUMN_SECONDS = [31, 39, 26] as const;
 
 const SOURCE_LABELS: Record<MediaSource, string> = {
   x: "X",
@@ -70,25 +86,59 @@ export function MediaWall({ items, page }: MediaWallProps) {
   const shown = items
     .filter((item) => filter === "all" || item.kind === filter)
     .filter((_, i) => i % 2 === parity)
-    .slice(0, PAGE_CAPACITY[page]);
+    .slice(0, MOSAIC_COLUMNS * PLATES_PER_COLUMN);
+
+  /* Deal round-robin, so a column is a cross-section of the library rather
+     than one source's run of plates. */
+  const columns = Array.from({ length: MOSAIC_COLUMNS }, (_, column) =>
+    shown.filter((_, i) => i % MOSAIC_COLUMNS === column),
+  );
 
   return (
-    <ul className="media-wall media-wall--mosaic" data-page={page}>
-      {shown.map((item, order) => (
-        <li
-          /* The filter in the key remounts the tile: the 240ms rise
-             replays, staggered by reading order. */
-          key={`${filter}:${item.id}`}
-          className={`media-cell media-cell--${item.kind}`}
-          style={{ "--order": order } as CSSProperties}
-        >
-          <MediaPlate
-            item={item}
-            index={`${PAGE_FOLIOS[page]}·${String(order + 1).padStart(2, "0")}`}
-          />
-        </li>
-      ))}
-    </ul>
+    <div className="media-wall media-wall--mosaic" data-page={page}>
+      {columns.map((plates, column) =>
+        plates.length === 0 ? null : (
+          <div
+            key={column}
+            className="media-col"
+            /* Middle column runs the other way; see the sketch. */
+            data-drift={column % 2 === 1 ? "down" : "up"}
+            style={
+              { "--column-seconds": `${COLUMN_SECONDS[column]}s` } as CSSProperties
+            }
+          >
+            <ul
+              /* The filter in the key remounts the track, so a changed
+                 filter restarts the loop instead of jumping mid-travel. */
+              key={filter}
+              className="media-col__track"
+            >
+              {[0, 1].map((copy) =>
+                plates.map((item, order) => (
+                  <li
+                    key={`${copy}:${item.id}`}
+                    className={`media-cell media-cell--${item.kind}`}
+                    data-copy={copy}
+                    /* The second copy exists only to close the loop. `inert`
+                       — not just aria-hidden — because these plates are
+                       links: hidden-but-focusable would put every headline in
+                       the tab order twice and read it out of nowhere. */
+                    inert={copy === 1}
+                  >
+                    <MediaPlate
+                      item={item}
+                      index={`${PAGE_FOLIOS[page]}·${String(
+                        column + order * MOSAIC_COLUMNS + 1,
+                      ).padStart(2, "0")}`}
+                    />
+                  </li>
+                )),
+              )}
+            </ul>
+          </div>
+        ),
+      )}
+    </div>
   );
 }
 
