@@ -63,6 +63,15 @@ const PUFF_RECENCY_FADE_START = 0.72;
 export const DRIFT_BURST_START_RADIUS = 30;
 export const DRIFT_BURST_GROWTH = 430;
 const BURST_DECAY = 3.4;
+/** A click spins the vortex up before the shockwave leaves it — the glyph
+    reacts to its own gust instead of merely emitting a ring. */
+export const DRIFT_SWIRL_IMPULSE = 7;
+const SWIRL_BOOST_DECAY = 3.2;
+/** Parcels of air thrown outward by a click. They are ordinary shed air —
+    static, dissipating in place — so the burst leaves real substance behind
+    rather than a travelling outline. */
+export const DRIFT_BURST_PUFFS = 8;
+export const DRIFT_BURST_PUFF_RADIUS = 26;
 
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.min(maximum, Math.max(minimum, value));
@@ -234,6 +243,44 @@ export function collectDriftTrail(
     seen += 1;
   }
   return live;
+}
+
+/** How fast the vortex turns: its idle rate, plus the hand's speed, plus
+    whatever is left of a click's spin-up. */
+export function driftSwirlRate(speed: number, boost: number): number {
+  return 1 + clamp(speed, 0, 1) * 1.6 + Math.max(0, boost);
+}
+
+/** Exponential decay of the click spin-up, frame-rate independent. */
+export function decayDriftSwirlBoost(boost: number, deltaSeconds: number) {
+  if (boost <= 0) return 0;
+  const next = boost * Math.exp(-SWIRL_BOOST_DECAY * Math.max(0, deltaSeconds));
+  return next < 0.01 ? 0 : next;
+}
+
+/**
+ * Throws a ring of air parcels outward from a click. They are shed air like
+ * any other, so they stay where they land and dissipate — the burst has body
+ * where a lone expanding outline had none.
+ */
+export function burstDriftTrail(
+  trail: DriftTrailState,
+  x: number,
+  y: number,
+  radius = DRIFT_BURST_PUFF_RADIUS,
+) {
+  for (let index = 0; index < DRIFT_BURST_PUFFS; index += 1) {
+    const angle = (index / DRIFT_BURST_PUFFS) * Math.PI * 2;
+    const slot = trail.puffs[trail.shedCount % DRIFT_TRAIL_CAPACITY]!;
+    slot.x = x + Math.cos(angle) * radius;
+    slot.y = y + Math.sin(angle) * radius;
+    slot.age = 0;
+    slot.force = 1;
+    trail.shedCount += 1;
+  }
+  trail.lastX = x;
+  trail.lastY = y;
+  trail.seeded = true;
 }
 
 /**

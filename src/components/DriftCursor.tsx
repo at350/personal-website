@@ -1,12 +1,16 @@
 import { useEffect, useRef } from "react";
 import {
+  DRIFT_SWIRL_IMPULSE,
   DRIFT_TRAIL_CAPACITY,
   DRIFT_TRAIL_SPAN,
   ageDriftTrail,
+  burstDriftTrail,
   collectDriftTrail,
   createDriftTrail,
+  decayDriftSwirlBoost,
   driftCursorGust,
   driftGustBurst,
+  driftSwirlRate,
   resetDriftTrail,
   shedDriftTrail,
 } from "@/drift/cursorMotion";
@@ -93,48 +97,70 @@ const FRAGMENT_SHADER = /* glsl */ `
     float time = mix(uTime, 7.3, stillness);
     float speed = mix(uSpeed, 0.0, stillness);
     vec2 motion = mix(uMotion, vec2(0.0), stillness);
-    float swirlPhase = mix(uSwirl, 4.2, stillness);
+    float swirl = mix(uSwirl, 4.2, stillness);
 
-    // The whorl sits ON the pointer. Nothing here lags behind it: a trailing
-    // mass would swing like a pendulum when the hand circles, which is the
-    // one thing moving air never does.
+    // The vortex sits ON the pointer. Nothing here lags behind it: a
+    // trailing mass would swing like a pendulum when the hand circles,
+    // which is the one thing moving air never does.
     vec2 p = vLocal;
-    float r = length(p);
-    vec2 pn = r > 0.0001 ? p / r : vec2(1.0, 0.0);
+    float r0 = length(p);
+    vec2 pn = r0 > 0.0001 ? p / r0 : vec2(1.0, 0.0);
+    float theta = r0 > 0.0001 ? atan(p.y, p.x) : 0.0;
 
-    // Differential rotation: inner air turns faster than outer air, so no
-    // circular structure can survive — everything shears into spiral wisps.
-    // This is what keeps the glyph reading as moving air, never as rings.
-    float ang = swirlPhase * (0.7 + 26.0 / (r + 12.0));
-    float ca = cos(ang);
-    float sa = sin(ang);
-    vec2 qn = vec2(pn.x * ca - pn.y * sa, pn.x * sa + pn.y * ca);
-
-    // Windsock envelope: a soft donut of air, stretched downwind while the
-    // hand moves so the whole glyph leans into the stroke. This is the ONLY
-    // motion response still attached to the pointer — a shape change, never
-    // a swinging offset. Computed first so it can gate the costly noise:
-    // the vast majority of this quad's fragments lie outside the whorl.
+    // Windsock: the system stretches downwind while the hand moves. This is
+    // the ONLY motion response still attached to the pointer — a shape
+    // change, never a swinging offset.
     float motionLength = length(motion);
     vec2 direction = motionLength > 0.001 ? motion / motionLength : vec2(0.0);
-    float tail = motionLength > 0.001
+    float lean = motionLength > 0.001
       ? max(0.0, dot(pn, -direction)) * speed
       : 0.0;
-    float rEffective = r / (1.0 + tail * 0.9);
-    float donut = smoothstep(3.0, 13.0, rEffective) *
-      (1.0 - smoothstep(30.0, 58.0, rEffective));
+    float r = r0 / (1.0 + lean * 0.9);
 
-    // Filaments are BORN from noise, not drawn: ridged fbm sampled on
-    // slowly growing circles in noise space gives long tangential wisps of
-    // uneven length and brightness, with no seam anywhere.
+    float outer = 1.0 - smoothstep(34.0, 72.0, r);
     float wind = 0.0;
-    float fieldA = 0.0;
-    if (donut > 0.002) {
-      vec2 domain = qn * (1.3 + r * 0.05) +
-        vec2(swirlPhase * 0.21, -swirlPhase * 0.12);
-      fieldA = windFbm(domain);
-      float fieldB = windFbm(domain * 1.9 + vec2(4.7, 9.2));
-      wind = smoothstep(0.5, 0.74, fieldA * 0.72 + fieldB * 0.38) * donut;
+    float grain = 0.0;
+    if (outer > 0.002) {
+      // A cyclone's bands are LOGARITHMIC SPIRALS: curves along which
+      // theta * arms + log(r) * pitch stays constant. Sampling structure in
+      // this coordinate makes concentric rings geometrically impossible —
+      // the arms sweep inward and tighten toward the eye on their own.
+      float logr = log(max(r, 2.0));
+      float twist = theta * 2.0 + logr * 4.2 - swirl * 2.0;
+
+      // sin/cos of twist are seam-free where raw twist jumps by 4*PI, so
+      // every texture below is continuous all the way around the eye.
+      vec2 armCoord = vec2(sin(twist), cos(twist));
+      float band = sin(twist) * 0.5 + 0.5;
+      float arms = smoothstep(0.24, 0.86, band);
+
+      // Secondary rainbands: finer, tighter, weaker. A cyclone carries
+      // several bands of unequal strength — a single clean pair reads as a
+      // pinwheel rather than weather.
+      float minorTwist = theta * 5.0 + logr * 7.4 - swirl * 2.6;
+      float minor = smoothstep(0.58, 0.96, sin(minorTwist) * 0.5 + 0.5);
+      arms = clamp(
+        arms + minor * 0.5 * smoothstep(9.0, 26.0, r),
+        0.0,
+        1.0
+      );
+
+      // Grain drawn ALONG the arms, drifting outward with the flow, so the
+      // bands look like moving material rather than painted stripes.
+      grain = windFbm(armCoord * 1.7 + vec2(logr * 2.3, swirl * 0.35));
+      arms *= 0.28 + 0.72 * grain;
+
+      // Bands fray into separate wisps toward the rim, the way real
+      // rainbands break up away from the core.
+      float fray = windFbm(armCoord * 3.4 + vec2(logr * 4.1, 7.0));
+      arms *= mix(1.0, smoothstep(0.22, 0.78, fray), smoothstep(11.0, 34.0, r));
+
+      // The eye: a calm clear centre ringed by its brighter wall.
+      float eye = smoothstep(3.5, 10.5, r);
+      float wallArm = (r - 12.5) / 5.5;
+      float eyewall = exp(-wallArm * wallArm) * (0.45 + 0.55 * grain);
+
+      wind = (arms * eye + eyewall * 0.5) * outer;
     }
 
     // Shed air: parcels left along the path the hand actually took, fixed
@@ -163,43 +189,53 @@ const FRAGMENT_SHADER = /* glsl */ `
     }
     shed *= 1.0 - stillness;
 
-    // The click gust: one expanding ring, noise-broken so it reads as a
-    // pressure front rather than drawn geometry, dissolving into air well
-    // before the draw region's edge could clip it. Guarded so the idle
-    // sentinel age never reaches the ring math: NaN from a negative-base
-    // pow would survive a step() multiplier.
+    // The click gust: a pressure front, not an outline. Its amplitude is
+    // lumpy around the circle (and those lumps ride the vortex), radial
+    // streaks drag inward behind it, and a thinning wake fills the space it
+    // has already crossed. Guarded so the idle sentinel age never reaches
+    // this math at all.
     float ring = 0.0;
     if (uBurstAge >= 0.0 && stillness < 0.5) {
       float burstRadius = 30.0 + uBurstAge * 430.0;
-      float ringArm = (r - burstRadius) / (7.0 + uBurstAge * 26.0);
-      float front = 0.55 + 0.45 * windNoise(qn * 3.0 + vec2(time * 0.9, 2.3));
-      ring = exp(-ringArm * ringArm) * exp(-uBurstAge * 3.4) * front *
-        (1.0 - smoothstep(150.0, 205.0, burstRadius));
+      float thickness = 8.0 + uBurstAge * 30.0;
+      float frontArm = (r0 - burstRadius) / thickness;
+      vec2 around = vec2(cos(theta), sin(theta));
+      float lumps = 0.3 + 0.7 * windFbm(
+        around * 2.4 + vec2(swirl * 0.3, uBurstAge * 1.7)
+      );
+      float streak = 0.4 + 0.6 * windFbm(
+        around * 7.5 + vec2(r0 * 0.05 - uBurstAge * 6.0, 3.1)
+      );
+      float wake = smoothstep(burstRadius * 0.3, burstRadius, r0) *
+        (1.0 - smoothstep(burstRadius, burstRadius + thickness * 1.4, r0)) * 0.4;
+      ring = (exp(-frontArm * frontArm) + wake) * lumps * streak *
+        exp(-uBurstAge * 3.4) * (1.0 - smoothstep(120.0, 185.0, burstRadius));
     }
 
-    // Registration: a precise contact dot on the raw pointer, with the
-    // faintest glassy lens around it.
-    float contact = exp(-r * r / 6.0);
-    float lens = exp(-r * r / 256.0) * 0.5;
+    // Registration: a precise contact dot on the raw pointer.
+    float contact = exp(-r0 * r0 / 6.0);
 
-    float wisps = clamp(wind * 0.95 + shed * 0.8 + ring * 0.7, 0.0, 1.0);
-    float alpha = wisps * 0.44 + lens * 0.09 + contact * 0.4;
+    float wisps = clamp(wind * 0.95 + shed * 0.8 + ring * 0.75, 0.0, 1.0);
+    float alpha = wisps * 0.44 + contact * 0.4;
 
     // Ink wisps on the white page; the site's red rides only the brightest
-    // filament tips, a fleck rather than a costume.
+    // band crests, a fleck rather than a costume.
     vec3 pale = vec3(0.5, 0.54, 0.6);
     vec3 ink = vec3(0.24, 0.27, 0.32);
     vec3 color = mix(pale, ink, clamp(wind + shed, 0.0, 1.0));
-    float tips = smoothstep(0.82, 0.95, fieldA) * donut;
-    color = mix(color, vec3(0.84, 0.18, 0.12), tips * 0.4);
+    color = mix(
+      color,
+      vec3(0.84, 0.18, 0.12),
+      smoothstep(0.78, 0.95, grain) * wind * 0.45
+    );
     color = mix(color, vec3(0.30, 0.33, 0.38), ring * 0.6);
 
     // The fade band sits beyond everything the shader can draw, so it only
     // ever guards against the quad edge itself, never clips live content.
     float edge = uHalfExtent - 6.0;
-    float band = ${EDGE_FADE}.0;
-    float quadFade = (1.0 - smoothstep(edge - band, edge, abs(vLocal.x))) *
-      (1.0 - smoothstep(edge - band, edge, abs(vLocal.y)));
+    float band2 = ${EDGE_FADE}.0;
+    float quadFade = (1.0 - smoothstep(edge - band2, edge, abs(vLocal.x))) *
+      (1.0 - smoothstep(edge - band2, edge, abs(vLocal.y)));
     alpha *= quadFade;
 
     if (alpha < 0.0015) discard;
@@ -317,6 +353,7 @@ export function DriftCursor() {
     let motionX = 0;
     let motionY = 0;
     let swirlPhase = 0;
+    let swirlBoost = 0;
     let burstAge = -1;
     let sessionStart = 0;
     const trail = createDriftTrail();
@@ -384,8 +421,10 @@ export function DriftCursor() {
       const response = 1 - Math.exp(-delta * 26);
       motionX += (gust.x - motionX) * response;
       motionY += (gust.y - motionY) * response;
-      // Integrated orbit phase: speed bends the whorl's rate smoothly.
-      swirlPhase += (1 + gust.speed * 1.6) * delta;
+      // Integrated orbit phase: the hand's speed and a click's spin-up both
+      // bend the rate smoothly instead of jumping the arms.
+      swirlBoost = decayDriftSwirlBoost(swirlBoost, delta);
+      swirlPhase += driftSwirlRate(gust.speed, swirlBoost) * delta;
       ageDriftTrail(trail, delta);
       if (burstAge >= 0) {
         burstAge += delta;
@@ -469,6 +508,10 @@ export function DriftCursor() {
       // the preference were lifted mid-session.
       if (visible && event.button === 0 && !reducedMotion.matches) {
         burstAge = 0;
+        // The vortex answers its own gust: it spins up, and throws a ring of
+        // air outward that dissipates where it lands.
+        swirlBoost = DRIFT_SWIRL_IMPULSE;
+        burstDriftTrail(trail, cursorX, cursorY);
       }
       if (reducedMotion.matches) render(7.3);
       else wake();
@@ -481,6 +524,7 @@ export function DriftCursor() {
       motionX = 0;
       motionY = 0;
       burstAge = -1;
+      swirlBoost = 0;
       resetDriftTrail(trail, cursorX, cursorY);
       trail.seeded = false;
       render(0);
