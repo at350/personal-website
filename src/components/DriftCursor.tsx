@@ -14,6 +14,9 @@ import {
   resetDriftTrail,
   shedDriftTrail,
 } from "@/drift/cursorMotion";
+// One source of truth for what counts as a tap: the cursor must not play a
+// gust the field will not deliver.
+import { DRIFT_TAP_SLOP } from "@/drift/driftField";
 import "@/styles/drift.css";
 
 /** Room for the whorl, the widest shed parcel at the far end of the trail,
@@ -355,6 +358,10 @@ export function DriftCursor() {
     let swirlPhase = 0;
     let swirlBoost = 0;
     let burstAge = -1;
+    let pressX = 0;
+    let pressY = 0;
+    let pressTravel = 0;
+    let pressing = false;
     let sessionStart = 0;
     const trail = createDriftTrail();
     const puffData = new Float32Array(DRIFT_TRAIL_CAPACITY * 4);
@@ -493,6 +500,12 @@ export function DriftCursor() {
       visible = !overChrome(event) &&
         (event.pointerType !== "touch" || event.pressure > 0);
       if (visible && !wasVisible) resetDriftTrail(trail, cursorX, cursorY);
+      if (pressing) {
+        pressTravel = Math.max(
+          pressTravel,
+          Math.hypot(cursorX - pressX, cursorY - pressY),
+        );
+      }
       if (reducedMotion.matches) render(7.3);
       else wake();
     };
@@ -502,19 +515,35 @@ export function DriftCursor() {
       updatePointer(event);
       visible = !overChrome(event);
       if (visible && !wasVisible) resetDriftTrail(trail, cursorX, cursorY);
-      // The click-gust ring launches with the same click that shoves leaves.
+      if (event.button === 0) {
+        pressing = true;
+        pressX = cursorX;
+        pressY = cursorY;
+        pressTravel = 0;
+      }
+      if (reducedMotion.matches) render(7.3);
+      else wake();
+    };
+
+    // The gust fires on release of a TAP, matching the field exactly: a
+    // press that travels is a drag carrying a leaf, and playing a burst for
+    // it would promise a shove the pages never receive.
+    const onPointerUp = (event: PointerEvent) => {
+      if (!pressing || event.button !== 0) return;
+      pressing = false;
+      updatePointer(event);
+      const tapped = pressTravel <= DRIFT_TAP_SLOP;
       // Never under reduced motion: the frame loop that ages the ring out is
       // not running there, and a stale age would replay a phantom ring if
       // the preference were lifted mid-session.
-      if (visible && event.button === 0 && !reducedMotion.matches) {
+      if (tapped && visible && !overChrome(event) && !reducedMotion.matches) {
         burstAge = 0;
         // The vortex answers its own gust: it spins up, and throws a ring of
         // air outward that dissipates where it lands.
         swirlBoost = DRIFT_SWIRL_IMPULSE;
         burstDriftTrail(trail, cursorX, cursorY);
+        wake();
       }
-      if (reducedMotion.matches) render(7.3);
-      else wake();
     };
 
     const hide = () => {
@@ -525,6 +554,7 @@ export function DriftCursor() {
       motionY = 0;
       burstAge = -1;
       swirlBoost = 0;
+      pressing = false;
       resetDriftTrail(trail, cursorX, cursorY);
       trail.seeded = false;
       render(0);
@@ -559,6 +589,7 @@ export function DriftCursor() {
     window.addEventListener("resize", resize);
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("pointerdown", onPointerDown, { passive: true });
+    window.addEventListener("pointerup", onPointerUp, { passive: true });
     window.addEventListener("blur", hide);
     document.addEventListener("pointerout", onPointerOut);
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -571,6 +602,7 @@ export function DriftCursor() {
       window.removeEventListener("resize", resize);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("blur", hide);
       document.removeEventListener("pointerout", onPointerOut);
       document.removeEventListener("visibilitychange", onVisibilityChange);
