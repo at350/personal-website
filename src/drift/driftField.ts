@@ -170,16 +170,40 @@ const ANGULAR_DAMPING = 0.55;
 const GRABBED_EXTRA_DAMPING = 2.4;
 export const DRIFT_MAX_SPEED = 520;
 export const DRIFT_MAX_SPIN = 2.4;
+/** Angular velocity splits into two halves with very different prices.
+    ROLL — spin about the sheet's own normal — wheels the page in its own
+    plane without moving that plane through depth, so it costs the clearance
+    budget nothing at all. TUMBLE — everything else — swings the plane
+    through depth, and is the whole reason the pile needs gaps. Damping and
+    capping the two together made the free half as scarce as the costly one,
+    which is why a windstorm read as a slow shuffle. Roll is now allowed to
+    be genuinely fast, and to hold its speed far longer than a tumble does. */
+export const DRIFT_MAX_ROLL = 5.2;
+const ROLL_DAMPING_RATIO = 0.42;
+
+/** Pages fly at a fraction of their resting size. Eleven full-size sheets
+    cover three times the viewport, so they overlap almost everywhere and the
+    depth budget is spent entirely on keeping that pile apart — which is what
+    left them too flat to read as weather. Shrinking them buys twice over:
+    the overlapping area falls with the SQUARE of the scale, and each page's
+    depth reach falls linearly with it. Rides in and out on release, so the
+    book comes apart and reassembles at its true size. */
+export const DRIFT_PAGE_SCALE = 0.58;
 
 const AMBIENT_ACCEL = 46;
 /** Angular acceleration amplitude (rad/s²). All three axes carry real
     energy now — pages pitch, yaw, and roll; the depth projection prices
     every tilt, so tumble no longer needs to be roll-only to stay safe. */
-const AMBIENT_TORQUE = 0.15;
-/** Paper drifting in still air settles broadside-on — eventually. Kept
-    deliberately weak so gusted pages linger at dramatic angles before
-    easing back toward the camera. */
-const ALIGN_TORQUE = 0.4;
+const AMBIENT_TORQUE = 0.5;
+/** The air's own spin, applied about each sheet's normal. Free of the depth
+    budget, so this is where the storm's energy can go without ever pushing
+    two pages through one another. */
+const AMBIENT_ROLL_TORQUE = 0.85;
+/** Paper drifting in still air settles broadside-on — eventually. This is
+    the one torque that actively works against the look: it turns pages to
+    face the camera, and a page facing the camera is a page not turning. Kept
+    barely strong enough to stop sheets ending up permanently edge-on. */
+const ALIGN_TORQUE = 0.15;
 /** Hard ceiling (~62°) on the out-of-plane tilt: deep enough to read as
     paper wheeling through the air, bounded enough that the depth projection
     can always price a gap that fits the containment volume. In-plane roll
@@ -261,7 +285,7 @@ const CROWD_ALIGN_BOOST = 2.2;
     whole column being spun past what the depth range can hold. */
 const CROWD_WIND_SHIELD = 0.8;
 const CROWD_SPIN_DAMPING = 0.7;
-const HARD_Z_FLOOR_RATIO = -0.4;
+const HARD_Z_FLOOR_RATIO = -1.16;
 const HARD_Z_HEADROOM = 40;
 export const DRIFT_CURRENT_ACCEL = 900;
 export const DRIFT_CURRENT_RADIUS_RATIO = 0.75;
@@ -289,15 +313,15 @@ const CONTAIN_ACCEL = 7;
 const CONTAIN_BRAKE = 3;
 const CONTAIN_MARGIN_X_RATIO = 0.45;
 const CONTAIN_MARGIN_Y_RATIO = 0.42;
-/** The drift volume extends BEHIND the resting page plane too — empty white
-    void where a page simply reads a little smaller. Eleven wild sheets
-    cannot layer in the front half alone, and depth is nearly free on screen:
-    the perspective counter-scale holds a page's apparent size constant, so a
-    deeper volume buys clearance without anything looking further away. */
-const CONTAIN_Z_MIN_RATIO = -0.34;
+/** The drift volume reaches far BEHIND the resting page plane — empty white
+    void, and the cheapest clearance there is. Every pair of overlapping
+    pages needs depth between them, so depth is the currency the whole pile
+    turns and folds on; there is nothing back there to crowd, and a page that
+    drifts into it simply reads a little further away. */
+export const CONTAIN_Z_MIN_RATIO = -1.1;
 /** Deep enough toward the camera that eleven sheets can layer with real
     clearance; the perspective-aware x/y bounds shrink to compensate. */
-const CONTAIN_Z_MAX_RATIO = 0.82;
+export const CONTAIN_Z_MAX_RATIO = 0.82;
 
 const GRAB_STIFFNESS = 60;
 const GRAB_DAMPING = 15.5;
@@ -686,10 +710,12 @@ export function stepDriftField(
     field.wasPressed = input.pressed;
     stepLanding(field, dt);
     for (const leaf of field.leaves) {
-      leaf.scale = Math.min(
-        1,
-        (input.cameraDistance - leaf.z) / input.cameraDistance,
-      );
+      // Same easing as the drifting path. Landing is precisely when the
+      // flying size has to be handed back, and dropping the factor here
+      // would return the whole difference in a single frame.
+      leaf.scale =
+        (1 - (1 - DRIFT_PAGE_SCALE) * leaf.release) *
+        Math.min(1, (input.cameraDistance - leaf.z) / input.cameraDistance);
     }
     return;
   }
@@ -848,6 +874,18 @@ export function stepDriftField(
     tx += ambientSpin * 0.8 * Math.sin(t * 0.23 + leaf.seedC * TAU);
     ty += ambientSpin * 0.9 * Math.sin(t * 0.19 + leaf.seedA * TAU);
     tz += ambientSpin * Math.sin(t * 0.31 + leaf.seedB * TAU);
+    // Spin about the sheet's own normal costs no clearance, so the ambient
+    // air drives it hard: slow enough to read as a drift rather than a
+    // propeller, but a wheel the eye can actually follow.
+    const ambientRoll =
+      AMBIENT_ROLL_TORQUE *
+      r *
+      field.inertia *
+      (0.7 * Math.sin(t * 0.21 + leaf.seedA * TAU) +
+        0.3 * Math.sin(t * 0.47 + leaf.seedB * TAU));
+    tx += leaf.axisNX * ambientRoll;
+    ty += leaf.axisNY * ambientRoll;
+    tz += leaf.axisNZ * ambientRoll;
 
     // Broadside-on preference: torque along n × ẑ eases the sheet's normal
     // toward whichever camera-facing pole it is already nearest, so flipped
@@ -1018,21 +1056,58 @@ export function stepDriftField(
     leaf.wx += (tx / field.inertia) * dt;
     leaf.wy += (ty / field.inertia) * dt;
     leaf.wz += (tz / field.inertia) * dt;
-    const angularDamp = Math.exp(
+    // Split the spin into the half that costs depth and the half that does
+    // not, then price them separately. Crowding, which exists only to keep
+    // the pile inside its depth budget, has no business slowing a roll.
+    // Take the normal from the live quaternion rather than leaf.axisN*: the
+    // cached axes are refreshed by the depth projection, which the landing
+    // collapse skips, and a split against a stale normal would misfile
+    // tumble as roll — the one direction that escapes the tumble cap.
+    const nx = 2 * (leaf.qx * leaf.qz + leaf.qy * leaf.qw);
+    const ny = 2 * (leaf.qy * leaf.qz - leaf.qx * leaf.qw);
+    const nz = 1 - 2 * (leaf.qx * leaf.qx + leaf.qy * leaf.qy);
+    const rollRate = leaf.wx * nx + leaf.wy * ny + leaf.wz * nz;
+    let rollX = nx * rollRate;
+    let rollY = ny * rollRate;
+    let rollZ = nz * rollRate;
+    let tumbleX = leaf.wx - rollX;
+    let tumbleY = leaf.wy - rollY;
+    let tumbleZ = leaf.wz - rollZ;
+
+    const grabDamp = grabbed ? GRABBED_EXTRA_DAMPING : 0;
+    const rollDamp = Math.exp(
+      -(ANGULAR_DAMPING * ROLL_DAMPING_RATIO + grabDamp) * dt,
+    );
+    rollX *= rollDamp;
+    rollY *= rollDamp;
+    rollZ *= rollDamp;
+    const rolled = Math.hypot(rollX, rollY, rollZ);
+    if (rolled > DRIFT_MAX_ROLL) {
+      const cap = DRIFT_MAX_ROLL / rolled;
+      rollX *= cap;
+      rollY *= cap;
+      rollZ *= cap;
+    }
+
+    const tumbleDamp = Math.exp(
       -(ANGULAR_DAMPING * (1 + CROWD_SPIN_DAMPING * Math.min(2.5, leaf.crowd)) +
-        (grabbed ? GRABBED_EXTRA_DAMPING : 0)) *
+        grabDamp) *
         dt,
     );
-    leaf.wx *= angularDamp;
-    leaf.wy *= angularDamp;
-    leaf.wz *= angularDamp;
-    const spin = Math.hypot(leaf.wx, leaf.wy, leaf.wz);
-    if (spin > DRIFT_MAX_SPIN) {
-      const cap = DRIFT_MAX_SPIN / spin;
-      leaf.wx *= cap;
-      leaf.wy *= cap;
-      leaf.wz *= cap;
+    tumbleX *= tumbleDamp;
+    tumbleY *= tumbleDamp;
+    tumbleZ *= tumbleDamp;
+    const tumbled = Math.hypot(tumbleX, tumbleY, tumbleZ);
+    if (tumbled > DRIFT_MAX_SPIN) {
+      const cap = DRIFT_MAX_SPIN / tumbled;
+      tumbleX *= cap;
+      tumbleY *= cap;
+      tumbleZ *= cap;
     }
+
+    leaf.wx = rollX + tumbleX;
+    leaf.wy = rollY + tumbleY;
+    leaf.wz = rollZ + tumbleZ;
 
     // dq/dt = ω ⊗ q / 2, then renormalize to hold unit length.
     const hx = leaf.wx * 0.5 * dt;
@@ -1055,10 +1130,9 @@ export function stepDriftField(
   // The perspective counter-scale reads the FINAL depth of the frame, after
   // the projection has had its say, so rendered size never lags a shove.
   for (const leaf of field.leaves) {
-    leaf.scale = Math.min(
-      1,
-      (input.cameraDistance - leaf.z) / input.cameraDistance,
-    );
+    leaf.scale =
+      (1 - (1 - DRIFT_PAGE_SCALE) * leaf.release) *
+      Math.min(1, (input.cameraDistance - leaf.z) / input.cameraDistance);
   }
 }
 
@@ -1101,19 +1175,113 @@ function pairOverlaps(
  * |dz| covering the sum of both sheets' true z-extents makes the depth axis
  * a separating axis — airtight by SAT sufficiency, whatever the orientation.
  */
+/** Depth a pair of tilted planes must hold between them.
+
+    The blunt answer is each page's full depth reach added together, and that
+    is what this used to charge. It is wildly pessimistic. Two planes can only
+    meet where their footprints overlap, and two planes that lean the SAME way
+    never converge at all — they are parallel, and could sit a hair apart at
+    any tilt without touching. Charging both of them their full reach priced
+    the commonest arrangement in the pile as if it were the worst one, and the
+    budget that bought went straight out of the pages' freedom to turn.
+
+    So price what actually closes. Each plane's height over the viewing plane
+    is linear in screen position, with gradient g; the pair converges at the
+    rate their gradients DIFFER, over the region where they overlap. Both are
+    cheap to bound: g falls out of inverting the page's own projection, and
+    the overlap is contained in a box around the lens where the two pages'
+    circumscribed discs meet. Never charges more than the old full-reach
+    answer, so it cannot loosen a gap that was already holding. */
 export function pairTilt(
   field: DriftField,
   a: DriftLeafState,
   b: DriftLeafState,
 ) {
   if (!pairOverlaps(field, a, b)) return 0;
+  const gate = a.release * b.release;
+  if (gate <= 0) return 0;
+
   const extA =
     (field.pw / 2) * a.scale * Math.abs(a.axisUZ) +
     (field.ph / 2) * a.scale * Math.abs(a.axisVZ);
   const extB =
     (field.pw / 2) * b.scale * Math.abs(b.axisUZ) +
     (field.ph / 2) * b.scale * Math.abs(b.axisVZ);
-  return a.release * b.release * (extA + extB);
+  const blunt = extA + extB;
+
+  // Gradient of each page's depth with respect to screen position. The page
+  // maps (u, v) along its own axes onto the viewing plane; invert that and
+  // the depth per screen unit falls out. A page seen edge-on projects to a
+  // sliver, the inverse blows up, and the blunt answer is the right one.
+  const detA = a.axisUX * a.axisVY - a.axisVX * a.axisUY;
+  const detB = b.axisUX * b.axisVY - b.axisVX * b.axisUY;
+  if (Math.abs(detA) < 1e-3 || Math.abs(detB) < 1e-3) return gate * blunt;
+  const gax = (a.axisVY * a.axisUZ - a.axisUY * a.axisVZ) / detA;
+  const gay = (a.axisUX * a.axisVZ - a.axisVX * a.axisUZ) / detA;
+  const gbx = (b.axisVY * b.axisUZ - b.axisUY * b.axisVZ) / detB;
+  const gby = (b.axisUX * b.axisVZ - b.axisVX * b.axisUZ) / detB;
+  const dgx = gbx - gax;
+  const dgy = gby - gay;
+
+  // Bound the overlap. Each page sits inside a disc of its half-diagonal;
+  // where two discs meet is a lens, and the lens sits inside a small box
+  // aligned with the line between the centres.
+  const halfDiag = Math.hypot(field.pw / 2, field.ph / 2);
+  const ra = halfDiag * a.scale;
+  const rb = halfDiag * b.scale;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const centres = Math.hypot(dx, dy);
+
+  let cx: number;
+  let cy: number;
+  let reach: number;
+  if (centres <= Math.abs(ra - rb) + 1e-3) {
+    // One disc sits inside the other, so the overlap IS the smaller page.
+    // Worth its own branch: the chord below is only defined for discs that
+    // properly cross, and on a nested pair it collapses to nothing — which
+    // would hand back a gap of zero for two pages sitting right on top of
+    // one another, the very case that needs the most room.
+    const inner = Math.min(ra, rb);
+    const smaller = ra <= rb ? a : b;
+    cx = smaller.x;
+    cy = smaller.y;
+    reach = inner * Math.hypot(dgx, dgy);
+  } else {
+    const ux = dx / centres;
+    const uy = dy / centres;
+    const along = Math.max(0, (ra + rb - centres) / 2);
+    const foot = clamp(
+      (centres * centres + ra * ra - rb * rb) / (2 * centres),
+      -ra,
+      ra,
+    );
+    // How far the shared area reaches to either side of the line of centres.
+    // The chord where the two outlines cross is the answer only while each
+    // page's own widest point lies outside the other; once one of them falls
+    // inside, the shared area bulges out to that page's full width and the
+    // chord badly understates it — which for two pages nearly on top of one
+    // another is a gap missed, not a gap trimmed.
+    let across = Math.sqrt(Math.max(0, ra * ra - foot * foot));
+    if (Math.hypot(centres, rb) <= ra) across = Math.max(across, rb);
+    if (Math.hypot(centres, ra) <= rb) across = Math.max(across, ra);
+    const offset = Math.min(ra, Math.max(-ra, centres - rb + along));
+    cx = a.x + ux * offset;
+    cy = a.y + uy * offset;
+    // Support of the box in the direction the planes converge.
+    reach =
+      along * Math.abs(dgx * ux + dgy * uy) +
+      across * Math.abs(-dgx * uy + dgy * ux);
+  }
+
+  // Depth already between the two surfaces at the middle of that overlap.
+  // A pair leaning apart there has bought some of its own clearance.
+  const bias =
+    (gbx * (cx - b.x) + gby * (cy - b.y)) -
+    (gax * (cx - a.x) + gay * (cy - a.y));
+
+  const measured = reach - bias;
+  return gate * clamp(measured, 0, blunt);
 }
 
 /**

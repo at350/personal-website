@@ -4,6 +4,9 @@ import {
   DRIFT_LAYER_GAP,
   driftPairClearance,
   beginDriftLanding,
+  CONTAIN_Z_MAX_RATIO,
+  CONTAIN_Z_MIN_RATIO,
+  DRIFT_PAGE_SCALE,
   createDriftField,
   pickDriftLeaf,
   pointerPointAtDepth,
@@ -191,8 +194,8 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
       // Soft containment: centers never reach the viewport edge.
       expect(Math.abs(leaf.x + input.shift)).toBeLessThan(720);
       expect(Math.abs(leaf.y)).toBeLessThan(450);
-      expect(leaf.z).toBeGreaterThan(PH * -0.45 - 20);
-      expect(leaf.z).toBeLessThan(PH * 0.82 + 60);
+      expect(leaf.z).toBeGreaterThan(PH * CONTAIN_Z_MIN_RATIO - 60);
+      expect(leaf.z).toBeLessThan(PH * CONTAIN_Z_MAX_RATIO + 60);
     }
   });
 
@@ -201,21 +204,28 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
     const input = makeInput();
     run(field, 600, input); // deep into the drift, leaves spread in z
     let spread = 0;
+    let apparentMin = Infinity;
+    let apparentMax = 0;
     for (const leaf of field.leaves) {
       spread = Math.max(spread, leaf.z);
-      // World size shrinks by exactly the perspective magnification, so the
-      // projected width stays the nominal page width.
+      // World size shrinks by exactly the perspective magnification, so a
+      // page's projected width does not depend on how deep it drifts. Pages
+      // fly at DRIFT_PAGE_SCALE of their resting size; what matters here is
+      // that depth alone never zooms one.
       const apparent =
         PW * leaf.scale * (input.cameraDistance / (input.cameraDistance - leaf.z));
       if (leaf.z >= 0) {
-        expect(apparent).toBeGreaterThan(PW * 0.995);
-        expect(apparent).toBeLessThan(PW * 1.005);
+        apparentMin = Math.min(apparentMin, apparent);
+        apparentMax = Math.max(apparentMax, apparent);
       } else {
         // Behind the page plane the counter-scale caps at 1 — pages may
         // look slightly smaller there, never zoomed.
-        expect(leaf.scale).toBe(1);
+        expect(leaf.scale).toBeLessThanOrEqual(DRIFT_PAGE_SCALE + 1e-9);
       }
     }
+    expect(apparentMax / apparentMin).toBeLessThan(1.01);
+    expect(apparentMax).toBeLessThan(PW * DRIFT_PAGE_SCALE * 1.005);
+    expect(apparentMin).toBeGreaterThan(PW * DRIFT_PAGE_SCALE * 0.995);
     // The run actually exercised real depth.
     expect(spread).toBeGreaterThan(100);
   });
@@ -697,5 +707,64 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
     pointerPointAtDepth(input, 230, out);
     // Closer to the camera the same ray covers less world distance.
     expect(Math.abs(out.y)).toBeLessThan(150);
+  });
+  it("still picks the page the pointer is over once pages fly smaller", () => {
+    // Pages render at DRIFT_PAGE_SCALE while adrift. Picking reasons about
+    // the same rectangle the renderer draws, so shrinking one without the
+    // other would leave the reader grabbing at a page that is not there.
+    const field = makeField();
+    const input = makeInput();
+    run(field, 400, input);
+    expect(field.phase).toBe("adrift");
+
+    for (const leaf of field.leaves) {
+      // Aim dead centre of this page, projected to the screen.
+      const t = (input.cameraDistance - leaf.z) / input.cameraDistance;
+      const aim = {
+        ...input,
+        inside: true,
+        screenX: (leaf.x + input.shift) / t - input.shift,
+        screenY: leaf.y / t,
+      };
+      const hit = pickDriftLeaf(field, aim);
+      // Something must be under the pointer — at worst a page in front.
+      expect(hit).toBeGreaterThanOrEqual(0);
+      // And whatever was picked really does cover that point.
+      const picked = field.leaves[hit]!;
+      const pt = (input.cameraDistance - picked.z) / input.cameraDistance;
+      const wx = aim.screenX * pt - picked.x;
+      const wy = aim.screenY * pt - picked.y;
+      const u = wx * picked.axisUX + wy * picked.axisUY;
+      const v = wx * picked.axisVX + wy * picked.axisVY;
+      expect(Math.abs(u)).toBeLessThan((PW / 2) * picked.scale + 12);
+      expect(Math.abs(v)).toBeLessThan((PH / 2) * picked.scale + 12);
+    }
+  });
+
+  it("grows pages back to full size smoothly as they land", () => {
+    // Pages fly small and rest full size, so the whole difference has to be
+    // spent gradually on the way home; a step here would read as a pop.
+    const field = makeField();
+    const input = makeInput();
+    run(field, 400, input);
+    const flying = field.leaves.map((leaf) => leaf.scale);
+    for (const scale of flying) {
+      expect(scale).toBeLessThan(DRIFT_PAGE_SCALE * 1.02);
+    }
+
+    beginDriftLanding(field);
+    let previous = flying.slice();
+    for (let frame = 0; frame < 600 && field.phase === "landing"; frame += 1) {
+      stepDriftField(field, DT, input);
+      for (const leaf of field.leaves) {
+        expect(leaf.scale - previous[leaf.index]!).toBeLessThan(0.05);
+      }
+      previous = field.leaves.map((leaf) => leaf.scale);
+    }
+    expect(field.phase).toBe("landed");
+    for (const leaf of field.leaves) {
+      expect(leaf.release).toBe(0);
+      expect(leaf.scale).toBeCloseTo(1, 6);
+    }
   });
 });
