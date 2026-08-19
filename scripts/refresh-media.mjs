@@ -47,6 +47,14 @@ const ANYAPI_LINKEDIN_URL =
   "https://api.getanyapi.com/v1/run/linkedin.profile_posts_full";
 const ANYAPI_TIMEOUT_MS = 20_000;
 
+// X's public syndication payload, the only place a post's attached media is
+// exposed (see xMediaFromSyndication). One quick request per post, so it gets
+// a short leash; the enrichment gives up entirely after a few misses, which
+// is what a blocked or reshaped endpoint looks like.
+const X_SYNDICATION_URL = "https://cdn.syndication.twimg.com/tweet-result";
+const X_SYNDICATION_TIMEOUT_MS = 6_000;
+const X_SYNDICATION_GIVE_UP_AFTER = 3;
+
 const LINKEDIN_POST_LIMIT = 10;
 
 // Both AnyAPI lanes cost money per call — X a flat $0.00075, LinkedIn ~$0.0195
@@ -197,19 +205,40 @@ function isPositiveInt(value) {
   return value !== undefined && Number.isInteger(value) && value > 0;
 }
 
-// First usable still from a post: an attached image, else a video poster.
-function postImage(images, videoThumbnail, title) {
-  const first = asRecord(toArray(images)[0]);
-  const src = textOf(first?.url) ?? textOf(videoThumbnail);
+// One plate image, with only the dimensions the schema will accept.
+function plateImage(src, width, height, title) {
   if (!src) return undefined;
-  const width = numOf(first?.width);
-  const height = numOf(first?.height);
   return {
     src,
     alt: truncate(`Image from the post “${title}”`, 240),
     width: isPositiveInt(width) ? width : undefined,
     height: isPositiveInt(height) ? height : undefined,
   };
+}
+
+// First usable still from a post: an attached image, else a video poster.
+function postImage(images, videoThumbnail, title) {
+  const first = asRecord(toArray(images)[0]);
+  return plateImage(
+    textOf(first?.url) ?? textOf(videoThumbnail),
+    numOf(first?.width),
+    numOf(first?.height),
+    title,
+  );
+}
+
+// See the long note in src/lib/media/normalize.ts: no AnyAPI X SKU returns
+// media URLs, so a post's picture can only come from X's public syndication
+// payload. No key involved; the token is derived from the post id.
+function xMediaFromSyndication(json, title) {
+  const first = asRecord(toArray(asRecord(json)?.mediaDetails)[0]);
+  const info = asRecord(first?.original_info);
+  return plateImage(
+    textOf(first?.media_url_https),
+    numOf(info?.width),
+    numOf(info?.height),
+    title,
+  );
 }
 
 function rssItems(xml) {
@@ -469,7 +498,13 @@ function configuredFeeds(env) {
           },
           ANYAPI_TIMEOUT_MS,
         );
-        return fromAnyApiX(await response.json(), xHandle);
+        const posts = fromAnyApiX(await response.json(), xHandle);
+        const withMedia = await attachXMedia(posts);
+        console.log(
+          `refresh-media: x: ${withMedia} of ${posts.length} post(s) ` +
+            "carry an image",
+        );
+        return posts;
       },
     });
   } else if (env.X_BEARER_TOKEN && env.X_USER_ID) {
@@ -515,6 +550,47 @@ function configuredFeeds(env) {
     });
   }
   return feeds;
+}
+
+/** The token embedded tweets send. Derived from the id — not a credential. */
+function syndicationToken(id) {
+  return ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
+}
+
+/**
+ * Give each X post its picture. Best-effort by design: a post without media,
+ * a failed lookup, or a reshaped payload simply leaves `image` unset, and the
+ * post itself is never dropped over it.
+ */
+async function attachXMedia(items) {
+  let found = 0;
+  let misses = 0;
+  for (const item of items) {
+    const id = item.id.slice(2);
+    if (!/^\d+$/.test(id)) continue;
+    if (misses >= X_SYNDICATION_GIVE_UP_AFTER) break;
+    const url =
+      `${X_SYNDICATION_URL}?id=${encodeURIComponent(id)}` +
+      `&token=${syndicationToken(id)}&lang=en`;
+    try {
+      const response = await fetchWithTimeout(url, {}, X_SYNDICATION_TIMEOUT_MS);
+      const image = xMediaFromSyndication(await response.json(), item.title);
+      if (image) {
+        item.image = image;
+        found += 1;
+      }
+      misses = 0;
+    } catch {
+      misses += 1;
+    }
+  }
+  if (misses >= X_SYNDICATION_GIVE_UP_AFTER) {
+    console.warn(
+      "refresh-media: x: syndication lookups kept failing; " +
+        "posts keep their copy but lose their pictures this run",
+    );
+  }
+  return found;
 }
 
 // --- thumbnail mirror -------------------------------------------------------
@@ -694,4 +770,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 }
 
 // Exported for the parity test only; the script's real interface is the CLI.
-export { anyapiDue, fromAnyApiLinkedIn, fromAnyApiX };
+export {
+  anyapiDue,
+  fromAnyApiLinkedIn,
+  fromAnyApiX,
+  xMediaFromSyndication,
+};
