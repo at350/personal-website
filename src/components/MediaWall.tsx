@@ -50,6 +50,7 @@ const PAGE_CAPACITY = { verso: 6, recto: 7 } as const;
 
 const SOURCE_LABELS: Record<MediaSource, string> = {
   x: "X",
+  linkedin: "LINKEDIN",
   letterboxd: "LETTERBOXD",
   substack: "SUBSTACK",
   youtube: "YOUTUBE",

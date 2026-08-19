@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  fromAnyApiLinkedIn,
   fromAnyApiX,
   fromLetterboxdRss,
   fromSubstackRss,
@@ -14,6 +15,23 @@ import { MediaItemSchema, type MediaItem } from "@/lib/media/types";
 
 const fixture = (name: string): string =>
   readFileSync(join(process.cwd(), "tests", "fixtures", name), "utf8");
+
+/**
+ * The cron script, imported on disk. jsdom serves import.meta.url over http:,
+ * which the ESM loader refuses, so reach it through the filesystem. Importing
+ * it does not start a refresh — the script guards on being the entry point.
+ */
+interface RefreshScript {
+  fromAnyApiX: (json: unknown, handle?: string) => unknown[];
+  fromAnyApiLinkedIn: (json: unknown) => unknown[];
+  anyapiDue: (env: Record<string, string>, now?: Date) => boolean;
+}
+
+const loadScript = async (): Promise<RefreshScript> =>
+  (await import(
+    /* @vite-ignore */
+    pathToFileURL(join(process.cwd(), "scripts", "refresh-media.mjs")).href
+  )) as RefreshScript;
 
 /** Shapes a broken or throttled AnyAPI response can actually take. */
 const GARBAGE: unknown[] = [
@@ -394,12 +412,7 @@ describe("refresh-media.mjs / normalize.ts parity", () => {
     // then parses differently — so compare the two on the same inputs.
     // Round-tripping through JSON and the schema is exactly what the script
     // writes and store.ts reads back.
-    // jsdom serves import.meta.url over http:, which the ESM loader refuses;
-    // reach the script on disk instead.
-    const script = (await import(
-      /* @vite-ignore */
-      pathToFileURL(join(process.cwd(), "scripts", "refresh-media.mjs")).href
-    )) as { fromAnyApiX: (json: unknown, handle?: string) => unknown[] };
+    const script = await loadScript();
 
     const inputs: unknown[] = [
       JSON.parse(fixture("anyapi.x.user_posts.json")),
@@ -425,6 +438,238 @@ describe("refresh-media.mjs / normalize.ts parity", () => {
         .map((item) => MediaItemSchema.parse(JSON.parse(JSON.stringify(item))));
       expect(viaScript).toEqual(fromAnyApiX(input, "alan_tai1"));
     }
+  });
+
+  it("normalizes LinkedIn bodies identically to the app's normalizer", async () => {
+    const script = await loadScript();
+    const inputs: unknown[] = [
+      JSON.parse(fixture("anyapi.linkedin.profile_posts.json")),
+      ...GARBAGE,
+      {
+        output: {
+          data: {
+            items: [
+              { id: "1", repostText: "not ours", createdUtc: 1781138598 },
+              { id: "2", text: "kept &amp; counted", createdUtc: 1781138598 },
+              { id: "3", text: "no date at all" },
+              { id: "4", text: "x".repeat(900), createdUtc: 1781138598 },
+              {
+                id: "5",
+                text: "video only",
+                images: [],
+                videoThumbnail: "https://media.licdn.com/v.jpg",
+                createdUtc: 1781138598,
+              },
+              {
+                id: "6",
+                text: "bad dimensions",
+                images: [{ url: "https://media.licdn.com/i.jpg", width: 0, height: 1.5 }],
+                createdUtc: 1781138598,
+              },
+            ],
+          },
+        },
+      },
+    ];
+
+    for (const input of inputs) {
+      const viaScript = script
+        .fromAnyApiLinkedIn(input)
+        .map((item) => MediaItemSchema.parse(JSON.parse(JSON.stringify(item))));
+      expect(viaScript).toEqual(fromAnyApiLinkedIn(input));
+    }
+  });
+});
+
+describe("fromAnyApiLinkedIn", () => {
+  // A real `POST /v1/run/linkedin.profile_posts_full` body, trimmed to six
+  // posts and scrubbed of the author's internal member URN.
+  const captured: unknown = JSON.parse(
+    fixture("anyapi.linkedin.profile_posts.json"),
+  );
+  const items = fromAnyApiLinkedIn(captured);
+  const raw = (
+    captured as { output: { data: { items: Record<string, never>[] } } }
+  ).output.data.items;
+  const byId = (id: string) => items.find((item) => item.id === `linkedin:${id}`);
+
+  const post = (fields: Record<string, unknown>) => ({
+    output: { found: true, data: { items: [fields] } },
+  });
+
+  it("normalizes the captured profile into schema-valid posts", () => {
+    expect(items).toHaveLength(6);
+    for (const item of items) {
+      expect(item.source).toBe("linkedin");
+      expect(item.kind).toBe("post");
+      expect(item.id).toMatch(/^linkedin:\d+$/);
+      expect(MediaItemSchema.safeParse(item).success).toBe(true);
+      expect(item.title.length).toBeLessThanOrEqual(200);
+      expect(item.excerpt?.length ?? 0).toBeLessThanOrEqual(500);
+      expect(item.url).toMatch(/^https:\/\/www\.linkedin\.com\/posts\//);
+    }
+  });
+
+  it("takes the byline from the author block", () => {
+    for (const item of items) expect(item.author).toBe("Alan Tai");
+  });
+
+  it("reads createdUtc epoch seconds into an ISO date", () => {
+    expect(byId("7494588276977074176")).toMatchObject({
+      publishedAt: "2026-08-16T02:58:07.000Z",
+    });
+    for (const item of items) {
+      expect(item.publishedAt).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
+    }
+  });
+
+  it("never prints the quoted author's copy as our own", () => {
+    // A quote post carries both our commentary (`text`) and the post being
+    // quoted (`repostText`). Only the first is ours to publish.
+    const quoted = raw.find((entry) => entry.repostText) as unknown as {
+      id: string;
+      text: string;
+      repostText: string;
+    };
+    expect(quoted?.repostText?.length).toBeGreaterThan(0);
+    const item = byId(quoted.id);
+    const copy = `${item?.title ?? ""}${item?.excerpt ?? ""}`;
+    expect(copy).not.toContain(quoted.repostText.slice(0, 40));
+    expect(quoted.text.startsWith(item?.title.replace(/…$/, "") ?? "")).toBe(true);
+  });
+
+  it("drops a bare repost, which carries no copy of its own", () => {
+    expect(
+      fromAnyApiLinkedIn(
+        post({
+          id: "1",
+          url: "https://www.linkedin.com/posts/alan-tai-nu_x-activity-1-aa",
+          repostText: "somebody else's entire post",
+          repostAuthorName: "Someone Else",
+          createdUtc: 1781138598,
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("mirrors an attached image with its real dimensions", () => {
+    expect(byId("7470636748868603905")?.image).toMatchObject({
+      src: expect.stringContaining("media.licdn.com"),
+      width: 954,
+      height: 1696,
+    });
+    expect(byId("7470636748868603905")?.image?.alt.length).toBeGreaterThan(0);
+  });
+
+  it("falls back to the video poster when a post has no still", () => {
+    // This post is a video: `images` is empty but `videoThumbnail` is not, and
+    // without the fallback the plate would render blank.
+    const video = byId("7492994105518718977");
+    expect(video?.image?.src).toContain("videocover");
+    expect(video?.image?.width).toBeUndefined();
+  });
+
+  it("leaves image unset when the post has neither", () => {
+    expect(byId("7473517334754713600")?.image).toBeUndefined();
+  });
+
+  it("splits a long post and caps the excerpt at 500", () => {
+    // The captured deck runs to 1112 characters.
+    const longest = items.reduce((a, b) =>
+      (b.excerpt?.length ?? 0) > (a.excerpt?.length ?? 0) ? b : a,
+    );
+    expect(longest.excerpt?.length).toBe(500);
+    expect(longest.excerpt?.endsWith("…")).toBe(true);
+    expect(longest.excerpt?.startsWith(longest.title.replace(/…$/, ""))).toBe(
+      false,
+    );
+  });
+
+  it("folds newlines so a multi-paragraph post reads as one line", () => {
+    const [item] = fromAnyApiLinkedIn(
+      post({
+        id: "2",
+        url: "https://www.linkedin.com/posts/alan-tai-nu_x-activity-2-aa",
+        text: "First line.\n\nSecond line &amp; third.",
+        createdUtc: 1781138598,
+      }),
+    );
+    expect(item?.title).toBe("First line. Second line & third.");
+  });
+
+  it("returns [] on garbage, an error body, or a changed shape", () => {
+    for (const bad of GARBAGE) expect(fromAnyApiLinkedIn(bad)).toEqual([]);
+    expect(fromAnyApiLinkedIn({ output: { data: { items: [] } } })).toEqual([]);
+  });
+
+  it("drops one bad record without killing the batch", () => {
+    const good = (n: number) => ({
+      id: `770000000000000000${n}`,
+      url: `https://www.linkedin.com/posts/alan-tai-nu_x-activity-770000000000000000${n}-aa`,
+      text: `a perfectly fine post ${n}`,
+      createdUtc: 1781138598,
+    });
+    const parsed = fromAnyApiLinkedIn({
+      output: {
+        found: true,
+        data: {
+          items: [
+            good(1),
+            { id: "2", url: "https://www.linkedin.com/posts/x" }, // no text
+            { text: "no id at all" },
+            null,
+            "not an object",
+            { id: "3", text: "   ", createdUtc: 1781138598 },
+            good(2),
+          ],
+        },
+      },
+    });
+    expect(parsed).toHaveLength(2);
+    expect(parsed.map((item) => item.title)).toEqual([
+      "a perfectly fine post 1",
+      "a perfectly fine post 2",
+    ]);
+  });
+
+  it("accepts a bare output as well as the full response envelope", () => {
+    expect(
+      fromAnyApiLinkedIn((captured as { output: unknown }).output),
+    ).toEqual(items);
+  });
+});
+
+describe("anyapiDue", () => {
+  // The paid lanes refresh twice a week rather than on all 12 daily cycles.
+  const at = (y: number, m: number, d: number, h: number) =>
+    new Date(Date.UTC(y, m, d, h, 17));
+
+  it("comes due on exactly two of the week's 84 cron cycles", async () => {
+    const { anyapiDue } = await loadScript();
+    const fired: string[] = [];
+    // 2026-08-16 is a Sunday; walk a full week of the `17 */2 * * *` cron.
+    for (let day = 0; day < 7; day += 1) {
+      for (let hour = 0; hour < 24; hour += 2) {
+        const when = at(2026, 7, 16 + day, hour);
+        if (anyapiDue({}, when)) {
+          fired.push(`${when.getUTCDay()}@${when.getUTCHours()}`);
+        }
+      }
+    }
+    expect(fired).toEqual(["1@6", "4@6"]); // Monday and Thursday, 06:17 UTC
+  });
+
+  it("only fires on an hour the cron actually runs", async () => {
+    const { anyapiDue } = await loadScript();
+    // The cron fires on even hours; an odd refresh hour would never come due.
+    expect(anyapiDue({}, at(2026, 7, 17, 7))).toBe(false);
+    expect(anyapiDue({}, at(2026, 7, 17, 6))).toBe(true);
+  });
+
+  it("ANYAPI_ALWAYS=1 forces a fetch for a manual run", async () => {
+    const { anyapiDue } = await loadScript();
+    expect(anyapiDue({ ANYAPI_ALWAYS: "1" }, at(2026, 7, 16, 3))).toBe(true);
+    expect(anyapiDue({ ANYAPI_ALWAYS: "0" }, at(2026, 7, 16, 3))).toBe(false);
   });
 });
 

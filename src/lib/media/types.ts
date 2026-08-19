@@ -3,6 +3,7 @@ import { z } from "zod";
 export const MediaSourceSchema = z.enum([
   "local",
   "x",
+  "linkedin",
   "letterboxd",
   "substack",
   "youtube",
@@ -93,6 +94,7 @@ export const MediaApiResponseSchema = z.object({
   degraded: z.boolean(),
   feeds: z.object({
     x: MediaFeedReportSchema,
+    linkedin: MediaFeedReportSchema,
     letterboxd: MediaFeedReportSchema,
     substack: MediaFeedReportSchema,
   }),

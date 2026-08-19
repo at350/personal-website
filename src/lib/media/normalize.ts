@@ -120,10 +120,12 @@ function handleFromStatusUrl(url: string | undefined): string | undefined {
 }
 
 /**
- * X appends a t.co shortlink for any attached photo, video, or quoted post.
- * That link is furniture, not copy — left in, it becomes the headline of a
- * short post ("my fav https://t.co/…"). Only a trailing run is dropped, so a
- * link someone wrote mid-sentence still reads as written.
+ * X — and only X — appends a t.co shortlink for any attached photo, video, or
+ * quoted post. That link is furniture, not copy: left in, it becomes the
+ * headline of a short post ("my fav https://t.co/…"). Only a trailing run is
+ * dropped, so a link someone wrote mid-sentence still reads as written. It is
+ * applied at the X call site, never to LinkedIn copy, where a trailing
+ * shortlink would be something the author actually typed.
  */
 const TRAILING_TCO = /(?:\s*https?:\/\/t\.co\/[A-Za-z0-9]+)+\s*$/i;
 
@@ -134,12 +136,33 @@ const TRAILING_TCO = /(?:\s*https?:\/\/t\.co\/[A-Za-z0-9]+)+\s*$/i;
  */
 const RETWEET_PREFIX = /^RT @[A-Za-z0-9_]{1,15}:/;
 
-/** Post copy as written: entities decoded, X's trailing furniture removed. */
+/** Post copy as written: entities decoded, newlines folded to spaces. */
 function postText(raw: string): string {
-  return decodeEntities(raw)
-    .replace(TRAILING_TCO, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return decodeEntities(raw).replace(/\s+/g, " ").trim();
+}
+
+/** Only pass dimensions the schema will actually accept. */
+function isPositiveInt(value: number | undefined): value is number {
+  return value !== undefined && Number.isInteger(value) && value > 0;
+}
+
+/** First usable still from a post: an attached image, else a video poster. */
+function postImage(
+  images: unknown,
+  videoThumbnail: unknown,
+  title: string,
+): MediaItem["image"] | undefined {
+  const first = asRecord(toArray(images)[0]);
+  const src = textOf(first?.url) ?? textOf(videoThumbnail);
+  if (!src) return undefined;
+  const width = numOf(first?.width);
+  const height = numOf(first?.height);
+  return {
+    src,
+    alt: truncate(`Image from the post “${title}”`, 240),
+    width: isPositiveInt(width) ? width : undefined,
+    height: isPositiveInt(height) ? height : undefined,
+  };
 }
 
 function rssItems(xml: string): XmlNode[] {
@@ -323,7 +346,7 @@ export function fromAnyApiX(
         const id = textOf(record?.id);
         const raw = textOf(record?.text);
         if (!record || !id || !raw) return [];
-        const text = postText(raw);
+        const text = postText(raw.replace(TRAILING_TCO, ""));
         // A media-only post has no copy left once the furniture is gone, and
         // a repost is not ours to print under this byline.
         if (!text || RETWEET_PREFIX.test(text)) return [];
@@ -340,6 +363,47 @@ export function fromAnyApiX(
               (handle ? `https://x.com/${handle}/status/${id}` : undefined),
             author: handle ? `@${handle}` : undefined,
             publishedAt: epochSecondsToIso(record.createdUtc),
+          },
+        ];
+      },
+    );
+    return validateItems(candidates);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Normalize AnyAPI's `linkedin.profile_posts_full` body, whose posts sit at
+ * `output.data.items`. Only the author's own `text` is ever read: a quote post
+ * also carries `repostText`, which belongs to whoever was quoted and must
+ * never be printed as this author's copy.
+ */
+export function fromAnyApiLinkedIn(json: unknown): MediaItem[] {
+  try {
+    const envelope = asRecord(json);
+    const output = asRecord(envelope?.output) ?? envelope;
+    const candidates = toArray(asRecord(output?.data)?.items).flatMap(
+      (entry) => {
+        const record = asRecord(entry);
+        const id = textOf(record?.id);
+        const raw = textOf(record?.text);
+        // A bare repost carries no copy of its own; only the quoted author's.
+        if (!record || !id || !raw) return [];
+        const text = postText(raw);
+        if (!text) return [];
+        const author = asRecord(record.author);
+        const copy = splitPostCopy(text);
+        return [
+          {
+            id: `linkedin:${id}`,
+            source: "linkedin",
+            kind: "post",
+            ...copy,
+            url: textOf(record.url),
+            author: textOf(author?.name) ?? textOf(author?.handle),
+            publishedAt: epochSecondsToIso(record.createdUtc),
+            image: postImage(record.images, record.videoThumbnail, copy.title),
           },
         ];
       },
