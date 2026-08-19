@@ -12,6 +12,7 @@ import {
 import { paperDriftActivity } from "@/book3d/paperMaterial";
 import { SHEET_REST_ENERGY } from "@/book3d/settle";
 import {
+  DRIFT_SHEET_MAX_DEVIATION,
   beginDriftLanding,
   createDriftField,
   pointerPointAtDepth,
@@ -47,11 +48,13 @@ const MOTION_FLEX = 3.2;
     rather than hinging it at one edge. */
 /* Sized against measurement, not taste: this solver answers a flutter
    acceleration with roughly amplitude/142 pixels of out-of-plane travel on a
-   528px page, so a base of 2400 buys ~17px of visible bow at rest and motion
-   carries it to ~25px — real curvature that still sits inside the 54px flex
-   budget the depth-clearance projection allows between sheets. */
-const FLUTTER_BASE = 2400;
-const FLUTTER_MOTION = 4;
+   528px page, so this base buys ~12px of bow at rest and motion carries it
+   toward the DRIFT_SHEET_MAX_DEVIATION clamp. That clamp is what the depth
+   clearance reserves room for between every overlapping pair, so the two
+   numbers move together: more bow costs gap, and gap is what stops sheets
+   from crossing on screen. */
+const FLUTTER_BASE = 1700;
+const FLUTTER_MOTION = 3;
 const FLUTTER_RATE = 2.3;
 const TAU = Math.PI * 2;
 const FIELD_SEED = 0xd21f7;
@@ -247,6 +250,7 @@ export function DriftBook({
     flutterY: 0,
     flutterZ: 0,
     flutterPhase: 0,
+    maxDeviation: DRIFT_SHEET_MAX_DEVIATION,
   });
   const currentScratch = useRef<DriftVec>({ x: 0, y: 0, z: 0 });
   const reportedLoosened = useRef(false);

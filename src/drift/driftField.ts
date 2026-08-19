@@ -199,9 +199,21 @@ const PAIR_LATERAL_ACCEL = 170;
     than a fast shove. Skipped entirely during the landing collapse. */
 const PAIR_HARD_X_RATIO = 1.3;
 const PAIR_HARD_Y_RATIO = 1.15;
-/** Extra slack over the exact geometric requirement: cloth flex off the
-    carrier plane plus solver discreteness. */
-const PAIR_HARD_MARGIN = 34;
+/** How far a flexing sheet may stray from its rigid carrier. Everything
+    below separates CARRIERS, but what the eye sees is the sheet: flutter bow
+    plus follow lag put the drawn surface tens of pixels off the plane this
+    projection reasons about, so that displacement has to be bounded for the
+    guarantee to mean anything on screen. Measured before the clamp existed:
+    a still page bowed ~17px and a fast one reached 38px. */
+export const DRIFT_SHEET_MAX_DEVIATION = 13;
+/** Extra slack over the exact geometric requirement. Two sheets can bow
+    TOWARD each other at once, so this has to cover both clamps — the old
+    flat 34 covered barely one, which let pages whose carriers were properly
+    separated still cross on screen — plus a little for solver discreteness. */
+const PAIR_HARD_MARGIN = DRIFT_SHEET_MAX_DEVIATION * 2 + 8;
+/** Sweeps of the final floor-only pass; it converges fast because the floor
+    it enforces is small enough to always fit the depth range. */
+const FLEX_FLOOR_SWEEPS = 4;
 /** Depth corrections are nearly invisible on screen — the perspective
     counter-scale holds apparent size constant — so the stack passes may
     move leaves briskly along z without reading as snaps. */
@@ -221,7 +233,7 @@ const CROWD_ALIGN_BOOST = 2.2;
     whole column being spun past what the depth range can hold. */
 const CROWD_WIND_SHIELD = 0.8;
 const CROWD_SPIN_DAMPING = 0.7;
-const HARD_Z_FLOOR_RATIO = -0.3;
+const HARD_Z_FLOOR_RATIO = -0.4;
 const HARD_Z_HEADROOM = 40;
 export const DRIFT_CURRENT_ACCEL = 900;
 export const DRIFT_CURRENT_RADIUS_RATIO = 0.75;
@@ -251,11 +263,13 @@ const CONTAIN_MARGIN_X_RATIO = 0.45;
 const CONTAIN_MARGIN_Y_RATIO = 0.42;
 /** The drift volume extends BEHIND the resting page plane too — empty white
     void where a page simply reads a little smaller. Eleven wild sheets
-    cannot layer in the front half alone. */
-const CONTAIN_Z_MIN_RATIO = -0.25;
+    cannot layer in the front half alone, and depth is nearly free on screen:
+    the perspective counter-scale holds a page's apparent size constant, so a
+    deeper volume buys clearance without anything looking further away. */
+const CONTAIN_Z_MIN_RATIO = -0.34;
 /** Deep enough toward the camera that eleven sheets can layer with real
     clearance; the perspective-aware x/y bounds shrink to compensate. */
-const CONTAIN_Z_MAX_RATIO = 0.7;
+const CONTAIN_Z_MAX_RATIO = 0.82;
 
 const GRAB_STIFFNESS = 60;
 const GRAB_DAMPING = 15.5;
@@ -1094,37 +1108,58 @@ function projectDepthClearance(field: DriftField, dt: number) {
     rank[order[position]!] = position;
   }
 
-  const requiredFor = (a: DriftLeafState, b: DriftLeafState) => {
+  // The requirement splits in two, because only one half may be negotiated.
+  // The TILT half is the sheets' true z-extents: real geometry, but it
+  // shrinks honestly when crowd pressure presses pages flat. The FLEX half
+  // covers how far each drawn sheet bows off its carrier plane, and that
+  // does not shrink just because the pile is crowded — scaling it away is
+  // exactly how pages whose carriers were properly spaced still crossed on
+  // screen. So the flex margin is a floor the scaler may never touch.
+  const tiltFor = (a: DriftLeafState, b: DriftLeafState) => {
     const ox = (b.x - a.x) / reachX;
     const oy = (b.y - a.y) / reachY;
     if (ox * ox + oy * oy >= 1) return 0;
     // Exact and continuous: |dz| covering the sum of both sheets' true
     // z-extents makes the depth axis a separating axis — airtight by SAT
-    // sufficiency, whatever the pair's orientation. Near-parallel stacks
-    // over-pay by this metric, which is precisely when the chain scaler
-    // below flattens them until the demand fits the depth range.
-    const gate = a.release * b.release;
+    // sufficiency, whatever the pair's orientation.
     const extA =
       (field.pw / 2) * a.scale * Math.abs(a.axisUZ) +
       (field.ph / 2) * a.scale * Math.abs(a.axisVZ);
     const extB =
       (field.pw / 2) * b.scale * Math.abs(b.axisUZ) +
       (field.ph / 2) * b.scale * Math.abs(b.axisVZ);
-    return gate * (extA + extB + PAIR_HARD_MARGIN);
+    return a.release * b.release * (extA + extB);
+  };
+  const flexFor = (a: DriftLeafState, b: DriftLeafState) => {
+    const ox = (b.x - a.x) / reachX;
+    const oy = (b.y - a.y) / reachY;
+    if (ox * ox + oy * oy >= 1) return 0;
+    return a.release * b.release * PAIR_HARD_MARGIN;
   };
 
   // A gust can herd every leaf into one column whose stacking chain wants
-  // more depth than the range holds. Gaps scale down to fit — the residual
-  // pressure escapes through the lateral relief below instead.
-  let chainDemand = 0;
-  for (let position = 1; position < order.length; position += 1) {
-    chainDemand += requiredFor(
-      field.leaves[order[position - 1]!]!,
-      field.leaves[order[position]!]!,
-    );
-  }
+  // more depth than the range holds. The tilt half scales down to fit; the
+  // flex floor is subtracted from the room first, never scaled.
   const chainRoom = (zCeil - zFloor) * PAIR_CHAIN_FILL;
-  let demandScale = chainDemand > chainRoom ? chainRoom / chainDemand : 1;
+  const measureChain = () => {
+    let tilt = 0;
+    let flex = 0;
+    for (let position = 1; position < order.length; position += 1) {
+      const a = field.leaves[order[position - 1]!]!;
+      const b = field.leaves[order[position]!]!;
+      tilt += tiltFor(a, b);
+      flex += flexFor(a, b);
+    }
+    return { tilt, flex };
+  };
+  let chain = measureChain();
+  const tiltScaleFor = (measured: { tilt: number; flex: number }) => {
+    if (measured.tilt <= 0) return 1;
+    const spare = chainRoom - measured.flex;
+    if (spare <= 0) return 0;
+    return Math.min(1, spare / measured.tilt);
+  };
+  let tiltScale = tiltScaleFor(chain);
 
   // If the tilts themselves are what cannot fit, the crowd pressure
   // physically flattens the pages until the chain fits again — wind-pressed
@@ -1133,22 +1168,19 @@ function projectDepthClearance(field: DriftField, dt: number) {
   // feasible layout exists every frame; free play (an unsaturated chain)
   // never enters this loop and keeps the full cap.
   let crowdCap = SWING_CAP;
-  for (let pass = 0; pass < 6 && demandScale < 1; pass += 1) {
+  for (let pass = 0; pass < 6 && tiltScale < 1; pass += 1) {
     crowdCap = Math.max(0.04, crowdCap * 0.55);
     for (const leaf of field.leaves) {
       if (leaf.index === field.grabIndex) continue;
       clampSwing(leaf, crowdCap);
       refreshAxes(leaf);
     }
-    chainDemand = 0;
-    for (let position = 1; position < order.length; position += 1) {
-      chainDemand += requiredFor(
-        field.leaves[order[position - 1]!]!,
-        field.leaves[order[position]!]!,
-      );
-    }
-    demandScale = chainDemand > chainRoom ? chainRoom / chainDemand : 1;
+    chain = measureChain();
+    tiltScale = tiltScaleFor(chain);
   }
+
+  const requiredFor = (a: DriftLeafState, b: DriftLeafState) =>
+    tiltFor(a, b) * tiltScale + flexFor(a, b);
 
   // One budgeted forward/backward stack pass instead of pairwise sweeps:
   // extent-based requirements obey the triangle inequality, so satisfying
@@ -1231,6 +1263,38 @@ function projectDepthClearance(field: DriftField, dt: number) {
       if (leaf.vz < 0) leaf.vz = 0;
     }
   }
+
+  // The passes above bound each leaf by its own feasible interval, so a
+  // locally impossible chain can leave the floor unmet. This last pass
+  // enforces the FLEX floor alone — the clearance the drawn sheets need —
+  // which is small enough to always fit the depth range, and so converges.
+  for (let sweep = 0; sweep < FLEX_FLOOR_SWEEPS; sweep += 1) {
+    let settled = true;
+    for (let i = 0; i < field.leaves.length; i += 1) {
+      const a = field.leaves[i]!;
+      if (a.release <= 0) continue;
+      for (let j = i + 1; j < field.leaves.length; j += 1) {
+        const b = field.leaves[j]!;
+        if (b.release <= 0) continue;
+        const need = flexFor(a, b);
+        if (need <= 0) continue;
+        const direction = rank[b.index]! > rank[a.index]! ? 1 : -1;
+        const gap = (b.z - a.z) * direction;
+        if (gap >= need) continue;
+        settled = false;
+        const push = (need - gap) * 0.5;
+        a.z = clamp(a.z - direction * push, zFloor, zCeil);
+        b.z = clamp(b.z + direction * push, zFloor, zCeil);
+        if ((b.vz - a.vz) * direction < 0) {
+          const shared = (a.vz + b.vz) * 0.5;
+          a.vz = shared;
+          b.vz = shared;
+        }
+      }
+    }
+    if (settled) break;
+  }
+
 }
 
 /** World position of a leaf-local point, written into out. */

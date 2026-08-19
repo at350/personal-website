@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DRIFT_LAYER_GAP,
+  DRIFT_SHEET_MAX_DEVIATION,
   beginDriftLanding,
   createDriftField,
   pickDriftLeaf,
@@ -189,8 +190,8 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
       // Soft containment: centers never reach the viewport edge.
       expect(Math.abs(leaf.x + input.shift)).toBeLessThan(720);
       expect(Math.abs(leaf.y)).toBeLessThan(450);
-      expect(leaf.z).toBeGreaterThan(PH * -0.35 - 20);
-      expect(leaf.z).toBeLessThan(PH * 0.7 + 60);
+      expect(leaf.z).toBeGreaterThan(PH * -0.45 - 20);
+      expect(leaf.z).toBeLessThan(PH * 0.82 + 60);
     }
   });
 
@@ -243,6 +244,38 @@ describe("drift leaf field", { timeout: 30_000 }, () => {
     // is clean on average, and grazes show on a small fraction of frames.
     expect(sum / 1650).toBeLessThan(1.6);
     expect(grazes / 1650).toBeLessThan(0.1);
+  });
+
+  it("leaves room for the sheets, not just the carriers, to stay apart", () => {
+    // The clearance projection separates rigid CARRIERS, but the eye sees
+    // the flexing sheet — which bows off that plane by up to
+    // DRIFT_SHEET_MAX_DEVIATION. Overlapping pairs must therefore hold more
+    // than twice that gap, or two pages whose carriers are correctly spaced
+    // still cross on screen. This is the invariant the reported clipping
+    // violated, and the carrier-only SAT checks below cannot see it.
+    const field = makeField();
+    const input = makeInput();
+    run(field, 150, input);
+    const needed = DRIFT_SHEET_MAX_DEVIATION * 2;
+
+    let worstShortfall = 0;
+    for (let frame = 0; frame < 900; frame += 1) {
+      stepDriftField(field, DT, input);
+      for (let i = 0; i < field.leaves.length; i += 1) {
+        for (let j = i + 1; j < field.leaves.length; j += 1) {
+          const a = field.leaves[i]!;
+          const b = field.leaves[j]!;
+          // Only pairs that actually overlap on screen can clip.
+          const ox = (b.x - a.x) / (PW * 0.9);
+          const oy = (b.y - a.y) / (PH * 0.85);
+          if (ox * ox + oy * oy >= 1) continue;
+          const gap = Math.abs(b.z - a.z);
+          worstShortfall = Math.max(worstShortfall, needed - gap);
+        }
+      }
+    }
+    // Overlapping sheets always keep both bows' worth of air between them.
+    expect(worstShortfall).toBeLessThanOrEqual(0);
   });
 
   it("parts the pile around a dragged leaf instead of cutting through it", () => {
