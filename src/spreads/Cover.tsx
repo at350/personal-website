@@ -27,6 +27,15 @@ export function Cover({ face, mode }: SpreadFaceProps) {
     // settled. Keep the entrance for the linear reader, where there is no
     // raster handoff to match.
     if (!isLiveMode(mode) || !motionOK() || !rootRef.current) return;
+    // Neighbour pages in the touch reader stay mounted but hidden so their
+    // images decode. SplitText measuring a visibility:hidden box throws or
+    // jumps type on Safari.
+    if (
+      rootRef.current.closest(".single__face--ready") ||
+      getComputedStyle(rootRef.current).visibility === "hidden"
+    ) {
+      return;
+    }
     const lines = rootRef.current.querySelectorAll(".cover2__word");
     const split = new SplitText(lines, {
       type: "chars",

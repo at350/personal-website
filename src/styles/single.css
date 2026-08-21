@@ -6,6 +6,12 @@
    values silently resolve against the viewport. Here they resolve against the
    paper, exactly as they do in the book. */
 
+html.fn-lock-scroll,
+html.fn-lock-scroll body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 .single {
   position: fixed;
   top: 0;
@@ -47,6 +53,20 @@
   padding-bottom: calc(8px + env(safe-area-inset-bottom));
 }
 
+@media (max-height: 500px) {
+  .single__chrome {
+    padding: 2px 14px;
+  }
+
+  .single__chrome--top {
+    padding-top: calc(28px + env(safe-area-inset-top));
+  }
+
+  .single__chrome--bottom {
+    padding-bottom: calc(4px + env(safe-area-inset-bottom));
+  }
+}
+
 .single__toc-open,
 .single__step {
   color: var(--sumi-2);
@@ -73,6 +93,7 @@
   min-height: 0;
   width: min(100% - 20px, 560px);
   margin: 0 auto;
+  -webkit-perspective: 1600px;
   perspective: 1600px;
 }
 
@@ -141,12 +162,14 @@
   inset: 0;
   transform-origin: left center;
   transform: rotateY(calc(var(--flip, 0) * -180deg));
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
 }
 
 .single__leaf-front,
 .single__leaf-back {
+  -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 }
 
@@ -177,6 +200,11 @@
 .single[data-busy] .single__face,
 .single[data-busy] .single__leaf-front {
   pointer-events: none;
+}
+
+.single[data-busy] {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* ---- contents -------------------------------------------------------- */

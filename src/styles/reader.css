@@ -1,5 +1,6 @@
 .reader {
   min-height: 100vh;
+  min-height: 100svh;
   background: var(--void);
   display: flex;
   flex-direction: column;
@@ -13,12 +14,21 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 18px 4px;
+  padding-top: calc(40px + env(safe-area-inset-top));
   color: var(--gray-warm);
   position: sticky;
   top: 0;
   background: var(--void);
   z-index: 20;
+}
+
+.reader__modes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 14px;
 }
 
 .reader__open {
@@ -33,9 +43,9 @@
 
 .reader__spread {
   width: 100%;
-  /* Clears the sticky mast and the fixed work-in-progress banner, which
-     scrollIntoView knows nothing about. */
-  scroll-margin-top: 96px;
+  /* Clears the sticky mast, the fixed work-in-progress banner, and the
+     iOS safe area, which scrollIntoView knows nothing about. */
+  scroll-margin-top: calc(96px + env(safe-area-inset-top));
   max-width: 680px;
   display: flex;
   flex-direction: column;

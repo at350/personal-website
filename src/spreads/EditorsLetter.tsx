@@ -11,7 +11,7 @@ import "@/styles/spreads/letter.css";
 const portrait = about.photos[0];
 
 /** Pages 04–05 — a letter (verso) and the portrait plate (recto). */
-export function EditorsLetter({ face }: SpreadFaceProps) {
+export function EditorsLetter({ face, mode }: SpreadFaceProps) {
   const plateRef = useRef<HTMLElement>(null);
 
   /* transitions.dev "3D tilt with glare": pointer drives ±3deg of tilt and
@@ -36,7 +36,7 @@ export function EditorsLetter({ face }: SpreadFaceProps) {
 
   if (face === "verso") {
     return (
-      <div className="letter" data-face="verso">
+      <div className="letter" data-face="verso" data-mode={mode}>
         <section className="letter__column" aria-label="A letter">
           <p className="letter__eyebrow">a letter</p>
           <h2 className="letter__heading">{about.heading}</h2>
@@ -59,7 +59,7 @@ export function EditorsLetter({ face }: SpreadFaceProps) {
   }
 
   return (
-    <div className="letter" data-face="recto">
+    <div className="letter" data-face="recto" data-mode={mode}>
       <figure
         className="letter__plate"
         ref={plateRef}

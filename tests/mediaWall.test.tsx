@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
-import { MediaWall, setLibraryFilter } from "@/components/MediaWall";
+import { MediaWall, mosaicColumnCount, setLibraryFilter } from "@/components/MediaWall";
 import { MediaItemSchema, type MediaItem } from "@/lib/media/types";
 
 const film = (overrides: Partial<MediaItem> = {}): MediaItem =>
@@ -120,5 +120,14 @@ describe("MediaWall drift", () => {
     expect(
       within(columns[0] as HTMLElement).getAllByText(/Film/)[0].textContent,
     ).toBe("Film 0");
+  });
+});
+
+describe("MediaWall columns", () => {
+  it("keeps three columns on a book page and two on phone paper", () => {
+    expect(mosaicColumnCount(0)).toBe(3);
+    expect(mosaicColumnCount(640)).toBe(3);
+    expect(mosaicColumnCount(420)).toBe(2);
+    expect(mosaicColumnCount(360)).toBe(2);
   });
 });

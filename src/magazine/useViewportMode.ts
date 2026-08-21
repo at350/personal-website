@@ -51,9 +51,20 @@ function writePreference(mode: ViewMode | null) {
   }
 }
 
+/** Phones, iPads, and other coarse pointers: a hover query or a pointer
+    query is enough. Either one changing (a trackpad connecting) re-runs. */
+export function isTouchPrimary(hoverNone: boolean, pointerCoarse: boolean): boolean {
+  return hoverNone || pointerCoarse;
+}
+
 /** What a visitor gets before expressing a preference. */
-export function autoMode(reducedMotion: boolean, width: number): ViewMode {
+export function autoMode(
+  reducedMotion: boolean,
+  width: number,
+  touchPrimary = false,
+): ViewMode {
   if (reducedMotion) return "reader";
+  if (touchPrimary) return "single";
   return width >= BOOK_MIN_WIDTH ? "book" : "single";
 }
 
@@ -63,16 +74,46 @@ export function resolveViewMode(
   override: ViewMode | null,
   reducedMotion: boolean,
   width: number,
+  touchPrimary = false,
 ): ViewMode {
   if (override === "book") {
-    return width >= BOOK_HARD_MIN ? "book" : autoMode(reducedMotion, width);
+    return width >= BOOK_HARD_MIN
+      ? "book"
+      : autoMode(reducedMotion, width, touchPrimary);
   }
   if (override === "single" || override === "reader") return override;
-  return autoMode(reducedMotion, width);
+  return autoMode(reducedMotion, width, touchPrimary);
 }
 
 function viewportWidth(): number {
   return typeof window === "undefined" ? BOOK_MIN_WIDTH : window.innerWidth;
+}
+
+function mediaMatches(query: string): boolean {
+  return typeof window !== "undefined" && window.matchMedia(query).matches;
+}
+
+/** Hover and pointer can change independently (a trackpad on an iPad). */
+export function useTouchPrimary(): boolean {
+  const [hoverNone, setHoverNone] = useState(() => mediaMatches("(hover: none)"));
+  const [pointerCoarse, setPointerCoarse] = useState(() =>
+    mediaMatches("(pointer: coarse)"),
+  );
+  useEffect(() => {
+    const hover = window.matchMedia("(hover: none)");
+    const pointer = window.matchMedia("(pointer: coarse)");
+    const syncHover = () => setHoverNone(hover.matches);
+    const syncPointer = () => setPointerCoarse(pointer.matches);
+    syncHover();
+    syncPointer();
+    hover.addEventListener("change", syncHover);
+    pointer.addEventListener("change", syncPointer);
+    return () => {
+      hover.removeEventListener("change", syncHover);
+      pointer.removeEventListener("change", syncPointer);
+    };
+  }, []);
+  return isTouchPrimary(hoverNone, pointerCoarse);
 }
 
 export interface ViewportMode {
@@ -86,6 +127,7 @@ export interface ViewportMode {
     persisted override. */
 export function useViewportMode(): ViewportMode {
   const reducedMotion = usePrefersReducedMotion();
+  const touchPrimary = useTouchPrimary();
   const [override, setOverride] = useState<ViewMode | null>(storedPreference);
   const [width, setWidth] = useState(viewportWidth);
 
@@ -101,7 +143,7 @@ export function useViewportMode(): ViewportMode {
   }, []);
 
   return {
-    mode: resolveViewMode(override, reducedMotion, width),
+    mode: resolveViewMode(override, reducedMotion, width, touchPrimary),
     setPreference,
     canOpenBook: width >= BOOK_HARD_MIN,
   };

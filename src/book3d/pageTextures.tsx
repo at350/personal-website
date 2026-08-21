@@ -120,6 +120,42 @@ async function settleImages(root: HTMLElement): Promise<void> {
   );
 }
 
+function nextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    const raf = globalThis.requestAnimationFrame;
+    if (typeof raf !== "function") {
+      resolve();
+      return;
+    }
+    raf(() => raf(() => resolve()));
+  });
+}
+
+/** Safari often returns an all-white canvas from an off-viewport foreignObject
+    clone. Sample a coarse grid; any ink or photo means the page is real. */
+export function canvasLooksBlank(canvas: HTMLCanvasElement): boolean {
+  const width = canvas.width;
+  const height = canvas.height;
+  if (!width || !height) return true;
+  try {
+    const context = canvas.getContext("2d");
+    if (!context || typeof context.getImageData !== "function") return false;
+    const stepX = Math.max(1, Math.floor(width / 8));
+    const stepY = Math.max(1, Math.floor(height / 8));
+    for (let y = 0; y < height; y += stepY) {
+      for (let x = 0; x < width; x += stepX) {
+        const pixel = context.getImageData(x, y, 1, 1).data;
+        if (pixel[0]! < 250 || pixel[1]! < 250 || pixel[2]! < 250) return false;
+        if (pixel[3]! < 250) return false;
+      }
+    }
+    return true;
+  } catch {
+    // A tainted canvas still holds pixels; we just cannot inspect them.
+    return false;
+  }
+}
+
 function capture(key: string, refresh = false): Promise<boolean> {
   if (!refresh && cache.has(key)) return Promise.resolve(true);
   const existing = inFlight.get(key);
@@ -133,6 +169,7 @@ function capture(key: string, refresh = false): Promise<boolean> {
     if (!el) return false;
 
     await document.fonts.ready;
+    await nextPaint();
     await settleImages(el);
     const options = {
       pixelRatio: capturePixelRatio(),
@@ -142,17 +179,25 @@ function capture(key: string, refresh = false): Promise<boolean> {
       imagePlaceholder: IMAGE_PLACEHOLDER,
     } as const;
 
-    let canvas: HTMLCanvasElement;
-    try {
-      canvas = await toCanvas(el, options);
-    } catch {
-      // Remote thumbnails must never hold the book hostage. A second pass
-      // preserves all typography and layout while omitting only failed images.
-      canvas = await toCanvas(el, {
-        ...options,
-        filter: (node) => !(node instanceof HTMLImageElement),
-      });
+    const rasterize = async () => {
+      try {
+        return await toCanvas(el, options);
+      } catch {
+        // Remote thumbnails must never hold the book hostage. A second pass
+        // preserves all typography and layout while omitting only failed images.
+        return await toCanvas(el, {
+          ...options,
+          filter: (node) => !(node instanceof HTMLImageElement),
+        });
+      }
+    };
+
+    let canvas = await rasterize();
+    if (canvasLooksBlank(canvas)) {
+      await nextPaint();
+      canvas = await rasterize();
     }
+    if (canvasLooksBlank(canvas) && refresh) return false;
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -340,6 +385,20 @@ export function FarmFace({
   );
 }
 
+/** Clipped to a 1px strip at the origin so Safari still decodes images and
+    paints the clone html-to-image reads, without covering the live issue. */
+export const CAPTURE_FARM_STYLE = {
+  position: "fixed",
+  left: 0,
+  top: 0,
+  width: CAPTURE_W,
+  height: 1,
+  overflow: "hidden",
+  opacity: 0.01,
+  pointerEvents: "none",
+  zIndex: 0,
+} as const;
+
 /** Offscreen live copies of every page, kept out of the a11y tree. */
 export function CaptureFarm({
   displayWidth,
@@ -369,13 +428,7 @@ export function CaptureFarm({
       aria-hidden
       inert
       data-capture-farm=""
-      style={{
-        position: "fixed",
-        left: -20000,
-        top: 0,
-        width: CAPTURE_W,
-        pointerEvents: "none",
-      }}
+      style={CAPTURE_FARM_STYLE}
     >
       {SPREADS.map((def, spread) => (
         <div key={def.id}>

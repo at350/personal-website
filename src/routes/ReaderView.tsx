@@ -7,10 +7,15 @@ import "@/styles/reader.css";
 interface ReaderViewProps {
   canOpenBook: boolean;
   onOpenBook: () => void;
+  onOpenPages?: () => void;
 }
 
 /** The whole issue as a vertical stack of pages — mobile and reduced-motion home. */
-export function ReaderView({ canOpenBook, onOpenBook }: ReaderViewProps) {
+export function ReaderView({
+  canOpenBook,
+  onOpenBook,
+  onOpenPages,
+}: ReaderViewProps) {
   const location = useLocation();
 
   // Deep links scroll to their spread.
@@ -27,10 +32,27 @@ export function ReaderView({ canOpenBook, onOpenBook }: ReaderViewProps) {
     <main className="reader">
       <header className="reader__mast">
         <p className="mono-label">ALAN TAI / NO. 01</p>
-        {canOpenBook ? (
-          <button className="mono-label reader__open" onClick={onOpenBook}>
-            open as book
-          </button>
+        {onOpenPages || canOpenBook ? (
+          <div className="reader__modes">
+            {onOpenPages ? (
+              <button
+                type="button"
+                className="mono-label reader__open"
+                onClick={onOpenPages}
+              >
+                read as pages
+              </button>
+            ) : null}
+            {canOpenBook ? (
+              <button
+                type="button"
+                className="mono-label reader__open"
+                onClick={onOpenBook}
+              >
+                open as book
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </header>
 
