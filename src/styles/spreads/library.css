@@ -27,7 +27,8 @@
 .library__chips {
   display: flex;
   max-width: 100%;
-  align-items: baseline;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 1.8cqw;
 }
 
@@ -35,6 +36,9 @@
   color: var(--ink-3);
   font-size: max(11px, 1.45cqw);
   letter-spacing: 0.14em;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 6px;
   transition: color 200ms var(--ease-settle);
 }
 

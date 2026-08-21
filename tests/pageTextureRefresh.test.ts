@@ -47,6 +47,10 @@ beforeEach(() => {
   dropAllTextures();
   document.body.replaceChildren();
   mocks.toCanvas.mockReset();
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    cb(0);
+    return 0;
+  });
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
     () => ({}) as CanvasRenderingContext2D,
   );
@@ -60,7 +64,10 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("page texture refresh barrier", () => {
   it("stays dirty until both faces finish", async () => {

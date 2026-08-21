@@ -67,6 +67,17 @@ afterEach(() => {
 });
 
 describe("the touch reader", () => {
+  it("locks document scrolling while the stage is up", () => {
+    const { unmount } = renderIssue();
+    expect(document.documentElement.classList.contains("fn-lock-scroll")).toBe(
+      true,
+    );
+    unmount();
+    expect(document.documentElement.classList.contains("fn-lock-scroll")).toBe(
+      false,
+    );
+  });
+
   it("opens on the cover and mounts its neighbour ready to be turned to", () => {
     const { container } = renderIssue();
 
@@ -114,6 +125,39 @@ describe("the touch reader", () => {
     });
 
     expect(container.querySelector(".single__leaf")).toBeNull();
+  });
+
+  it("commits a full swipe even when Safari cancels the pointer", async () => {
+    stubMatchMedia(true);
+    const { container, onSpreadSettled } = renderIssue();
+    const paper = paperOf(container);
+
+    act(() => {
+      paper.dispatchEvent(pointer("pointerdown", 320, 400, 0));
+      paper.dispatchEvent(pointer("pointermove", 250, 400, 50));
+      paper.dispatchEvent(pointer("pointermove", 20, 402, 200));
+      paper.dispatchEvent(pointer("pointercancel", 20, 402, 210));
+    });
+
+    await waitFor(() => expect(onSpreadSettled).toHaveBeenCalledWith(1));
+  });
+
+  it("rolls back when Safari cancels a timid drag", async () => {
+    stubMatchMedia(true);
+    const { container, onSpreadSettled } = renderIssue();
+    const paper = paperOf(container);
+    onSpreadSettled.mockClear();
+
+    act(() => {
+      paper.dispatchEvent(pointer("pointerdown", 320, 400, 0));
+      paper.dispatchEvent(pointer("pointermove", 280, 400, 600));
+      paper.dispatchEvent(pointer("pointercancel", 280, 400, 620));
+    });
+
+    await waitFor(() => {
+      expect(container.querySelector(".single__leaf")).toBeNull();
+    });
+    expect(onSpreadSettled).not.toHaveBeenCalledWith(1);
   });
 
   it("turns by arrow key, and the announcer names the landed page", async () => {

@@ -3,6 +3,7 @@
   height: 100vh;
   height: 100dvh;
   background: var(--void);
+  overflow: hidden;
   overflow: clip;
   /* A horizontal pull anywhere near the book is ours (page turn); vertical
      pans and pinch zoom stay with the browser. Without this, touch drags on

@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Link } from "react-router";
 import type { MediaImage, MediaItem, MediaKind, MediaSource } from "@/lib/media/types";
 import { withBasePath } from "@/lib/basePath";
@@ -53,7 +53,17 @@ const PAGE_FOLIOS = { verso: "014", recto: "015" } as const;
    one copy, so the moment the first copy leaves the frame the second sits
    precisely where it began and the seam never lands on screen. */
 const MOSAIC_COLUMNS = 3;
+const MOSAIC_NARROW_COLUMNS = 2;
+/** Phone paper is ~360px; three catalog columns become unreadable there. */
+export const MOSAIC_NARROW_MAX_WIDTH = 420;
 const PLATES_PER_COLUMN = 7;
+
+/** Degenerate/unmeasured widths keep the printed three-column wall, so jsdom
+    and the capture farm do not collapse to the phone layout. */
+export function mosaicColumnCount(width: number): number {
+  if (!Number.isFinite(width) || width <= 0) return MOSAIC_COLUMNS;
+  return width <= MOSAIC_NARROW_MAX_WIDTH ? MOSAIC_NARROW_COLUMNS : MOSAIC_COLUMNS;
+}
 
 /* Columns drift at slightly different speeds so the three never lock into a
    marching grid. Prime-ish seconds keep them out of phase for a long while.
@@ -82,20 +92,40 @@ interface MediaWallProps {
 /** Catalog wall: verso takes even-indexed items, recto odd (stable split). */
 export function MediaWall({ items, page }: MediaWallProps) {
   const filter = useLibraryFilter();
+  const wallRef = useRef<HTMLDivElement>(null);
+  const [columnCount, setColumnCount] = useState(MOSAIC_COLUMNS);
   const parity = page === "verso" ? 0 : 1;
   const shown = items
     .filter((item) => filter === "all" || item.kind === filter)
     .filter((_, i) => i % 2 === parity)
-    .slice(0, MOSAIC_COLUMNS * PLATES_PER_COLUMN);
+    .slice(0, columnCount * PLATES_PER_COLUMN);
+
+  useEffect(() => {
+    const node = wallRef.current;
+    if (!node) return;
+    const apply = (width: number) => setColumnCount(mosaicColumnCount(width));
+    apply(node.clientWidth);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      apply(entries[0]?.contentRect.width ?? node.clientWidth);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   /* Deal round-robin, so a column is a cross-section of the library rather
      than one source's run of plates. */
-  const columns = Array.from({ length: MOSAIC_COLUMNS }, (_, column) =>
-    shown.filter((_, i) => i % MOSAIC_COLUMNS === column),
+  const columns = Array.from({ length: columnCount }, (_, column) =>
+    shown.filter((_, i) => i % columnCount === column),
   );
 
   return (
-    <div className="media-wall media-wall--mosaic" data-page={page}>
+    <div
+      ref={wallRef}
+      className="media-wall media-wall--mosaic"
+      data-page={page}
+      data-columns={columnCount}
+    >
       {columns.map((plates, column) =>
         plates.length === 0 ? null : (
           <div
@@ -128,7 +158,7 @@ export function MediaWall({ items, page }: MediaWallProps) {
                     <MediaPlate
                       item={item}
                       index={`${PAGE_FOLIOS[page]}·${String(
-                        column + order * MOSAIC_COLUMNS + 1,
+                        column + order * columnCount + 1,
                       ).padStart(2, "0")}`}
                     />
                   </li>

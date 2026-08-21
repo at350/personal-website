@@ -46,6 +46,15 @@
   text-wrap: balance;
 }
 
+/* No spine outside the book: the heading must not hang off the paper. */
+.letter:is([data-mode="reader"], [data-mode="single"])[data-face="verso"] {
+  padding-left: 8cqw;
+}
+
+.letter:is([data-mode="reader"], [data-mode="single"]) .letter__heading {
+  margin-left: 0;
+}
+
 .letter__body {
   font-family: var(--font-body);
   line-height: 1.52;

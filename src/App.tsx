@@ -43,6 +43,7 @@ function IssueView() {
       <ReaderView
         canOpenBook={canOpenBook}
         onOpenBook={() => setPreference("book")}
+        onOpenPages={() => setPreference("single")}
       />
     );
   }
@@ -168,6 +169,10 @@ function ReaderRoute() {
       canOpenBook={canOpenBook}
       onOpenBook={() => {
         setPreference("book");
+        navigate("/");
+      }}
+      onOpenPages={() => {
+        setPreference("single");
         navigate("/");
       }}
     />

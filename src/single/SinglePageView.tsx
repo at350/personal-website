@@ -14,6 +14,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -138,6 +139,13 @@ export function SinglePageView({
     if (sheet === null) paint(0);
   }, [sheet, current, paint]);
 
+  /* iOS rubber-bands the document under a position:fixed stage unless the
+     root itself cannot scroll. */
+  useEffect(() => {
+    document.documentElement.classList.add("fn-lock-scroll");
+    return () => document.documentElement.classList.remove("fn-lock-scroll");
+  }, []);
+
   /* ---- gesture ------------------------------------------------------- */
 
   const gesture = useRef<{
@@ -149,10 +157,38 @@ export function SinglePageView({
     samples: PointerSample[];
   } | null>(null);
   const swallowClick = useRef(false);
+  const detachGesture = useRef<(() => void) | null>(null);
+
+  const stopListening = useCallback(() => {
+    detachGesture.current?.();
+    detachGesture.current = null;
+  }, []);
+
+  useEffect(() => () => stopListening(), [stopListening]);
+
+  const endGesture = useCallback((event: { pointerId: number }) => {
+    const drag = gesture.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    gesture.current = null;
+    stopListening();
+    if (!drag.engaged) return;
+    try {
+      paperRef.current?.releasePointerCapture?.(event.pointerId);
+    } catch {
+      /* capture is a nicety; iOS Safari often never granted it */
+    }
+    const velocity = flickVelocity(drag.samples);
+    const span = Math.max(1, (paperRef.current?.clientWidth ?? 1) * DRAG_SPAN);
+    // px/ms → progress/s: over the span that is a whole turn, times 1000.
+    flungVelocityRef.current = (velocity / span) * 1000;
+    dispatch({ type: "DRAG_MOVE", progress: progressRef.current });
+    dispatch({ type: "DRAG_END", velocity });
+  }, [stopListening]);
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent) => {
       if (event.button !== 0 || sheet !== null || riffle !== null) return;
+      stopListening();
       gesture.current = {
         id: event.pointerId,
         startX: event.clientX,
@@ -161,54 +197,54 @@ export function SinglePageView({
         startProgress: 0,
         samples: [{ x: event.clientX, t: event.timeStamp }],
       };
+
+      const onMove = (move: PointerEvent) => {
+        const drag = gesture.current;
+        if (!drag || drag.id !== move.pointerId) return;
+        drag.samples.push({ x: move.clientX, t: move.timeStamp });
+        if (drag.samples.length > 8) drag.samples.shift();
+
+        if (!drag.engaged) {
+          const dx = move.clientX - drag.startX;
+          const dy = move.clientY - drag.startY;
+          if (!shouldEngage(dx, dy)) return;
+          const edge = edgeForDelta(dx);
+          // A back-edge pull starts from a sheet already lying flipped left.
+          drag.startProgress = edge === "fore" ? 0 : 1;
+          drag.startX = move.clientX;
+          drag.engaged = true;
+          swallowClick.current = true;
+          try {
+            paperRef.current?.setPointerCapture(move.pointerId);
+          } catch {
+            /* window listeners keep the gesture without capture */
+          }
+          dispatch({ type: "DRAG_START", edge });
+          paint(drag.startProgress);
+          return;
+        }
+
+        const width = paperRef.current?.clientWidth ?? 1;
+        paint(dragProgress(drag.startProgress, drag.startX, move.clientX, width));
+      };
+
+      const onUp = (up: PointerEvent) => endGesture(up);
+      const onTouchMove = (touch: TouchEvent) => {
+        if (gesture.current?.engaged) touch.preventDefault();
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+      window.addEventListener("touchmove", onTouchMove, { passive: false });
+      detachGesture.current = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+        window.removeEventListener("touchmove", onTouchMove);
+      };
     },
-    [sheet, riffle],
-  );
-
-  const onPointerMove = useCallback(
-    (event: ReactPointerEvent) => {
-      const drag = gesture.current;
-      if (!drag || drag.id !== event.pointerId) return;
-      drag.samples.push({ x: event.clientX, t: event.timeStamp });
-      if (drag.samples.length > 8) drag.samples.shift();
-
-      if (!drag.engaged) {
-        const dx = event.clientX - drag.startX;
-        const dy = event.clientY - drag.startY;
-        if (!shouldEngage(dx, dy)) return;
-        const edge = edgeForDelta(dx);
-        // A back-edge pull starts from a sheet already lying flipped left.
-        drag.startProgress = edge === "fore" ? 0 : 1;
-        drag.startX = event.clientX;
-        drag.engaged = true;
-        swallowClick.current = true;
-        paperRef.current?.setPointerCapture(event.pointerId);
-        dispatch({ type: "DRAG_START", edge });
-        paint(drag.startProgress);
-        return;
-      }
-
-      const width = paperRef.current?.clientWidth ?? 1;
-      paint(dragProgress(drag.startProgress, drag.startX, event.clientX, width));
-    },
-    [paint],
-  );
-
-  const endGesture = useCallback(
-    (event: ReactPointerEvent) => {
-      const drag = gesture.current;
-      if (!drag || drag.id !== event.pointerId) return;
-      gesture.current = null;
-      if (!drag.engaged) return;
-      paperRef.current?.releasePointerCapture?.(event.pointerId);
-      const velocity = flickVelocity(drag.samples);
-      const span = Math.max(1, (paperRef.current?.clientWidth ?? 1) * DRAG_SPAN);
-      // px/ms → progress/s: over the span that is a whole turn, times 1000.
-      flungVelocityRef.current = (velocity / span) * 1000;
-      dispatch({ type: "DRAG_MOVE", progress: progressRef.current });
-      dispatch({ type: "DRAG_END", velocity });
-    },
-    [],
+    [sheet, riffle, paint, endGesture, stopListening],
   );
 
   /* A drag that began on a link must not also follow it. */
@@ -217,6 +253,10 @@ export function SinglePageView({
     swallowClick.current = false;
     event.preventDefault();
     event.stopPropagation();
+  }, []);
+
+  const onDragStart = useCallback((event: ReactDragEvent) => {
+    event.preventDefault();
   }, []);
 
   /* ---- navigation ---------------------------------------------------- */
@@ -305,9 +345,7 @@ export function SinglePageView({
         className="single__paper"
         ref={paperRef}
         onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endGesture}
-        onPointerCancel={endGesture}
+        onDragStart={onDragStart}
         onClickCapture={onClickCapture}
       >
         <div className="single__face single__face--under">

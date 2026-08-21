@@ -50,6 +50,31 @@ describe("cover motion parity", () => {
     },
   );
 
+  it("runs the entrance on a live single-page cover", () => {
+    render(
+      <MemoryRouter>
+        <div className="single__face single__face--under">
+          <Cover face="recto" mode="single" />
+        </div>
+      </MemoryRouter>,
+    );
+
+    expect(mocks.splitText).toHaveBeenCalledOnce();
+  });
+
+  it("does not split a cover waiting in the wings", () => {
+    render(
+      <MemoryRouter>
+        <div className="single__face single__face--ready" aria-hidden>
+          <Cover face="recto" mode="single" />
+        </div>
+      </MemoryRouter>,
+    );
+
+    expect(mocks.splitText).not.toHaveBeenCalled();
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
   it("keeps the live book cover in the same settled state as its texture", () => {
     render(
       <MemoryRouter>
