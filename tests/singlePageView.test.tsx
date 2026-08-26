@@ -1,6 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
+
+/* The cover's masthead entrance is the loudest thing a remount would replay,
+   so this suite counts its tweens across turns. Mocked exactly as
+   coverMotionParity.test.tsx does. */
+const gsapMocks = vi.hoisted(() => {
+  const splitText = vi.fn(function SplitTextMock() {
+    return { chars: ["A"], revert: vi.fn() };
+  });
+  const from = vi.fn(() => ({ kill: vi.fn() }));
+  return { from, splitText };
+});
+
+vi.mock("gsap", () => ({
+  default: { from: gsapMocks.from, registerPlugin: vi.fn() },
+}));
+vi.mock("gsap/SplitText", () => ({ SplitText: gsapMocks.splitText }));
+vi.mock("@/lib/motion", () => ({
+  motionOK: () => true,
+  EASE_SETTLE: "power4.out",
+  settleIn: () => null,
+  riseLines: () => null,
+}));
+
 import { FACES, faceForSpread, SPREADS } from "@/magazine/folio";
 import { SinglePageView } from "@/single/SinglePageView";
 
@@ -78,13 +101,39 @@ describe("the touch reader", () => {
     );
   });
 
-  it("opens on the cover and mounts its neighbour ready to be turned to", () => {
+  it("opens on the cover with every other sheet mounted and waiting", () => {
     const { container } = renderIssue();
 
-    expect(container.querySelectorAll(".single__face--under")).toHaveLength(1);
-    // The next face is mounted but hidden, so its images decode before the turn.
-    expect(container.querySelectorAll(".single__face--ready").length).toBeGreaterThan(0);
-    expect(container.querySelector(".single__leaf")).toBeNull();
+    // One page shows; the rest are mounted but hidden, so their images decode
+    // and their entrances settle before any turn reveals them.
+    expect(
+      container.querySelectorAll('.single__sheet[data-role="under"]'),
+    ).toHaveLength(1);
+    expect(
+      container.querySelectorAll('.single__sheet[data-role="idle"]'),
+    ).toHaveLength(FACES.length - 1);
+    expect(container.querySelector('.single__sheet[data-role="leaf"]')).toBeNull();
+  });
+
+  it("keeps the same DOM node for a face across a turn — a slot refactor that remounts fails here", async () => {
+    stubMatchMedia(true);
+    const { container, onSpreadSettled } = renderIssue();
+    const sheets = container.querySelectorAll(".single__sheet");
+    const destination = sheets[1]!;
+    expect(destination.getAttribute("data-role")).toBe("idle");
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+      );
+    });
+    await waitFor(() => expect(onSpreadSettled).toHaveBeenCalledWith(1));
+
+    // Identity, not equality: the landed page is the very element that was
+    // waiting, so nothing inside it remounted or replayed.
+    expect(container.querySelector('.single__sheet[data-role="under"]')).toBe(
+      destination,
+    );
   });
 
   it("commits a full swipe and reports the spread it landed on", async () => {
@@ -110,7 +159,7 @@ describe("the touch reader", () => {
     swipe(paper, 320, 280, 600);
 
     await waitFor(() => {
-      expect(container.querySelector(".single__leaf")).toBeNull();
+      expect(container.querySelector('.single__sheet[data-role="leaf"]')).toBeNull();
     });
     expect(onSpreadSettled).not.toHaveBeenCalledWith(1);
   });
@@ -124,7 +173,7 @@ describe("the touch reader", () => {
       paper.dispatchEvent(pointer("pointermove", 208, 420, 90));
     });
 
-    expect(container.querySelector(".single__leaf")).toBeNull();
+    expect(container.querySelector('.single__sheet[data-role="leaf"]')).toBeNull();
   });
 
   it("commits a full swipe even when Safari cancels the pointer", async () => {
@@ -155,7 +204,7 @@ describe("the touch reader", () => {
     });
 
     await waitFor(() => {
-      expect(container.querySelector(".single__leaf")).toBeNull();
+      expect(container.querySelector('.single__sheet[data-role="leaf"]')).toBeNull();
     });
     expect(onSpreadSettled).not.toHaveBeenCalledWith(1);
   });
@@ -193,6 +242,29 @@ describe("the touch reader", () => {
     );
 
     await waitFor(() => expect(onSpreadSettled).toHaveBeenCalledWith(6));
+  });
+
+  it("runs the cover's entrance exactly once, however many pages turn", async () => {
+    stubMatchMedia(true);
+    const { onSpreadSettled } = renderIssue();
+    const entrancesAfterMount = gsapMocks.from.mock.calls.length;
+    expect(entrancesAfterMount).toBeGreaterThan(0);
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+      );
+    });
+    await waitFor(() => expect(onSpreadSettled).toHaveBeenCalledWith(1));
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
+      );
+    });
+    await waitFor(() => expect(onSpreadSettled).toHaveBeenLastCalledWith(0));
+
+    // Turning away and back must not replay the masthead.
+    expect(gsapMocks.from.mock.calls.length).toBe(entrancesAfterMount);
   });
 
   it("lands a route on the spread's first face, never mid-spread", () => {

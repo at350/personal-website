@@ -4,7 +4,14 @@
    faces instead of 11 spreads — `engine.ts` indexes a 1-D sequence with sheets
    between adjacent entries and never assumes two pages per entry. What the
    book answers with Verlet cloth and a texture handoff, this answers with one
-   rotated element and a spring, because there is only ever one renderer here. */
+   rotated element and a spring, because there is only ever one renderer here.
+
+   Every face mounts once and stays mounted; a turn only changes each sheet's
+   role. Faces used to move between three positional slots (under / leaf /
+   ready), and React treats a slot change as an unmount, so every turn
+   replayed entrance animations and re-decoded images on the pages involved.
+   Stable identity is what makes a landed page arrive settled — the same
+   contract the book keeps by rasterizing its moving pages. */
 
 import {
   useCallback,
@@ -17,6 +24,7 @@ import {
   type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
 } from "react";
 import {
   FACES,
@@ -46,12 +54,89 @@ import "@/styles/single.css";
 
 const TOTAL_FACES = FACES.length;
 
+type SheetRole = "under" | "leaf" | "idle";
+
 interface SinglePageViewProps {
   targetSpread: number;
   onSpreadSettled?: (spread: number) => void;
   canOpenBook?: boolean;
   onOpenBook?: () => void;
   onOpenReader?: () => void;
+}
+
+/** The paper fades behind the folio and running head are honest only on pages
+    that actually scroll: painting them over the cover's barcode or the
+    colophon's closing mark washes out content that was never going anywhere.
+    Track where the page's scroller stands and expose it as data attributes
+    the stylesheet keys on. */
+function useOverflowState(frontRef: RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const front = frontRef.current;
+    if (!front) return;
+    const scroller = front.querySelector<HTMLElement>(
+      ":scope > *:not(.running-head):not(.folio):not([data-paper-overlay])",
+    );
+    if (!scroller) return;
+
+    const sync = () => {
+      const above = scroller.scrollTop > 2;
+      const below =
+        scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 2;
+      front.dataset.overflowTop = above ? "true" : "false";
+      front.dataset.overflowBottom = below ? "true" : "false";
+    };
+    sync();
+
+    scroller.addEventListener("scroll", sync, { passive: true });
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(sync);
+      observer.observe(front);
+      observer.observe(scroller);
+      // Content can grow after mount (images, the library restocking).
+      if (scroller.firstElementChild) observer.observe(scroller.firstElementChild);
+    }
+    return () => {
+      scroller.removeEventListener("scroll", sync);
+      observer?.disconnect();
+    };
+  }, [frontRef]);
+}
+
+function Sheet({
+  index,
+  role,
+  sheetRef,
+}: {
+  index: number;
+  role: SheetRole;
+  sheetRef: (node: HTMLDivElement | null) => void;
+}) {
+  const frontRef = useRef<HTMLDivElement>(null);
+  useOverflowState(frontRef);
+  const def = FACES[index]!;
+
+  return (
+    <div
+      className="single__sheet"
+      data-role={role}
+      ref={sheetRef}
+      aria-hidden={role !== "under" || undefined}
+      inert={role === "idle" || undefined}
+    >
+      <div className="single__sheet-front" ref={frontRef}>
+        <PageFace spread={def.spread} side={def.side} mode="single" />
+        <div className="single__shade" data-paper-overlay aria-hidden />
+        <div className="single__fade single__fade--top" data-paper-overlay aria-hidden />
+        <div
+          className="single__fade single__fade--bottom"
+          data-paper-overlay
+          aria-hidden
+        />
+      </div>
+      <div className="single__sheet-back" aria-hidden />
+    </div>
+  );
 }
 
 export function SinglePageView({
@@ -66,27 +151,45 @@ export function SinglePageView({
     faceForSpread(targetSpread),
     initialEngineState,
   );
-  const { current, sheet, riffle, settleTarget, dragging } = state;
+  const { current, sheet, riffle, settleTarget, dragging, progress } = state;
   const reducedMotion = usePrefersReducedMotion();
   const [contentsOpen, setContentsOpen] = useState(false);
 
   const paperRef = useRef<HTMLDivElement>(null);
-  const leafRef = useRef<HTMLDivElement>(null);
+  /* One element per face, stable for the life of the view. */
+  const sheetRefs = useRef<(HTMLDivElement | null)[]>([]);
+  /* The sheet element the current turn rotates. */
+  const paintTargetRef = useRef<HTMLDivElement | null>(null);
   /* Progress is written straight to the element during a drag and a settle.
-     Routing it through React would re-render ten live faces per frame. */
+     Routing it through React would re-render twenty live faces per frame. */
   const progressRef = useRef(0);
   /* Progress-units per second, converted from the pointer's px/ms at release
      so the settle continues the throw rather than restarting from rest. */
   const flungVelocityRef = useRef(0);
 
-  const paint = useCallback((progress: number) => {
-    progressRef.current = progress;
-    leafRef.current?.style.setProperty("--flip", String(progress));
+  const paint = useCallback((value: number) => {
+    progressRef.current = value;
+    paintTargetRef.current?.style.setProperty("--flip", String(value));
   }, []);
 
   const face = FACES[current];
-  const leafFace = sheet;
   const underFace = sheet === null ? current : sheet + 1;
+
+  /* Aim the paint at the turning sheet before the browser shows the commit —
+     a backward turn's leaf must already lie flipped (--flip: 1) on its first
+     visible frame, or the previous page flashes flat over the current one.
+     At rest, clear every inline --flip so each sheet lies flat for its next
+     role. */
+  useLayoutEffect(() => {
+    if (sheet === null) {
+      paintTargetRef.current = null;
+      progressRef.current = 0;
+      for (const node of sheetRefs.current) node?.style.removeProperty("--flip");
+      return;
+    }
+    paintTargetRef.current = sheetRefs.current[sheet] ?? null;
+    paint(progress);
+  }, [sheet, progress, paint]);
 
   /* ---- settle -------------------------------------------------------- */
 
@@ -123,7 +226,7 @@ export function SinglePageView({
   }, [settling, settleTarget, reducedMotion, paint]);
 
   /* A riffle (a jump of more than one face, from the contents or a deep link)
-     crossfades rather than flicking twenty leaves past the reader. */
+     lands after a beat rather than flicking twenty leaves past the reader. */
   useEffect(() => {
     if (riffle === null) return;
     const timer = window.setTimeout(
@@ -132,12 +235,6 @@ export function SinglePageView({
     );
     return () => window.clearTimeout(timer);
   }, [riffle, reducedMotion]);
-
-  /* Paper at rest lies flat. Re-assert it after every landing, including the
-     ones that arrive by riffle rather than by spring. */
-  useLayoutEffect(() => {
-    if (sheet === null) paint(0);
-  }, [sheet, current, paint]);
 
   /* iOS rubber-bands the document under a position:fixed stage unless the
      root itself cannot scroll. */
@@ -219,6 +316,14 @@ export function SinglePageView({
           } catch {
             /* window listeners keep the gesture without capture */
           }
+          /* Every sheet is always mounted, so an unguarded paint would rotate
+             real paper even when the engine refuses the turn at either cover.
+             Only aim at a sheet the engine will actually fly. */
+          const canTurn =
+            edge === "fore" ? current < TOTAL_FACES - 1 : current > 0;
+          paintTargetRef.current = canTurn
+            ? (sheetRefs.current[edge === "fore" ? current : current - 1] ?? null)
+            : null;
           dispatch({ type: "DRAG_START", edge });
           paint(drag.startProgress);
           return;
@@ -244,7 +349,7 @@ export function SinglePageView({
         window.removeEventListener("touchmove", onTouchMove);
       };
     },
-    [sheet, riffle, paint, endGesture, stopListening],
+    [sheet, riffle, current, paint, endGesture, stopListening],
   );
 
   /* A drag that began on a link must not also follow it. */
@@ -320,13 +425,6 @@ export function SinglePageView({
     return `${pageLabel(spread)} · ${SPREADS[spread]?.label ?? ""}`;
   }, [current]);
 
-  /* Neighbours stay mounted but hidden so their images are already decoded
-     when the leaf lifts. visibility, not display: a display:none image never
-     starts fetching. */
-  const neighbours = [current - 1, current + 1].filter(
-    (index) => index >= 0 && index < TOTAL_FACES && index !== underFace,
-  );
-
   return (
     <main className="single" data-busy={busy || undefined}>
       <header className="single__chrome single__chrome--top">
@@ -348,42 +446,24 @@ export function SinglePageView({
         onDragStart={onDragStart}
         onClickCapture={onClickCapture}
       >
-        <div className="single__face single__face--under">
-          {FACES[underFace] ? (
-            <PageFace
-              spread={FACES[underFace].spread}
-              side={FACES[underFace].side}
-              mode="single"
+        {FACES.map((def, index) => {
+          const role: SheetRole =
+            sheet !== null && index === sheet
+              ? "leaf"
+              : index === underFace
+                ? "under"
+                : "idle";
+          return (
+            <Sheet
+              key={`${def.spread}:${def.side}`}
+              index={index}
+              role={role}
+              sheetRef={(node) => {
+                sheetRefs.current[index] = node;
+              }}
             />
-          ) : null}
-        </div>
-
-        {leafFace !== null && FACES[leafFace] ? (
-          <div className="single__leaf" ref={leafRef}>
-            <div className="single__leaf-front">
-              <PageFace
-                spread={FACES[leafFace]!.spread}
-                side={FACES[leafFace]!.side}
-                mode="single"
-              />
-            </div>
-            <div className="single__leaf-back" aria-hidden />
-          </div>
-        ) : null}
-
-        {neighbours.map((index) => (
-          <div
-            className="single__face single__face--ready"
-            key={`${FACES[index]!.spread}:${FACES[index]!.side}`}
-            aria-hidden
-          >
-            <PageFace
-              spread={FACES[index]!.spread}
-              side={FACES[index]!.side}
-              mode="single"
-            />
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <nav className="single__chrome single__chrome--bottom" aria-label="Pages">

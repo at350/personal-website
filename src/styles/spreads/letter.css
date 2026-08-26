@@ -13,7 +13,9 @@
 /* ————— Verso (p. 04): the letter ————— */
 
 .letter[data-face="verso"] {
-  padding: 8cqw 8cqw 8cqw 0;
+  /* The px floor keeps the eyebrow clear of the running head on the smallest
+     pages; everywhere else 8cqw already exceeds it. */
+  padding: max(8cqw, 34px) 8cqw 8cqw 0;
 }
 
 /* Hard right: margin-left auto pins the column to the right page margin. */
