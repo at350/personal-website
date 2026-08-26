@@ -97,93 +97,78 @@ html.fn-lock-scroll body {
   perspective: 1600px;
 }
 
-/* Every page box: the under page, the neighbours waiting in the wings, and
-   the turning leaf's face. A definite size from the containing block is what
-   lets `container-type: size` apply at all. */
-.single__face,
-.single__leaf-front {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  background: var(--washi);
-  container-type: size;
-  box-shadow:
-    0 10px 30px rgba(28, 26, 23, 0.12),
-    0 2px 8px rgba(28, 26, 23, 0.08);
-}
-
-/* A page whose composition overruns its box scrolls inside it rather than
-   shrinking its own type. The furniture stays pinned to the paper. */
-.single__face > *:not(.running-head):not(.folio),
-.single__leaf-front > *:not(.running-head):not(.folio) {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-}
-
-/* Furniture is pinned to the paper, as printed page furniture should be — but
-   a page whose composition overruns scrolls its content underneath it. Fade
-   the paper out behind the folio so text passes beneath a page number instead
-   of colliding with it, and let the running head do the same at the top. The
-   fade doubles as the only honest "there is more below" cue a printed page
-   can offer. */
-.single__face::after,
-.single__leaf-front::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 3;
-  height: calc(var(--page-pad) * 2);
-  pointer-events: none;
-  background: linear-gradient(
-    to top,
-    var(--washi) 62%,
-    rgba(255, 255, 255, 0)
-  );
-}
-
-.single__face > .folio,
-.single__face > .running-head,
-.single__leaf-front > .folio,
-.single__leaf-front > .running-head {
-  z-index: 4;
-}
-
-/* Mounted, not shown: a display:none image never starts fetching, so the next
-   turn would land on a blank plate. */
-.single__face--ready {
-  visibility: hidden;
-}
-
-.single__leaf {
+/* One sheet per face, mounted once and never remounted: a turn only changes
+   each sheet's role. That stability is what keeps entrance animations from
+   replaying and images from re-decoding as pages turn — the DOM node that
+   lands is the same node that was waiting. */
+.single__sheet {
   position: absolute;
   inset: 0;
   transform-origin: left center;
   transform: rotateY(calc(var(--flip, 0) * -180deg));
   -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Idle sheets stay mounted (their images fetch, their entrances have already
+   settled) but invisible; only the resting page and a turning leaf show. */
+.single__sheet[data-role="under"],
+.single__sheet[data-role="leaf"] {
+  visibility: visible;
+}
+
+.single__sheet[data-role="under"] {
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.single__sheet[data-role="leaf"] {
+  z-index: 5;
   will-change: transform;
 }
 
-.single__leaf-front,
-.single__leaf-back {
+/* A definite size from the containing block is what lets
+   `container-type: size` apply at all. */
+.single__sheet-front,
+.single__sheet-back {
+  position: absolute;
+  inset: 0;
+  background: var(--washi);
+  overflow: hidden;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 }
 
-.single__leaf-back {
-  position: absolute;
-  inset: 0;
-  background: var(--washi);
+.single__sheet-front {
+  container-type: size;
+  box-shadow:
+    0 10px 30px rgba(28, 26, 23, 0.12),
+    0 2px 8px rgba(28, 26, 23, 0.08);
+}
+
+.single__sheet-back {
   transform: rotateY(180deg);
 }
 
+/* A page whose composition overruns its box scrolls inside it rather than
+   shrinking its own type. The furniture and the paper overlays stay pinned. */
+.single__sheet-front > *:not(.running-head):not(.folio):not([data-paper-overlay]) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.single__sheet-front > .folio,
+.single__sheet-front > .running-head {
+  z-index: 4;
+}
+
 /* The gutter shadow deepens as the leaf lifts, so paper reads as paper rather
-   than as a rotating rectangle. */
-.single__leaf-front::before {
-  content: "";
+   than as a rotating rectangle. Custom properties inherit, so the sheet's
+   --flip drives it. */
+.single__shade {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -196,9 +181,53 @@ html.fn-lock-scroll body {
   opacity: calc(var(--flip, 0) * 1.7);
 }
 
+/* Furniture is pinned to the paper, as printed page furniture should be — but
+   a page whose composition overruns scrolls its content underneath it. The
+   paper fades out behind the folio and the running head so text passes under
+   them instead of colliding — and only on pages that actually scroll, and
+   only on the side that still has content past the edge. Painting a fade
+   over the cover's barcode or the colophon's closing mark would wash out
+   content that was never going anywhere. */
+.single__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.single__fade--top {
+  top: 0;
+  height: calc(var(--page-pad) * 1.6);
+  background: linear-gradient(
+    to bottom,
+    var(--washi) 52%,
+    rgba(255, 255, 255, 0)
+  );
+}
+
+.single__fade--bottom {
+  bottom: 0;
+  height: calc(var(--page-pad) * 2);
+  background: linear-gradient(
+    to top,
+    var(--washi) 62%,
+    rgba(255, 255, 255, 0)
+  );
+}
+
+.single__sheet-front[data-overflow-top="true"] .single__fade--top {
+  opacity: 1;
+}
+
+.single__sheet-front[data-overflow-bottom="true"] .single__fade--bottom {
+  opacity: 1;
+}
+
 /* Nothing on a moving page is clickable. */
-.single[data-busy] .single__face,
-.single[data-busy] .single__leaf-front {
+.single[data-busy] .single__sheet {
   pointer-events: none;
 }
 
@@ -265,7 +294,7 @@ html.fn-lock-scroll body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .single__leaf {
+  .single__sheet[data-role="leaf"] {
     will-change: auto;
   }
 }

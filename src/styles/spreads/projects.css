@@ -484,6 +484,36 @@
   }
 }
 
+/* On a narrow page the meta line's intrinsic width starved the name column
+   until the two printed through each other ("TerraBlade" over "ACCESSIBLE").
+   Stack them instead: name on its own line, discipline and year beneath it. */
+@container (max-width: 520px) {
+  .proj-index__row {
+    grid-template-columns: 7cqw minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+
+  .proj-index__no {
+    grid-row: 1;
+  }
+
+  .proj-index__name {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .proj-index__meta {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: left;
+  }
+
+  .proj-index__toggle {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
 /* The census: five of forty weekends, printed. */
 .proj-count__census {
   margin-top: 4cqh;

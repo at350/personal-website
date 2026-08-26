@@ -314,6 +314,29 @@ a.media-plate:focus-visible .media-plate__title {
   overflow: hidden;
 }
 
+/* On a phone page the drift's clip edge sits close to real text, and a tile
+   chopped mid-word reads as a layout bug rather than a window. Dissolve the
+   tiles at the boundary instead. Scoped to narrow pages so the capture farm's
+   640px faces — and the book textures made from them — are untouched. */
+@container (max-width: 520px) {
+  .media-col {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 26px,
+      #000 calc(100% - 26px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 26px,
+      #000 calc(100% - 26px),
+      transparent
+    );
+  }
+}
+
 /* The track is taken out of flow on purpose. It is deliberately about twice
    the height of the page, and in flow it would push the column — and with it
    the whole face — to its own size. The reader stacks faces at their natural

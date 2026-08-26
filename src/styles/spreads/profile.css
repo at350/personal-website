@@ -14,7 +14,8 @@
 .profile[data-face="verso"] {
   display: flex;
   flex-direction: column;
-  padding: 8.5cqw 7cqw 7cqw;
+  /* Floored so the statement clears the running head on the smallest pages. */
+  padding: max(8.5cqw, 34px) 7cqw 7cqw;
 }
 
 .profile__statement {
