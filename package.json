@@ -6,7 +6,7 @@
   "description": "Alan Tai. Issue No. 01.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && node scripts/build-feeds.mjs",
+    "build": "tsc -b && vite build && vite build --ssr src/prerender/entry.tsx --outDir dist-ssr && node scripts/prerender.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",

@@ -13,7 +13,7 @@ npm run dev        # http://localhost:5173
 ```
 
 ```bash
-npm run build      # type-checks, bundles, writes rss.xml + sitemap.xml
+npm run build      # type-checks, bundles, prerenders every route, writes rss.xml + sitemap.xml
 npm test           # engine, folio math, content schemas, media normalizers
 npm run lint
 ```
