@@ -1,0 +1,143 @@
+/* The keys sheet — a printed slip that rises above the folio bar the way the
+   contents menu does: paper, one ink rule, the same hard 3px shadow. It sits
+   above the stage chrome (the nav at 12, the mode HUDs at 110–115) and under
+   the experience dock (120), and it is centered under the spine so it never
+   reaches the dock at the left. */
+
+.keys {
+  /* A native <dialog> arrives with the browser's own margins, inset and
+     sizing; every one of them is overruled so the slip lands where the
+     contents menu does. */
+  position: absolute;
+  inset: auto;
+  margin: 0;
+  height: auto;
+  left: 50%;
+  /* The nav's own bottom offset plus its height and a slip of air, so the
+     sheet lands exactly where the contents menu would. */
+  bottom: calc(clamp(14px, 2.6vh, 30px) + 44px);
+  transform: translateX(-50%);
+  z-index: 116;
+  width: min(360px, calc(100vw - 2 * 120px));
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  padding: 12px 18px 14px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  animation: keys-rise 240ms var(--ease-settle);
+}
+
+.keys:focus {
+  outline: none;
+}
+
+.keys:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
+}
+
+@keyframes keys-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.keys__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.keys__title {
+  color: var(--ink);
+  letter-spacing: 0.22em;
+}
+
+.keys__close {
+  color: var(--ink-3);
+  padding: 2px 0;
+  transition: color 160ms ease;
+}
+
+.keys__close:hover,
+.keys__close:focus-visible {
+  color: var(--red);
+}
+
+/* Groups are separated by hairlines; the last one runs to the paper's edge. */
+.keys__group {
+  padding: 9px 0 10px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.keys__group:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.keys__group-title {
+  color: var(--ink-3);
+  font-size: 10px;
+  margin-bottom: 5px;
+}
+
+.keys__row {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  column-gap: 12px;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.keys__term {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  font-feature-settings: "lnum" 1;
+}
+
+/* A key is a hairline box in the mono face; a gesture is the same face with
+   no box, since nothing on the keyboard corresponds to it. */
+.keys__key {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1;
+  padding: 3px 5px 2px;
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.keys__gesture {
+  color: var(--ink-2);
+  padding: 3px 0 2px;
+  letter-spacing: 0.08em;
+}
+
+.keys__desc {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .keys {
+    animation: none;
+  }
+
+  .keys__close {
+    transition: none;
+  }
+}

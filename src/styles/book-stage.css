@@ -207,6 +207,32 @@
   color: var(--ink);
 }
 
+/* The "?" hangs off the nav's right edge at the nav's own gap rather than
+   joining the flex row, so the arrows and folio stay centered on the spine
+   exactly where they were before the fourth item existed. */
+.bstage__help {
+  position: absolute;
+  left: calc(100% + 28px);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-3);
+  font-size: 12px;
+  letter-spacing: 0;
+  min-width: 28px;
+  padding: 6px 4px;
+  transition: color 160ms ease;
+}
+
+.bstage__help:hover:not(:disabled),
+.bstage__help[aria-expanded="true"] {
+  color: var(--ink);
+}
+
+.bstage__help:disabled {
+  opacity: 0.22;
+  cursor: default;
+}
+
 /* The quick contents — a printed slip above the folio bar. */
 .bstage__toc {
   position: absolute;
