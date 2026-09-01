@@ -26,6 +26,7 @@ interface RefreshScript {
   fromAnyApiX: (json: unknown, handle?: string) => unknown[];
   fromAnyApiLinkedIn: (json: unknown) => unknown[];
   fromGoodreadsRss: (xml: string, shelf?: string) => unknown[];
+  fromLetterboxdRss: (xml: string) => unknown[];
   anyapiDue: (env: Record<string, string>, now?: Date) => boolean;
   snapshotUnchanged: (previous: unknown[], next: unknown[]) => boolean;
   carriedUnconfigured: (previous: unknown[], feedNames: string[]) => unknown[];
@@ -983,5 +984,32 @@ describe("carriedUnconfigured", () => {
     const { carriedUnconfigured } = await loadScript();
     expect(carriedUnconfigured([post, film], ["letterboxd", "x"])).toEqual([]);
     expect(carriedUnconfigured([null, { id: "?" }, post], ["x"])).toEqual([]);
+  });
+});
+
+describe("numeric character references", () => {
+  // Letterboxd spells an apostrophe as &#039; in both <title> and
+  // <letterboxd:filmTitle>; the plate must print the apostrophe, not the code.
+  const xml = `<?xml version="1.0"?>
+    <rss><channel>
+      <item>
+        <title>Good Luck, Have Fun, Don&#039;t Die, 2025 - ★★★</title>
+        <link>https://letterboxd.com/alantai/film/good-luck-have-fun-dont-die/</link>
+        <guid>letterboxd-watch-1</guid>
+        <letterboxd:filmTitle>Good Luck, Have Fun, Don&#039;t Die</letterboxd:filmTitle>
+        <letterboxd:filmYear>2025</letterboxd:filmYear>
+      </item>
+    </channel></rss>`;
+
+  it("decodes them in the app normalizer", () => {
+    const [film] = fromLetterboxdRss(xml);
+    expect(film?.title).toBe("Good Luck, Have Fun, Don't Die");
+    expect(film?.image).toBeUndefined();
+  });
+
+  it("decodes them identically in the cron script", async () => {
+    const script = await loadScript();
+    const [film] = script.fromLetterboxdRss(xml) as Array<{ title: string }>;
+    expect(film?.title).toBe("Good Luck, Have Fun, Don't Die");
   });
 });

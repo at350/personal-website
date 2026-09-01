@@ -110,7 +110,7 @@
       "id": "letterboxd:letterboxd-watch-1393765860",
       "source": "letterboxd",
       "kind": "film",
-      "title": "Good Luck, Have Fun, Don&#039;t Die",
+      "title": "Good Luck, Have Fun, Don't Die",
       "url": "https://letterboxd.com/alantai/film/good-luck-have-fun-dont-die/",
       "publishedAt": "2026-07-13T03:50:45.000Z",
       "watchedAt": "2026-07-12T00:00:00.000Z",
@@ -118,7 +118,7 @@
       "rating": 3,
       "image": {
         "src": "/media/thumbs/ac14e2e39f0a.jpg",
-        "alt": "Poster for Good Luck, Have Fun, Don&#039;t Die"
+        "alt": "Poster for Good Luck, Have Fun, Don't Die"
       }
     },
     {
@@ -373,7 +373,7 @@
       "id": "letterboxd:letterboxd-watch-1112933693",
       "source": "letterboxd",
       "kind": "film",
-      "title": "Five Nights at Freddy&#039;s 2",
+      "title": "Five Nights at Freddy's 2",
       "url": "https://letterboxd.com/alantai/film/five-nights-at-freddys-2/",
       "publishedAt": "2025-12-21T05:34:55.000Z",
       "watchedAt": "2025-12-20T00:00:00.000Z",
@@ -381,7 +381,7 @@
       "rating": 2,
       "image": {
         "src": "/media/thumbs/fbcafadb195b.jpg",
-        "alt": "Poster for Five Nights at Freddy&#039;s 2"
+        "alt": "Poster for Five Nights at Freddy's 2"
       }
     },
     {
@@ -449,7 +449,7 @@
       "id": "letterboxd:letterboxd-review-1081832352",
       "source": "letterboxd",
       "kind": "film",
-      "title": "Now You See Me: Now You Don&#039;t",
+      "title": "Now You See Me: Now You Don't",
       "url": "https://letterboxd.com/alantai/film/now-you-see-me-now-you-dont-2025/",
       "excerpt": "cringe dialogue",
       "publishedAt": "2025-11-23T03:34:54.000Z",
@@ -458,7 +458,7 @@
       "rating": 2,
       "image": {
         "src": "/media/thumbs/d8b5d973c892.jpg",
-        "alt": "Poster for Now You See Me: Now You Don&#039;t"
+        "alt": "Poster for Now You See Me: Now You Don't"
       }
     },
     {
@@ -559,7 +559,7 @@
       "id": "letterboxd:letterboxd-review-992170122",
       "source": "letterboxd",
       "kind": "film",
-      "title": "Honey Don&#039;t!",
+      "title": "Honey Don't!",
       "url": "https://letterboxd.com/alantai/film/honey-dont/",
       "excerpt": "First half was great -- beautifully shot, suspenseful, and a dynamic casting of brilliant actors. But the plot started to muddy up throughout the second half, and I walked away from the film with zero message and meaning.",
       "publishedAt": "2025-08-23T03:18:14.000Z",
@@ -568,7 +568,7 @@
       "rating": 3,
       "image": {
         "src": "/media/thumbs/18b19e85904b.jpg",
-        "alt": "Poster for Honey Don&#039;t!"
+        "alt": "Poster for Honey Don't!"
       }
     },
     {
@@ -1410,5 +1410,5 @@
       }
     }
   ],
-  "generatedAt": "2026-09-01T23:04:34.845Z"
+  "generatedAt": "2026-09-01T23:13:04.909Z"
 }

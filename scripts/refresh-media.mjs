@@ -252,7 +252,9 @@ function xMediaFromSyndication(json, title) {
 }
 
 function rssItems(xml) {
-  const parser = new XMLParser({ ignoreAttributes: false });
+  // htmlEntities: letterboxd writes apostrophes as numeric character
+  // references (`Don&#039;t`), which only decode under this option.
+  const parser = new XMLParser({ ignoreAttributes: false, htmlEntities: true });
   const doc = asRecord(parser.parse(xml));
   const channel = asRecord(asRecord(doc?.rss)?.channel);
   return toArray(channel?.item).flatMap((entry) => {
@@ -954,6 +956,7 @@ export {
   fromAnyApiLinkedIn,
   fromAnyApiX,
   fromGoodreadsRss,
+  fromLetterboxdRss,
   snapshotUnchanged,
   xMediaFromSyndication,
 };

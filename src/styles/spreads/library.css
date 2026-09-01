@@ -209,6 +209,18 @@ a.media-plate:focus-visible .media-plate__index {
   opacity: 1;
 }
 
+/* Without JavaScript nothing will ever mark an image loaded, and the
+   prerendered library would print a wall of skeletons over perfectly good
+   covers. index.html sets the js class before first paint, so this only
+   ever applies to the static page a crawler or a no-script reader sees. */
+html:not(.js) .media-plate__thumb {
+  opacity: 1;
+}
+
+html:not(.js) .media-plate__media::after {
+  display: none;
+}
+
 .media-plate__title {
   font-family: var(--font-ui);
   font-weight: 500;

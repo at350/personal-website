@@ -178,7 +178,10 @@ function postImage(
 }
 
 function rssItems(xml: string): XmlNode[] {
-  const parser = new XMLParser({ ignoreAttributes: false });
+  // Letterboxd writes apostrophes as numeric character references
+  // (`Don&#039;t`), which this parser only decodes under `htmlEntities` —
+  // without it the reference reaches the plate as literal text.
+  const parser = new XMLParser({ ignoreAttributes: false, htmlEntities: true });
   const doc = asRecord(parser.parse(xml));
   const channel = asRecord(asRecord(doc?.rss)?.channel);
   return toArray(channel?.item).flatMap((entry) => {
