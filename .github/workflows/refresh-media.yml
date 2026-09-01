@@ -1,6 +1,6 @@
 # Refreshes the media snapshot (src/lib/media/live.json plus the mirrored
 # thumbnails under public/media/thumbs/) from configured feeds (letterboxd,
-# substack, X, LinkedIn) and publishes it when it changed, so the deployed
+# goodreads, substack, X, LinkedIn) and publishes it when it changed, so the deployed
 # site updates itself without a server. The script exits 0 even when every
 # feed fails, and only rewrites the snapshot when at least one succeeds and
 # the item list actually differs from the previous one.
@@ -19,8 +19,8 @@
 # something new.
 #
 # Configure repository secrets (all optional — unset feeds are skipped):
-#   LETTERBOXD_USER, SUBSTACK_RSS_URL, ANYAPI_KEY, X_HANDLE,
-#   LINKEDIN_PROFILE_URL, X_BEARER_TOKEN, X_USER_ID
+#   LETTERBOXD_USER, GOODREADS_USER_ID, SUBSTACK_RSS_URL, ANYAPI_KEY,
+#   X_HANDLE, LINKEDIN_PROFILE_URL, X_BEARER_TOKEN, X_USER_ID
 #
 # ANYAPI_KEY turns on BOTH social feeds (getanyapi.com) with one credential:
 # recent X posts and recent LinkedIn posts. Those two lanes cost money per
@@ -79,6 +79,10 @@ jobs:
           # Unset is fine: the script falls back to the account baked into it
           # (DEFAULT_LETTERBOXD_USER). Set the secret only to point elsewhere.
           LETTERBOXD_USER: ${{ secrets.LETTERBOXD_USER }}
+          # Unset is fine here too: the script falls back to the numeric id
+          # baked into it (DEFAULT_GOODREADS_USER_ID). Set the secret only to
+          # point the bookshelf at another account.
+          GOODREADS_USER_ID: ${{ secrets.GOODREADS_USER_ID }}
           SUBSTACK_RSS_URL: ${{ secrets.SUBSTACK_RSS_URL }}
           # Preferred source for recent X and LinkedIn posts — one key, both
           # lanes. Also unset-safe: the handle and profile URL fall back to the
@@ -102,8 +106,14 @@ jobs:
       # main; force-replacing an unrelated commit cannot conflict, which is
       # why the old rebase-and-retry loop is gone. main is never touched: the
       # repository's own index and HEAD are not involved at all.
+      #
+      # Only main may publish. The media-snapshot branch is what production
+      # deploys from, and a workflow_dispatch can be run against any branch;
+      # without this gate an experiment on a feature branch would force-replace
+      # the live site's snapshot. Other refs get the dry run below instead.
       - name: Publish the snapshot if it changed
         id: publish
+        if: github.ref_name == 'main'
         env:
           BASELINE_TREE: ${{ steps.overlay.outputs.tree }}
           SNAPSHOT_TREE: .github/actions/overlay-media-snapshot/snapshot-tree.sh
@@ -121,6 +131,25 @@ jobs:
           git push --force origin "$commit:refs/heads/media-snapshot"
           echo "published parentless snapshot $commit to media-snapshot."
           echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # The same comparison for a run dispatched on any other ref, minus the
+      # push: it reports whether the refresh would have published, so a branch
+      # can prove the script still finds something new without ever being
+      # able to replace production's snapshot.
+      - name: Dry run — report whether the snapshot changed (non-main ref)
+        if: github.ref_name != 'main'
+        env:
+          BASELINE_TREE: ${{ steps.overlay.outputs.tree }}
+          SNAPSHOT_TREE: .github/actions/overlay-media-snapshot/snapshot-tree.sh
+        run: |
+          set -euo pipefail
+          tree="$("$SNAPSHOT_TREE")"
+          if [ "$tree" = "$BASELINE_TREE" ]; then
+            echo "dry run on ${GITHUB_REF_NAME}: media snapshot unchanged."
+          else
+            echo "dry run on ${GITHUB_REF_NAME}: media snapshot would change" \
+              "(tree $tree vs baseline $BASELINE_TREE); not publishing from a non-main ref."
+          fi
 
       # A push authenticated with GITHUB_TOKEN deliberately does not start
       # another workflow run — and deploy.yml only watches main anyway, which

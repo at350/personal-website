@@ -110,7 +110,12 @@ Three details in that workflow are load-bearing:
   (and treats a `200` that yields zero items as a failure, since that is
   nearly always an error page rather than an emptied diary). Without it, one
   letterboxd hiccup while another feed succeeded would drop every film and
-  delete every mirrored poster.
+  delete every mirrored poster. A source with no feed configured is carried
+  the same way, and since CI reads the previous snapshot from the
+  `media-snapshot` branch — not from `main` — editing `main`'s `live.json`
+  cannot retire one. To retire a source, delete the branch
+  (`git push origin --delete media-snapshot`); the overlay's missing-branch
+  fallback then rebuilds from `main`'s baseline on the next refresh.
 
 Run it by hand with `npm run refresh-media`, or from the Actions tab. Optional
 repo secrets, none required:

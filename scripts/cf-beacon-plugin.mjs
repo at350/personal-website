@@ -1,9 +1,11 @@
 /* Cloudflare Web Analytics, set at press time.
  *
- * The issue keeps no reader state: no cookies, no localStorage, no
- * fingerprint. Cloudflare's beacon honours that — it counts page views at the
- * edge from one small script and stores nothing on the visitor's machine — so
- * it is the one counter allowed into the masthead. The site token is the only
+ * The issue keeps no tracking state: no cookies, no fingerprint, nothing that
+ * follows a reader between visits. The one thing it stores is the reader's
+ * own view preference (see useViewportMode), which is a setting, not a
+ * record of them. Cloudflare's beacon honours that — it counts page views at
+ * the edge from one small script and stores nothing on the visitor's machine
+ * — so it is the one counter allowed into the masthead. The site token is the only
  * moving part, and it is not a secret (it ships in the page source), so the
  * build reads it from CF_BEACON_TOKEN and prints the tag only when one is
  * set. A build without a token is the same issue with no counter at all.

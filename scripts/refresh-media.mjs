@@ -251,16 +251,53 @@ function xMediaFromSyndication(json, title) {
   );
 }
 
+// htmlEntities: letterboxd writes apostrophes as numeric character
+// references (`Don&#039;t`), which only decode under this option.
+const rssParser = () =>
+  new XMLParser({ ignoreAttributes: false, htmlEntities: true });
+
 function rssItems(xml) {
-  // htmlEntities: letterboxd writes apostrophes as numeric character
-  // references (`Don&#039;t`), which only decode under this option.
-  const parser = new XMLParser({ ignoreAttributes: false, htmlEntities: true });
-  const doc = asRecord(parser.parse(xml));
+  const doc = asRecord(rssParser().parse(xml));
   const channel = asRecord(asRecord(doc?.rss)?.channel);
   return toArray(channel?.item).flatMap((entry) => {
     const record = asRecord(entry);
     return record ? [record] : [];
   });
+}
+
+/**
+ * Whether a body is an RSS document at all: an `<rss>` root with a
+ * `<channel>` inside it, items or no items. A shelf with nothing on it is
+ * still a feed and still passes; an HTML interstitial, a login page, or a
+ * JSON error served with a 200 is not, and fails. Parse errors count as
+ * "not a feed" rather than throwing, so the caller decides what a bad body
+ * means.
+ */
+function isRssDocument(xml) {
+  if (typeof xml !== "string") return false;
+  try {
+    const rss = asRecord(asRecord(rssParser().parse(xml))?.rss);
+    return rss !== undefined && "channel" in rss;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Hand the body back if it is a feed; throw if it is not. The per-feed
+ * "0 usable items is a failure" guard only sees a lane's combined result,
+ * and a lane made of several fetches — the two Goodreads shelves — can have
+ * one of them answer 200 with a page that parses to nothing while the other
+ * still delivers. Flattened together that reads as success, the vanished
+ * shelf's books leave the snapshot, and the thumbnail prune deletes their
+ * covers. Throwing here turns that into the lane failure it is, so
+ * carry-forward keeps both shelves.
+ */
+function assertRssBody(xml, label) {
+  if (!isRssDocument(xml)) {
+    throw new Error(`${label}: body is not an RSS document`);
+  }
+  return xml;
 }
 
 /** Light validity gate; the app re-validates every item with zod on load. */
@@ -365,14 +402,19 @@ function goodreadsReview(value) {
 // A size suffix (._SX318_.jpg, ._SY475_.jpg) is what makes a Goodreads cover
 // plate-sized; a bare URL is the full scan (2.5 MB where the sized twin is
 // 32 KB), so a bare one is given the standard large width before it is
-// fetched or mirrored. Mirrors normalize.ts.
+// fetched or mirrored. Only a real cover — the `/books/<stamp>l/<id>.<ext>`
+// shape — can take the suffix: Goodreads' stock "nophoto" placeholder has no
+// sized twin, and suffixing it yields a 404 the mirror would retry every
+// cycle, so anything off that path passes through untouched. Mirrors
+// normalize.ts.
 const GOODREADS_SIZED = /\._S[XY]\d+_\.(?:jpe?g|png|gif|webp)$/i;
 const GOODREADS_BARE = /\.(?:jpe?g|png|gif|webp)$/i;
+const GOODREADS_COVER_PATH = /\/books\//;
 
 function goodreadsCover(value) {
   const src = textOf(value);
   if (!src) return undefined;
-  if (GOODREADS_SIZED.test(src)) return src;
+  if (!GOODREADS_COVER_PATH.test(src) || GOODREADS_SIZED.test(src)) return src;
   return src.replace(GOODREADS_BARE, "._SX318_$&");
 }
 
@@ -550,7 +592,9 @@ function configuredFeeds(env) {
   // rides the same two-hourly cadence with no key and no due gate. One feed
   // covers both shelves: its name doubles as the `source` every book carries,
   // so a shelf that fails carries the whole lane forward instead of deleting
-  // the other shelf's history.
+  // the other shelf's history. Each shelf body is checked for being a feed
+  // before it is parsed, because a 200 that is not one would otherwise
+  // flatten into the other shelf's books and pass as success.
   const goodreadsUserId = env.GOODREADS_USER_ID || DEFAULT_GOODREADS_USER_ID;
   if (goodreadsUserId) {
     const shelfUrl = (shelf) =>
@@ -562,7 +606,10 @@ function configuredFeeds(env) {
         const shelves = await Promise.all(
           GOODREADS_SHELVES.map(async (shelf) =>
             fromGoodreadsRss(
-              await (await fetchWithTimeout(shelfUrl(shelf))).text(),
+              assertRssBody(
+                await (await fetchWithTimeout(shelfUrl(shelf))).text(),
+                `goodreads/${shelf}`,
+              ),
               shelf,
             ),
           ),
@@ -810,7 +857,11 @@ function snapshotUnchanged(previousItems, nextItems) {
  * is not a feed that failed; it is simply absent, and absent must never mean
  * deleted. Without this, a by-hand baseline refresh would drop every post CI
  * last fetched and the thumbnail prune would delete their pictures with them.
- * To retire a source on purpose, remove its items from live.json by hand.
+ * To retire a source on purpose, delete the media-snapshot branch
+ * (`git push origin --delete media-snapshot`): CI reads the previous snapshot
+ * from that branch, not from main, so a hand edit to main's live.json is
+ * overlaid away on the next run and the items ride on. With the branch gone,
+ * the overlay's missing-branch fallback rebuilds from main's baseline instead.
  */
 function carriedUnconfigured(previousItems, feedNames) {
   const configured = new Set(feedNames);
@@ -952,11 +1003,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 // Exported for the parity test only; the script's real interface is the CLI.
 export {
   anyapiDue,
+  assertRssBody,
   carriedUnconfigured,
   fromAnyApiLinkedIn,
   fromAnyApiX,
   fromGoodreadsRss,
   fromLetterboxdRss,
+  isRssDocument,
   snapshotUnchanged,
   xMediaFromSyndication,
 };

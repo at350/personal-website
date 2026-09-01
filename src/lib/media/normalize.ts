@@ -318,14 +318,24 @@ function goodreadsReview(value: unknown): string | undefined {
  * against 32 KB for its sized twin. The CDN honours the suffix on any cover,
  * so a bare URL is given the standard large width before it is ever fetched
  * or mirrored.
+ *
+ * Only a real cover can take the suffix, though. A book with no cover on
+ * file arrives with Goodreads' stock "nophoto" placeholder instead
+ * (`…/assets/nophoto/book/111x148-….png`), and that file has no sized twin:
+ * suffixing it yields a URL the CDN answers 404, which ships a broken plate
+ * and has the mirror retrying it every cycle. Real covers all live under a
+ * `/books/<stamp>l/<id>.<ext>` path, so only that shape is ever rewritten;
+ * anything else is passed through untouched, and the bare placeholder loads
+ * as-is.
  */
 const GOODREADS_SIZED = /\._S[XY]\d+_\.(?:jpe?g|png|gif|webp)$/i;
 const GOODREADS_BARE = /\.(?:jpe?g|png|gif|webp)$/i;
+const GOODREADS_COVER_PATH = /\/books\//;
 
 function goodreadsCover(value: unknown): string | undefined {
   const src = textOf(value);
   if (!src) return undefined;
-  if (GOODREADS_SIZED.test(src)) return src;
+  if (!GOODREADS_COVER_PATH.test(src) || GOODREADS_SIZED.test(src)) return src;
   return src.replace(GOODREADS_BARE, "._SX318_$&");
 }
 

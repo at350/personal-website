@@ -30,6 +30,8 @@ interface RefreshScript {
   anyapiDue: (env: Record<string, string>, now?: Date) => boolean;
   snapshotUnchanged: (previous: unknown[], next: unknown[]) => boolean;
   carriedUnconfigured: (previous: unknown[], feedNames: string[]) => unknown[];
+  isRssDocument: (xml: unknown) => boolean;
+  assertRssBody: (xml: unknown, label: string) => string;
 }
 
 const loadScript = async (): Promise<RefreshScript> =>
@@ -55,6 +57,27 @@ const makeItem = (
   overrides: Partial<MediaItem> & { id: string; title: string },
 ): MediaItem =>
   MediaItemSchema.parse({ source: "web", kind: "link", ...overrides });
+
+/** What Goodreads sends as `book_large_image_url` for a book with no cover. */
+const NOPHOTO_SRC =
+  "https://s.gr-assets.com/assets/nophoto/book/111x148-bcc042a9c91a29c1d680899eff700a03.png";
+
+/** One cover-less book beside one whose real cover arrives without a size. */
+const NOPHOTO_XML = `<?xml version="1.0"?>
+  <rss><channel>
+    <item>
+      <title>No Cover On File</title>
+      <link>https://www.goodreads.com/review/show/4</link>
+      <book_id>4</book_id>
+      <book_large_image_url><![CDATA[${NOPHOTO_SRC}]]></book_large_image_url>
+    </item>
+    <item>
+      <title>Bare Cover</title>
+      <link>https://www.goodreads.com/review/show/5</link>
+      <book_id>5</book_id>
+      <book_large_image_url><![CDATA[https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1347360991l/1358.jpg]]></book_large_image_url>
+    </item>
+  </channel></rss>`;
 
 describe("fromLetterboxdRss", () => {
   const items = fromLetterboxdRss(fixture("letterboxd.rss.xml"));
@@ -282,6 +305,18 @@ describe("fromGoodreadsRss", () => {
     expect(fromGoodreadsRss("this is << not xml >>")).toEqual([]);
     expect(fromGoodreadsRss("")).toEqual([]);
     expect(fromGoodreadsRss("<html><body>404</body></html>")).toEqual([]);
+  });
+
+  it("leaves the stock nophoto placeholder alone but still sizes a bare /books/ cover", () => {
+    // Goodreads sends the placeholder for a book with no cover on file. It
+    // has no sized twin — the CDN answers 404 for `…._SX318_.png` — so the
+    // bare placeholder must reach the plate as-is, while a real cover under
+    // /books/ still gains the large width it always did.
+    const [placeholder, bare] = fromGoodreadsRss(NOPHOTO_XML);
+    expect(placeholder?.image?.src).toBe(NOPHOTO_SRC);
+    expect(bare?.image?.src).toBe(
+      "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1347360991l/1358._SX318_.jpg",
+    );
   });
 
   it("drops a bad item without killing the batch", () => {
@@ -642,6 +677,7 @@ describe("refresh-media.mjs / normalize.ts parity", () => {
           </channel></rss>`,
         "read",
       ],
+      [NOPHOTO_XML, "read"],
     ];
 
     for (const [xml, shelf] of inputs) {
@@ -984,6 +1020,51 @@ describe("carriedUnconfigured", () => {
     const { carriedUnconfigured } = await loadScript();
     expect(carriedUnconfigured([post, film], ["letterboxd", "x"])).toEqual([]);
     expect(carriedUnconfigured([null, { id: "?" }, post], ["x"])).toEqual([]);
+  });
+});
+
+describe("isRssDocument / assertRssBody", () => {
+  // The goodreads lane is two shelf fetches flattened into one result. A
+  // shelf that answers 200 with a page that is not a feed parses to nothing,
+  // and flattened into the other shelf that would pass the per-feed "0 items"
+  // guard — so each body has to prove it is a feed before it counts.
+  const EMPTY_SHELF = `<?xml version="1.0"?>
+    <rss version="2.0"><channel>
+      <title>Alan's bookshelf: currently-reading</title>
+      <link>https://www.goodreads.com/review/list_rss/1?shelf=currently-reading</link>
+    </channel></rss>`;
+  const INTERSTITIAL = `<!DOCTYPE html>
+    <html><head><title>Goodreads</title><meta charset="utf-8"></head>
+    <body><p>Please wait while we verify your browser.</p></body></html>`;
+
+  it("accepts a real feed and a well-formed shelf with nothing on it", async () => {
+    const { isRssDocument, assertRssBody } = await loadScript();
+    expect(isRssDocument(fixture("goodreads.rss.xml"))).toBe(true);
+    expect(isRssDocument(fixture("goodreads-reading.rss.xml"))).toBe(true);
+    expect(isRssDocument(fixture("letterboxd.rss.xml"))).toBe(true);
+    expect(isRssDocument(EMPTY_SHELF)).toBe(true);
+    expect(assertRssBody(EMPTY_SHELF, "goodreads/currently-reading")).toBe(
+      EMPTY_SHELF,
+    );
+  });
+
+  it("rejects an HTML page, JSON, an empty body, and xml with no channel", async () => {
+    const { isRssDocument, assertRssBody } = await loadScript();
+    for (const body of [
+      INTERSTITIAL,
+      "<html><body>404</body></html>",
+      '{"error":"rate limited"}',
+      "",
+      "<rss></rss>",
+      "<feed><entry/></feed>",
+      null,
+      undefined,
+    ]) {
+      expect(isRssDocument(body)).toBe(false);
+    }
+    expect(() => assertRssBody(INTERSTITIAL, "goodreads/read")).toThrow(
+      /goodreads\/read: body is not an RSS document/,
+    );
   });
 });
 

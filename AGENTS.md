@@ -27,15 +27,22 @@ Non-obvious notes:
   install, lint, test, build, and the dev server all work fine.
 - On first load the book shows a brief entry gate that pre-captures all page
   textures (via `html-to-image`) before it becomes interactive, so allow ~8-10s
-  before the 3D book responds. Turn pages with the Right/Left Arrow keys, the
-  space bar, or by dragging horizontally across the book.
-- `npm run refresh-media` pulls the letterboxd film log with no configuration
-  (the account is baked into the script) and needs network access; the substack
-  and X feeds stay off until their optional secrets are set (see `README.md`).
+  before the 3D book responds. Turn pages with the Right/Left Arrow keys
+  (Home/End jump to either cover; `?` opens the keys sheet) or by dragging
+  horizontally across the book.
+- `npm run refresh-media` pulls the letterboxd film log and both Goodreads
+  shelves (read and currently-reading) with no configuration — the account
+  and the numeric user id are baked into the script — and needs network
+  access; the substack, X, and LinkedIn lanes stay off until their optional
+  secrets are set (see `README.md`).
   The GitHub workflow runs it every two hours, force-publishes a changed
   snapshot as one parentless commit on the `media-snapshot` branch (never to
   `main`), and then dispatches `deploy.yml` itself, because a `GITHUB_TOKEN`
   push cannot trigger another workflow. Both workflows overlay that branch
   onto the checkout first via `.github/actions/overlay-media-snapshot`. The
   `live.json` and `public/media/thumbs/` on `main` are an offline baseline,
-  refreshed only by hand; do not expect them to match the live site.
+  refreshed only by hand; do not expect them to match the live site. Because
+  CI reads the previous snapshot from that branch, a source's items cannot be
+  retired by editing `main`'s `live.json` — delete the branch instead
+  (`git push origin --delete media-snapshot`) and the next refresh rebuilds
+  from `main`'s baseline.
