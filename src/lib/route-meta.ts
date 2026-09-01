@@ -20,9 +20,11 @@ export const BASE_TITLE = "Alan Tai";
 export const BASE_DESCRIPTION =
   "Alan Tai builds software, research, and early-stage products. Issue No. 01.";
 
-/** The share plate, one absolute image for every route. */
+/** The share plate, one absolute image for every route. It follows SITE_URL
+    like the canonical does, so a build for another origin points scrapers at
+    its own copy of the plate rather than the production one. */
 export const OG_IMAGE = {
-  url: "https://alantai.me/og.png",
+  url: `${SITE_URL}/og.png`,
   type: "image/png",
   width: 1200,
   height: 630,
@@ -75,8 +77,13 @@ export function metaForPath(pathname: string): RouteMeta {
   const own = ROUTE_META[path];
   if (own) return websiteMeta(path, own);
 
-  if (path.startsWith("/writing/")) {
-    const slug = path.split("/")[2];
+  /* A dispatch lives at exactly /writing/<slug>, the shape the router's
+     /writing/:slug matches. Anything deeper under a real slug is a URL nobody
+     printed — the app shows Not Found there — so it takes the unknown-path
+     road below instead of borrowing the article's title and canonical. */
+  const segments = path.split("/");
+  if (segments.length === 3 && segments[1] === "writing") {
+    const slug = segments[2];
     const dispatch = dispatches.find((d) => d.id === slug);
     if (dispatch) {
       return {
