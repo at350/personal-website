@@ -49,6 +49,7 @@ jobs:
         env:
           VITE_BASE: /
           SITE_URL: https://alantai.me
+          CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
