@@ -144,7 +144,13 @@ function worstCrossing(field: DriftField, solved: LeafVertex[][]) {
   return worst;
 }
 
-describe("drift page collision", { timeout: 60_000 }, () => {
+// These are physics runs, not unit checks: 750 solver frames per case, each
+// frame measuring every pair of leaves. On a laptop the pair takes twenty
+// seconds; on the shared GitHub runner, where vitest's workers split two
+// cores with the rest of the suite, the first case alone has run past sixty
+// and taken the deploy down with it. The budget below is for that runner,
+// not a licence for the solver to get slower.
+describe("drift page collision", { timeout: 240_000 }, () => {
   it("never lets one page's surface pass through another's", () => {
     const rig = makeRig();
     const idle = input();
