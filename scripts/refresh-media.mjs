@@ -663,6 +663,42 @@ async function mirrorThumbnails(items) {
   return { mirrored, kept: remote.length - mirrored };
 }
 
+// --- change detection --------------------------------------------------------
+//
+// The snapshot carries a `generatedAt` stamp, so a naive rewrite "changes"
+// the file on every run even when not a single item moved — and in CI every
+// change is a published snapshot and a full Pages rebuild. Twelve cycles a day
+// of identical items is exactly the churn this guard exists to swallow: the
+// file is only rewritten when the items themselves differ.
+
+/**
+ * One canonical text for a JSON value: keys sorted, undefined dropped, so
+ * two items compare equal whenever JSON.stringify would print them the same
+ * regardless of the order their normalizer happened to assign the keys.
+ */
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const record = asRecord(value);
+  if (!record) return JSON.stringify(value) ?? "null";
+  const entries = Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`);
+  return `{${entries.join(",")}}`;
+}
+
+/**
+ * Whether the run produced exactly the previous snapshot's items, in the
+ * same order. Only the items count — `generatedAt` is deliberately outside
+ * the comparison, since it is new on every run by construction.
+ */
+function snapshotUnchanged(previousItems, nextItems) {
+  return (
+    previousItems.length === nextItems.length &&
+    canonicalJson(previousItems) === canonicalJson(nextItems)
+  );
+}
+
 /** The previous snapshot's items, or [] when there is nothing readable yet. */
 async function previousItems() {
   try {
@@ -745,7 +781,18 @@ async function main() {
   }
 
   const deduped = [...new Map(items.map((item) => [item.id, item])).values()];
+  // Mirror before comparing: the previous snapshot already points at local
+  // thumbs, and a fresh item only matches it once its src has been rewritten
+  // to the same local path. Re-mirroring identical images is idempotent.
   const thumbs = await mirrorThumbnails(deduped);
+  if (snapshotUnchanged(previous, deduped)) {
+    console.log(
+      `refresh-media: unchanged — ${deduped.length} item(s) from ` +
+        `${succeeded}/${feeds.length} feed(s) match the previous snapshot; ` +
+        "leaving src/lib/media/live.json untouched.",
+    );
+    return;
+  }
   const snapshot = { items: deduped, generatedAt: new Date().toISOString() };
   await writeFile(LIVE_JSON_URL, `${JSON.stringify(snapshot, null, 2)}\n`);
   console.log(
@@ -774,5 +821,6 @@ export {
   anyapiDue,
   fromAnyApiLinkedIn,
   fromAnyApiX,
+  snapshotUnchanged,
   xMediaFromSyndication,
 };

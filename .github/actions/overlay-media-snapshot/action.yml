@@ -1,0 +1,77 @@
+# Lays the live media snapshot over the checkout.
+#
+# main carries only a hand-refreshed baseline of src/lib/media/live.json and
+# public/media/thumbs/ so local dev and the test suite work offline. The
+# snapshot the site actually ships lives on the `media-snapshot` branch: one
+# parentless commit, force-replaced by refresh-media.yml whenever a feed
+# changed, holding nothing but those two paths. Both workflows call this
+# action before anything else — refresh-media.yml so carry-forward and change
+# detection start from the live snapshot rather than main's stale baseline,
+# deploy.yml so the build ships what the last refresh found. Sharing the
+# action is what keeps the two from drifting: there is exactly one
+# definition of "overlay", and one of "the snapshot" (snapshot-tree.sh).
+#
+# The overlay is staged as well as written to disk, so a later diff sees the
+# live snapshot as the starting point rather than as a change to main.
+name: Overlay media snapshot
+description: >-
+  Checks out src/lib/media/live.json and public/media/thumbs/ from the
+  parentless media-snapshot branch, falling back to main's baseline copy when
+  the branch does not exist yet.
+
+outputs:
+  tree:
+    description: >-
+      Tree id of the snapshot paths after the overlay (see snapshot-tree.sh).
+      refresh-media.yml compares against it to decide whether the refresh
+      changed anything worth publishing.
+    value: ${{ steps.overlay.outputs.tree }}
+
+runs:
+  using: composite
+  steps:
+    - id: overlay
+      shell: bash
+      env:
+        SNAPSHOT_TREE: ${{ github.action_path }}/snapshot-tree.sh
+      run: |
+        set -euo pipefail
+
+        # Tell "the branch is not there yet" (the very first refresh, or a
+        # fork) apart from "origin could not be reached": the former falls
+        # back to main's baseline, the latter must fail the job rather than
+        # quietly deploy stale media. --exit-code makes ls-remote exit 2 for
+        # exactly the no-such-branch case.
+        status=0
+        git ls-remote --exit-code --heads origin media-snapshot >/dev/null || status=$?
+        case "$status" in
+          0) ;;
+          2)
+            echo "overlay-media-snapshot: no media-snapshot branch yet; keeping main's baseline."
+            echo "tree=$("$SNAPSHOT_TREE")" >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+          *)
+            echo "overlay-media-snapshot: could not list origin's branches (git exit $status)." >&2
+            exit "$status"
+            ;;
+        esac
+
+        # The branch is one commit with no parent, so depth 1 is all of it.
+        git fetch --depth=1 origin refs/heads/media-snapshot
+
+        # A checkout overlays; it never removes what is already there. Clear
+        # the baseline's thumbs from disk and from the index first so a poster
+        # the live snapshot has since pruned cannot survive into the build.
+        rm -rf public/media/thumbs
+        git rm -r -q --cached --ignore-unmatch -- public/media/thumbs
+        git checkout FETCH_HEAD -- src/lib/media/live.json
+        # A snapshot whose every image failed to mirror has no thumbs tree at
+        # all (git does not record empty directories), and checkout refuses a
+        # pathspec that matches nothing in the tree.
+        if git cat-file -e FETCH_HEAD:public/media/thumbs 2>/dev/null; then
+          git checkout FETCH_HEAD -- public/media/thumbs
+        fi
+
+        echo "overlay-media-snapshot: overlaid snapshot $(git rev-parse --short FETCH_HEAD) from media-snapshot."
+        echo "tree=$("$SNAPSHOT_TREE")" >> "$GITHUB_OUTPUT"

@@ -1,7 +1,17 @@
-# Refreshes src/lib/media/live.json from configured feeds (letterboxd,
-# substack, X) and commits the snapshot if it changed, so the deployed site
-# updates itself without a server. The script exits 0 even when every feed
-# fails, and only rewrites the snapshot when at least one succeeds.
+# Refreshes the media snapshot (src/lib/media/live.json plus the mirrored
+# thumbnails under public/media/thumbs/) from configured feeds (letterboxd,
+# substack, X, LinkedIn) and publishes it when it changed, so the deployed
+# site updates itself without a server. The script exits 0 even when every
+# feed fails, and only rewrites the snapshot when at least one succeeds and
+# the item list actually differs from the previous one.
+#
+# The snapshot never lands on main. It lives on the `media-snapshot` branch
+# as ONE parentless commit holding only the two snapshot paths; each changed
+# refresh force-replaces that commit, so the branch never accumulates history
+# and main's log stays a log of real work rather than two-hourly chores. Both
+# this workflow and deploy.yml overlay that branch onto the checkout before
+# doing anything else (see .github/actions/overlay-media-snapshot). main keeps
+# a hand-refreshed baseline so local dev and the tests work offline.
 #
 # Runs every two hours: a film logged on letterboxd reaches alantai.me within
 # one cycle. Refresh runs are cheap (one install and a few RSS fetches); the
@@ -33,11 +43,13 @@ on:
         default: false
 
 permissions:
+  # Force-pushing the media-snapshot branch. main is never written.
   contents: write
-  # Needed to dispatch the deploy workflow after committing (see below).
+  # Needed to dispatch the deploy workflow after publishing (see below).
   actions: write
 
-# Never let two refreshes race for the same push.
+# Never let two refreshes race for the same branch: a force-push cannot
+# conflict, but two overlapping runs could still publish out of order.
 concurrency:
   group: refresh-media
   cancel-in-progress: false
@@ -47,6 +59,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Before the script runs, so that carry-forward reads the live snapshot
+      # (not main's stale baseline) and so the tree recorded here is what the
+      # result is compared against.
+      - name: Overlay the live media snapshot
+        id: overlay
+        uses: ./.github/actions/overlay-media-snapshot
 
       - uses: actions/setup-node@v4
         with:
@@ -76,41 +95,44 @@ jobs:
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           X_USER_ID: ${{ secrets.X_USER_ID }}
 
-      - name: Commit snapshot if changed
-        id: commit
+      # Publishes the snapshot as a single commit with NO parent whose tree
+      # holds only the two snapshot paths, then force-replaces the branch tip
+      # with it. Parentless means the branch is always exactly one commit
+      # deep; only-two-paths means it can never be mistaken for a copy of
+      # main; force-replacing an unrelated commit cannot conflict, which is
+      # why the old rebase-and-retry loop is gone. main is never touched: the
+      # repository's own index and HEAD are not involved at all.
+      - name: Publish the snapshot if it changed
+        id: publish
+        env:
+          BASELINE_TREE: ${{ steps.overlay.outputs.tree }}
+          SNAPSHOT_TREE: .github/actions/overlay-media-snapshot/snapshot-tree.sh
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/lib/media/live.json public/media/thumbs
-          if git diff --quiet --cached; then
-            echo "live.json unchanged; nothing to commit."
+          set -euo pipefail
+          tree="$("$SNAPSHOT_TREE")"
+          if [ "$tree" = "$BASELINE_TREE" ]; then
+            echo "media snapshot unchanged; nothing to publish."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "chore: refresh media snapshot"
-          # A human push can land between our checkout and this push; rebase
-          # the snapshot commit onto whatever main has become and try again.
-          for attempt in 1 2 3; do
-            if git push; then
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            echo "push rejected (attempt $attempt); rebasing onto origin/main."
-            git pull --rebase origin "${GITHUB_REF_NAME}"
-          done
-          echo "could not push the snapshot after 3 attempts." >&2
-          exit 1
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          commit="$(git commit-tree "$tree" -m "media snapshot $(date -u +%Y-%m-%dT%H:%M:%SZ)")"
+          git push --force origin "$commit:refs/heads/media-snapshot"
+          echo "published parentless snapshot $commit to media-snapshot."
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
       # A push authenticated with GITHUB_TOKEN deliberately does not start
-      # another workflow run, so deploy.yml — which triggers on push — would
-      # never see the snapshot and alantai.me would keep serving the previous
-      # one. workflow_dispatch is the documented exception to that rule, so
-      # ask Pages to rebuild explicitly. Without this step the library stops
-      # updating even though the commits keep landing. Only main may dispatch
-      # it: deploy.yml publishes to production Pages and already restricts
-      # itself to that branch.
+      # another workflow run — and deploy.yml only watches main anyway, which
+      # the snapshot branch never touches — so alantai.me would keep serving
+      # the previous snapshot. workflow_dispatch is the documented exception
+      # to that rule, so ask Pages to rebuild explicitly; deploy.yml then
+      # overlays the fresh branch before it builds. Without this step the
+      # library stops updating even though the snapshots keep landing. Only
+      # main may dispatch it: deploy.yml publishes to production Pages and
+      # already restricts itself to that branch.
       - name: Deploy the new snapshot
-        if: steps.commit.outputs.changed == 'true' && github.ref_name == 'main'
+        if: steps.publish.outputs.changed == 'true' && github.ref_name == 'main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
