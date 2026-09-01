@@ -471,6 +471,13 @@ export const contact = {
       external: true,
     },
     {
+      kind: "goodreads",
+      label: "Goodreads",
+      display: "alan-tai",
+      href: "https://www.goodreads.com/user/show/169946288-alan-tai",
+      external: true,
+    },
+    {
       kind: "journalism",
       label: "Journalism archive",
       display: "Selected reporting",

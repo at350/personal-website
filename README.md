@@ -13,7 +13,7 @@ npm run dev        # http://localhost:5173
 ```
 
 ```bash
-npm run build      # type-checks, bundles, writes rss.xml + sitemap.xml
+npm run build      # type-checks, bundles, prerenders every route, writes rss.xml + sitemap.xml
 npm test           # engine, folio math, content schemas, media normalizers
 npm run lint
 ```
@@ -63,27 +63,59 @@ npm run lint
 
 The library restocks itself. `.github/workflows/refresh-media.yml` runs
 **every two hours**: it reads each configured feed, mirrors every remote image
-into `public/media/thumbs/`, and commits a new `src/lib/media/live.json` when
-anything changed. A film logged on [letterboxd.com/alantai](https://letterboxd.com/alantai/)
+into `public/media/thumbs/`, and publishes a new `src/lib/media/live.json`
+when the items actually changed (the `generatedAt` stamp alone never counts).
+A film logged on [letterboxd.com/alantai](https://letterboxd.com/alantai/)
 is on the site within one cycle, and it needs no configuring at all — the
 username lives in `scripts/refresh-media.mjs` as `DEFAULT_LETTERBOXD_USER`.
+Books work the same way: the Goodreads lane reads both the **read** and
+**currently-reading** shelves of
+[goodreads.com/user/show/169946288-alan-tai](https://www.goodreads.com/user/show/169946288-alan-tai)
+as free RSS on the same two-hour clock — no key, the numeric id lives
+beside the letterboxd username as `DEFAULT_GOODREADS_USER_ID` — and an
+open book lands with a **READING** mark until it moves to the read shelf.
 The X and LinkedIn lanes cost money per call, so they ride a slower clock;
 see [Social posts](#social-posts) below.
 
-Two details in that workflow are load-bearing:
+The snapshot never lands on `main`. It lives on the **`media-snapshot`**
+branch as a single commit with no parent that holds only `live.json` and
+`public/media/thumbs/`; every changed refresh force-replaces that commit, so
+the branch is always one commit deep and `main`'s log stays a log of real
+work. `main` keeps a baseline copy of both paths so local dev and the tests
+work with no network — refreshed **only by hand**, when it drifts far enough
+to matter: `npm run refresh-media`, then commit. To read what the site is
+actually serving:
 
+```bash
+git fetch origin media-snapshot && git show FETCH_HEAD:src/lib/media/live.json
+```
+
+Three details in that workflow are load-bearing:
+
+- **Both workflows overlay the branch before anything else.**
+  `.github/actions/overlay-media-snapshot` fetches `media-snapshot` (falling
+  back to `main`'s baseline until the first refresh creates it) and checks
+  the two paths out over the checkout. `refresh-media.yml` does it so
+  carry-forward and change detection start from the live snapshot rather
+  than the stale baseline; `deploy.yml` does it so the build ships what the
+  last refresh found. One shared action means the two cannot drift.
 - **It dispatches the deploy itself.** A push authenticated with
-  `GITHUB_TOKEN` deliberately does not start another workflow run, so
-  `deploy.yml` — which triggers on push — never sees the snapshot commit.
-  `workflow_dispatch` is the documented exception, so the refresh job calls it
-  explicitly. Remove that step and the commits keep landing while the
-  published site quietly stops changing.
+  `GITHUB_TOKEN` deliberately does not start another workflow run — and
+  `deploy.yml` only watches `main`, which the snapshot never touches.
+  `workflow_dispatch` is the documented exception, so the refresh job calls
+  it explicitly after a changed publish. Remove that step and the snapshots
+  keep landing while the published site quietly stops changing.
 - **A feed that fails keeps its last-known items.** `refresh-media.mjs`
   carries a failed feed's contribution forward from the previous snapshot
   (and treats a `200` that yields zero items as a failure, since that is
   nearly always an error page rather than an emptied diary). Without it, one
   letterboxd hiccup while another feed succeeded would drop every film and
-  delete every mirrored poster.
+  delete every mirrored poster. A source with no feed configured is carried
+  the same way, and since CI reads the previous snapshot from the
+  `media-snapshot` branch — not from `main` — editing `main`'s `live.json`
+  cannot retire one. To retire a source, delete the branch
+  (`git push origin --delete media-snapshot`); the overlay's missing-branch
+  fallback then rebuilds from `main`'s baseline on the next refresh.
 
 Run it by hand with `npm run refresh-media`, or from the Actions tab. Optional
 repo secrets, none required:
@@ -91,6 +123,7 @@ repo secrets, none required:
 | Secret | Purpose |
 |---|---|
 | `LETTERBOXD_USER` | Point the film log at a different account |
+| `GOODREADS_USER_ID` | Point the bookshelf at a different Goodreads account (the numeric id from its profile URL) |
 | `SUBSTACK_RSS_URL` | Substack feed URL once the newsletter exists |
 | `ANYAPI_KEY` | Recent X **and** LinkedIn posts via [AnyAPI](https://getanyapi.com) — one key, both lanes |
 | `X_HANDLE` | Point the X feed at a different handle (defaults to `DEFAULT_X_HANDLE`) |
@@ -147,3 +180,42 @@ Studio Co.). All licenses permit self-hosted web embedding; files live in
 
 White `#FFFFFF`. Ink `#0E0E0C`. One red: `#D7261E`. Hairlines at 14% ink.
 No gradients. The book's lighting does the shading.
+
+## Analytics
+
+One counter, and it keeps nothing: [Cloudflare Web
+Analytics](https://developers.cloudflare.com/web-analytics/). It is free,
+cookieless, and sets no client-side state at all (no cookies, no
+`localStorage`), and Cloudflare does not fingerprint visitors by IP or user
+agent, so there is no consent banner to draw. The colophon says "no cookies"
+and means it.
+
+The beacon is a single deferred script with a per-site token in a
+`data-cf-beacon` JSON attribute. The token is public by design (it ships in
+the page source), so it lives in a repository **variable**, not a secret, and
+`scripts/cf-beacon-plugin.mjs` prints the tag into `<head>` of
+`dist/index.html` at build time. No token, no tag: local builds and forks
+ship no counter.
+
+- **Get the token** — Cloudflare dashboard → **Analytics & Logs → Web
+  Analytics → Add a site**, hostname `alantai.me` (it is not proxied, so
+  choose the manual JS snippet), then copy the `token` out of the snippet
+  shown under **Manage site**.
+- **Set it** — `gh variable set CF_BEACON_TOKEN --body "<token>"`, then push
+  or re-run the *Deploy to GitHub Pages* workflow. `deploy.yml` hands the
+  variable to `npm run build` as `CF_BEACON_TOKEN`.
+- **Verify locally** — `CF_BEACON_TOKEN=test npm run build && grep -c
+  cloudflareinsights dist/index.html` prints `1`; without the variable it
+  prints `0`. The tag is
+  `<script defer src="https://static.cloudflareinsights.com/beacon.min.js"
+  data-cf-beacon='{"token":"<token>","spa":true}'></script>`.
+- **Verify in production** — open the network panel on alantai.me and look
+  for a request to `cloudflareinsights.com` (the script) and a `POST` to
+  `/cdn-cgi/rum`; the dashboard shows page views within a few minutes.
+- **Routes** — the site is a single-page book, so turns are History-API
+  navigations, not page loads. The beacon watches the History and Navigation
+  APIs and reports each route change as its own page view; `spa` is `true` by
+  default in the beacon and is written out anyway so the page source says so.
+  Checked against `beacon.min.js` itself: the attribute is parsed as JSON,
+  `spa` is on unless it is explicitly `false`, and the script never touches
+  `document.cookie` or `localStorage`.

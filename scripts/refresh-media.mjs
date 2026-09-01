@@ -17,6 +17,9 @@
 //   LETTERBOXD_USER            letterboxd username -> https://letterboxd.com/<user>/rss/
 //                              defaults to DEFAULT_LETTERBOXD_USER below, so
 //                              `npm run refresh-media` works with no env at all
+//   GOODREADS_USER_ID          numeric goodreads user id -> the "read" and
+//                              "currently-reading" shelf feeds (free RSS);
+//                              defaults to DEFAULT_GOODREADS_USER_ID below
 //   SUBSTACK_RSS_URL           full substack feed url
 //   ANYAPI_KEY                 anyapi.com key -> recent X posts AND linkedin
 //                              posts (preferred; one key serves both)
@@ -83,6 +86,13 @@ function anyapiDue(env, now = new Date()) {
 // the repo rather than in a secret: the film log then keeps refreshing without
 // any configuration at all. LETTERBOXD_USER overrides it (say, on a fork).
 const DEFAULT_LETTERBOXD_USER = "alantai";
+
+// Same reasoning for the goodreads account: the numeric id is in every public
+// profile URL, so the bookshelf keeps refreshing with no configuration at
+// all. GOODREADS_USER_ID overrides it. Both shelves are read: finished books
+// carry a finish date, open ones carry the READING mark.
+const DEFAULT_GOODREADS_USER_ID = "169946288";
+const GOODREADS_SHELVES = ["read", "currently-reading"];
 
 // Same reasoning for the X handle: it is public, so baking it in keeps the
 // posts flowing with only ANYAPI_KEY set. X_HANDLE overrides it.
@@ -241,14 +251,53 @@ function xMediaFromSyndication(json, title) {
   );
 }
 
+// htmlEntities: letterboxd writes apostrophes as numeric character
+// references (`Don&#039;t`), which only decode under this option.
+const rssParser = () =>
+  new XMLParser({ ignoreAttributes: false, htmlEntities: true });
+
 function rssItems(xml) {
-  const parser = new XMLParser({ ignoreAttributes: false });
-  const doc = asRecord(parser.parse(xml));
+  const doc = asRecord(rssParser().parse(xml));
   const channel = asRecord(asRecord(doc?.rss)?.channel);
   return toArray(channel?.item).flatMap((entry) => {
     const record = asRecord(entry);
     return record ? [record] : [];
   });
+}
+
+/**
+ * Whether a body is an RSS document at all: an `<rss>` root with a
+ * `<channel>` inside it, items or no items. A shelf with nothing on it is
+ * still a feed and still passes; an HTML interstitial, a login page, or a
+ * JSON error served with a 200 is not, and fails. Parse errors count as
+ * "not a feed" rather than throwing, so the caller decides what a bad body
+ * means.
+ */
+function isRssDocument(xml) {
+  if (typeof xml !== "string") return false;
+  try {
+    const rss = asRecord(asRecord(rssParser().parse(xml))?.rss);
+    return rss !== undefined && "channel" in rss;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Hand the body back if it is a feed; throw if it is not. The per-feed
+ * "0 usable items is a failure" guard only sees a lane's combined result,
+ * and a lane made of several fetches — the two Goodreads shelves — can have
+ * one of them answer 200 with a page that parses to nothing while the other
+ * still delivers. Flattened together that reads as success, the vanished
+ * shelf's books leave the snapshot, and the thumbnail prune deletes their
+ * covers. Throwing here turns that into the lane failure it is, so
+ * carry-forward keeps both shelves.
+ */
+function assertRssBody(xml, label) {
+  if (!isRssDocument(xml)) {
+    throw new Error(`${label}: body is not an RSS document`);
+  }
+  return xml;
 }
 
 /** Light validity gate; the app re-validates every item with zod on load. */
@@ -320,6 +369,79 @@ function fromLetterboxdRss(xml) {
         image: poster
           ? { src: poster, alt: `Poster for ${title}` }
           : undefined,
+      };
+    })
+    .filter(isUsable);
+}
+
+// Goodreads writes 0 where a book was shelved unrated; zero stars is not a
+// verdict, so it never reaches the plate.
+function bookRating(value) {
+  const rating = numOf(value);
+  return rating !== undefined && rating > 0 ? rating : undefined;
+}
+
+// `book_published` is the first edition's year, negative for a classical text
+// (Gorgias arrives as -380). Mirrors MediaItemSchema's year range: a value
+// outside it would sink the whole item on load rather than just the year.
+function bookYear(value) {
+  const year = numOf(value);
+  return year !== undefined && Number.isInteger(year) && year >= 1888 && year <= 2200
+    ? year
+    : undefined;
+}
+
+// The member's own review, as written; Goodreads allows light HTML in it.
+function goodreadsReview(value) {
+  const text = textOf(value);
+  if (!text) return undefined;
+  const copy = stripHtml(text);
+  return copy ? truncate(copy, 280) : undefined;
+}
+
+// A size suffix (._SX318_.jpg, ._SY475_.jpg) is what makes a Goodreads cover
+// plate-sized; a bare URL is the full scan (2.5 MB where the sized twin is
+// 32 KB), so a bare one is given the standard large width before it is
+// fetched or mirrored. Only a real cover — the `/books/<stamp>l/<id>.<ext>`
+// shape — can take the suffix: Goodreads' stock "nophoto" placeholder has no
+// sized twin, and suffixing it yields a 404 the mirror would retry every
+// cycle, so anything off that path passes through untouched. Mirrors
+// normalize.ts.
+const GOODREADS_SIZED = /\._S[XY]\d+_\.(?:jpe?g|png|gif|webp)$/i;
+const GOODREADS_BARE = /\.(?:jpe?g|png|gif|webp)$/i;
+const GOODREADS_COVER_PATH = /\/books\//;
+
+function goodreadsCover(value) {
+  const src = textOf(value);
+  if (!src) return undefined;
+  if (!GOODREADS_COVER_PATH.test(src) || GOODREADS_SIZED.test(src)) return src;
+  return src.replace(GOODREADS_BARE, "._SX318_$&");
+}
+
+// Every fact arrives twice, as an element and folded into an HTML description;
+// only the elements are read. The feed does not label its shelf, so the call
+// site passes it and the currently-reading shelf becomes the READING mark.
+function fromGoodreadsRss(xml, shelf = "read") {
+  return rssItems(xml)
+    .map((item) => {
+      const title = textOf(item.title) ?? "";
+      const link = textOf(item.link);
+      const cover = goodreadsCover(item.book_large_image_url);
+      return {
+        id: `goodreads:${textOf(item.book_id) ?? textOf(item.guid) ?? link ?? title}`,
+        source: "goodreads",
+        kind: "book",
+        title,
+        url: link,
+        author: textOf(item.author_name),
+        excerpt: goodreadsReview(item.user_review),
+        publishedAt: isoDate(item.pubDate),
+        readAt: isoDate(item.user_read_at),
+        rating: bookRating(item.user_rating),
+        year: bookYear(item.book_published),
+        // Undefined keys drop out of JSON.stringify, keeping the snapshot terse.
+        isReading: shelf === "currently-reading" || undefined,
+        image: cover ? { src: cover, alt: `Cover of ${title}` } : undefined,
       };
     })
     .filter(isUsable);
@@ -464,6 +586,36 @@ function configuredFeeds(env) {
     feeds.push({
       name: "letterboxd",
       run: async () => fromLetterboxdRss(await (await fetchWithTimeout(url)).text()),
+    });
+  }
+  // Goodreads' shelf feeds are public RSS like letterboxd's, so the book lane
+  // rides the same two-hourly cadence with no key and no due gate. One feed
+  // covers both shelves: its name doubles as the `source` every book carries,
+  // so a shelf that fails carries the whole lane forward instead of deleting
+  // the other shelf's history. Each shelf body is checked for being a feed
+  // before it is parsed, because a 200 that is not one would otherwise
+  // flatten into the other shelf's books and pass as success.
+  const goodreadsUserId = env.GOODREADS_USER_ID || DEFAULT_GOODREADS_USER_ID;
+  if (goodreadsUserId) {
+    const shelfUrl = (shelf) =>
+      `https://www.goodreads.com/review/list_rss/` +
+      `${encodeURIComponent(goodreadsUserId)}?shelf=${shelf}`;
+    feeds.push({
+      name: "goodreads",
+      run: async () => {
+        const shelves = await Promise.all(
+          GOODREADS_SHELVES.map(async (shelf) =>
+            fromGoodreadsRss(
+              assertRssBody(
+                await (await fetchWithTimeout(shelfUrl(shelf))).text(),
+                `goodreads/${shelf}`,
+              ),
+              shelf,
+            ),
+          ),
+        );
+        return shelves.flat();
+      },
     });
   }
   if (env.SUBSTACK_RSS_URL) {
@@ -663,6 +815,61 @@ async function mirrorThumbnails(items) {
   return { mirrored, kept: remote.length - mirrored };
 }
 
+// --- change detection --------------------------------------------------------
+//
+// The snapshot carries a `generatedAt` stamp, so a naive rewrite "changes"
+// the file on every run even when not a single item moved — and in CI every
+// change is a published snapshot and a full Pages rebuild. Twelve cycles a day
+// of identical items is exactly the churn this guard exists to swallow: the
+// file is only rewritten when the items themselves differ.
+
+/**
+ * One canonical text for a JSON value: keys sorted, undefined dropped, so
+ * two items compare equal whenever JSON.stringify would print them the same
+ * regardless of the order their normalizer happened to assign the keys.
+ */
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const record = asRecord(value);
+  if (!record) return JSON.stringify(value) ?? "null";
+  const entries = Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`);
+  return `{${entries.join(",")}}`;
+}
+
+/**
+ * Whether the run produced exactly the previous snapshot's items, in the
+ * same order. Only the items count — `generatedAt` is deliberately outside
+ * the comparison, since it is new on every run by construction.
+ */
+function snapshotUnchanged(previousItems, nextItems) {
+  return (
+    previousItems.length === nextItems.length &&
+    canonicalJson(previousItems) === canonicalJson(nextItems)
+  );
+}
+
+/**
+ * The previous snapshot's items whose source has no feed registered this run.
+ * A source that is not configured — the paid lanes on a keyless laptop, say —
+ * is not a feed that failed; it is simply absent, and absent must never mean
+ * deleted. Without this, a by-hand baseline refresh would drop every post CI
+ * last fetched and the thumbnail prune would delete their pictures with them.
+ * To retire a source on purpose, delete the media-snapshot branch
+ * (`git push origin --delete media-snapshot`): CI reads the previous snapshot
+ * from that branch, not from main, so a hand edit to main's live.json is
+ * overlaid away on the next run and the items ride on. With the branch gone,
+ * the overlay's missing-branch fallback rebuilds from main's baseline instead.
+ */
+function carriedUnconfigured(previousItems, feedNames) {
+  const configured = new Set(feedNames);
+  return previousItems.filter(
+    (item) => typeof item?.source === "string" && !configured.has(item.source),
+  );
+}
+
 /** The previous snapshot's items, or [] when there is nothing readable yet. */
 async function previousItems() {
   try {
@@ -737,6 +944,19 @@ async function main() {
     console.log(`refresh-media: ${feed.name}: ok, ${feedItems.length} item(s)`);
   }
 
+  const unconfigured = carriedUnconfigured(
+    previous,
+    feeds.map((feed) => feed.name),
+  );
+  if (unconfigured.length > 0) {
+    items.push(...unconfigured);
+    const sources = [...new Set(unconfigured.map((item) => item.source))];
+    console.log(
+      `refresh-media: ${sources.join(", ")}: not configured this run, ` +
+        `keeping ${unconfigured.length} item(s) from the previous snapshot`,
+    );
+  }
+
   if (succeeded === 0) {
     console.warn(
       "refresh-media: every configured feed failed; leaving live.json untouched.",
@@ -745,7 +965,18 @@ async function main() {
   }
 
   const deduped = [...new Map(items.map((item) => [item.id, item])).values()];
+  // Mirror before comparing: the previous snapshot already points at local
+  // thumbs, and a fresh item only matches it once its src has been rewritten
+  // to the same local path. Re-mirroring identical images is idempotent.
   const thumbs = await mirrorThumbnails(deduped);
+  if (snapshotUnchanged(previous, deduped)) {
+    console.log(
+      `refresh-media: unchanged — ${deduped.length} item(s) from ` +
+        `${succeeded}/${feeds.length} feed(s) match the previous snapshot; ` +
+        "leaving src/lib/media/live.json untouched.",
+    );
+    return;
+  }
   const snapshot = { items: deduped, generatedAt: new Date().toISOString() };
   await writeFile(LIVE_JSON_URL, `${JSON.stringify(snapshot, null, 2)}\n`);
   console.log(
@@ -772,7 +1003,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 // Exported for the parity test only; the script's real interface is the CLI.
 export {
   anyapiDue,
+  assertRssBody,
+  carriedUnconfigured,
   fromAnyApiLinkedIn,
   fromAnyApiX,
+  fromGoodreadsRss,
+  fromLetterboxdRss,
+  isRssDocument,
+  snapshotUnchanged,
   xMediaFromSyndication,
 };

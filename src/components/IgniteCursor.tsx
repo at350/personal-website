@@ -752,7 +752,7 @@ export function IgniteCursor() {
       updatePointer(event);
       const target = event.target instanceof Element ? event.target : null;
       const overChrome = Boolean(
-        target?.closest(".experience-dock, .ignite-hud, .bstage__nav"),
+        target?.closest(".experience-dock, .ignite-hud, .bstage__nav, .keys"),
       );
       visible = !overChrome && (event.pointerType !== "touch" || event.pressure > 0);
       if (visible && !wasVisible) resetPlumeBody();
@@ -764,7 +764,9 @@ export function IgniteCursor() {
       const wasVisible = visible;
       updatePointer(event);
       const target = event.target instanceof Element ? event.target : null;
-      visible = !target?.closest(".experience-dock, .ignite-hud, .bstage__nav");
+      visible = !target?.closest(
+        ".experience-dock, .ignite-hud, .bstage__nav, .keys",
+      );
       if (visible && !wasVisible) resetPlumeBody();
       if (reducedMotion.matches) render(0.83);
       else wake();

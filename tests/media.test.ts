@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   fromAnyApiLinkedIn,
   fromAnyApiX,
+  fromGoodreadsRss,
   fromLetterboxdRss,
   fromSubstackRss,
   fromXApi,
@@ -24,7 +25,13 @@ const fixture = (name: string): string =>
 interface RefreshScript {
   fromAnyApiX: (json: unknown, handle?: string) => unknown[];
   fromAnyApiLinkedIn: (json: unknown) => unknown[];
+  fromGoodreadsRss: (xml: string, shelf?: string) => unknown[];
+  fromLetterboxdRss: (xml: string) => unknown[];
   anyapiDue: (env: Record<string, string>, now?: Date) => boolean;
+  snapshotUnchanged: (previous: unknown[], next: unknown[]) => boolean;
+  carriedUnconfigured: (previous: unknown[], feedNames: string[]) => unknown[];
+  isRssDocument: (xml: unknown) => boolean;
+  assertRssBody: (xml: unknown, label: string) => string;
 }
 
 const loadScript = async (): Promise<RefreshScript> =>
@@ -50,6 +57,27 @@ const makeItem = (
   overrides: Partial<MediaItem> & { id: string; title: string },
 ): MediaItem =>
   MediaItemSchema.parse({ source: "web", kind: "link", ...overrides });
+
+/** What Goodreads sends as `book_large_image_url` for a book with no cover. */
+const NOPHOTO_SRC =
+  "https://s.gr-assets.com/assets/nophoto/book/111x148-bcc042a9c91a29c1d680899eff700a03.png";
+
+/** One cover-less book beside one whose real cover arrives without a size. */
+const NOPHOTO_XML = `<?xml version="1.0"?>
+  <rss><channel>
+    <item>
+      <title>No Cover On File</title>
+      <link>https://www.goodreads.com/review/show/4</link>
+      <book_id>4</book_id>
+      <book_large_image_url><![CDATA[${NOPHOTO_SRC}]]></book_large_image_url>
+    </item>
+    <item>
+      <title>Bare Cover</title>
+      <link>https://www.goodreads.com/review/show/5</link>
+      <book_id>5</book_id>
+      <book_large_image_url><![CDATA[https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1347360991l/1358.jpg]]></book_large_image_url>
+    </item>
+  </channel></rss>`;
 
 describe("fromLetterboxdRss", () => {
   const items = fromLetterboxdRss(fixture("letterboxd.rss.xml"));
@@ -156,6 +184,155 @@ describe("fromLetterboxdRss", () => {
       isRewatch: false,
     });
     expect(parsed[0]?.watchedAt).toBeUndefined();
+  });
+});
+
+describe("fromGoodreadsRss", () => {
+  it("gives a bare cover URL the CDN's large-width suffix and leaves sized ones alone", () => {
+    // A bare URL is the full scan (one weighed 2.5 MB); the sized twin is
+    // what the plate wants, and the CDN honours the suffix on every cover.
+    const items = fromGoodreadsRss(fixture("goodreads.rss.xml"));
+    const bySrc = items.map((item) => item.image?.src);
+    expect(bySrc).toContain(
+      "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1347360991l/1358._SX318_.jpg",
+    );
+    expect(bySrc).toContain(
+      "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1719396734l/127280527._SX318_.jpg",
+    );
+    expect(bySrc).toContain(
+      "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1545854312l/12609433._SY475_.jpg",
+    );
+    expect(bySrc.some((src) => src?.endsWith("/1358.jpg"))).toBe(false);
+  });
+
+  const items = fromGoodreadsRss(fixture("goodreads.rss.xml"));
+  const reading = fromGoodreadsRss(
+    fixture("goodreads-reading.rss.xml"),
+    "currently-reading",
+  );
+
+  it("parses every item with source and kind", () => {
+    expect(items).toHaveLength(3);
+    for (const item of items) {
+      expect(item.source).toBe("goodreads");
+      expect(item.kind).toBe("book");
+      expect(item.id).toMatch(/^goodreads:\d+$/);
+      expect(MediaItemSchema.safeParse(item).success).toBe(true);
+    }
+  });
+
+  it("reads title, author, link, and the day it was finished", () => {
+    expect(items[0]).toMatchObject({
+      id: "goodreads:127280527",
+      title: "Big Ideas, Little Pictures: Explaining the World One Sketch at a Time",
+      author: "Jono Hey",
+      url: "https://www.goodreads.com/review/show/7869033955?utm_medium=api&utm_source=rss",
+      publishedAt: "2025-10-29T15:34:46.000Z",
+      readAt: "2025-10-29T00:00:00.000Z",
+      rating: 5,
+      excerpt: "super cool",
+      isReading: false,
+    });
+  });
+
+  it("treats Goodreads' rating 0 as unrated, not as zero stars", () => {
+    expect(items[1]?.title).toBe("Encomium of Helen");
+    expect(items[1]?.rating).toBeUndefined();
+    expect(items[1]?.excerpt).toBe("making my way through critical works");
+  });
+
+  it("leaves readAt unset when the shelf carries no finish date", () => {
+    expect(items[1]?.readAt).toBeUndefined();
+    expect(items[1]?.publishedAt).toBe("2025-10-24T02:11:11.000Z");
+  });
+
+  it("leaves an empty review with no excerpt to print", () => {
+    expect(items[2]?.title).toContain("The Power of Habit");
+    expect(items[2]?.excerpt).toBeUndefined();
+    expect(items[2]?.rating).toBe(5);
+    expect(items[2]?.readAt).toBe("2025-10-21T00:00:00.000Z");
+  });
+
+  it("keeps a first-edition year only when the schema can hold it", () => {
+    // Gorgias arrives as -380; sending that through would drop the whole
+    // item, so the year is left off and the book stays in the library.
+    expect(items[1]?.year).toBeUndefined();
+    expect(items[2]?.year).toBe(2012);
+    expect(items[0]?.year).toBeUndefined(); // feed sent an empty element
+  });
+
+  it("uses the large cover with an alt that names the book", () => {
+    expect(items[0]?.image).toEqual({
+      src: "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1719396734l/127280527._SX318_.jpg",
+      alt: "Cover of Big Ideas, Little Pictures: Explaining the World One Sketch at a Time",
+    });
+  });
+
+  it("marks the currently-reading shelf as an open book", () => {
+    expect(reading).toHaveLength(1);
+    expect(reading[0]).toMatchObject({
+      id: "goodreads:30659",
+      title: "Meditations",
+      author: "Marcus Aurelius",
+      isReading: true,
+    });
+    expect(reading[0]?.readAt).toBeUndefined();
+    expect(reading[0]?.rating).toBeUndefined();
+    expect(reading[0]?.year).toBeUndefined(); // published 180, pre-schema
+    expect(fromGoodreadsRss(fixture("goodreads-reading.rss.xml"))[0]?.isReading).
+      toBe(false);
+  });
+
+  it("strips the light html a review may carry and truncates to 280", () => {
+    const body = Array.from({ length: 80 }, (_, i) => `word${i}`).join(" ");
+    const xml = `<?xml version="1.0"?>
+      <rss><channel>
+        <item>
+          <title>Long One</title>
+          <link>https://www.goodreads.com/review/show/1</link>
+          <book_id>1</book_id>
+          <user_review><![CDATA[First line.<br/>${body} &amp; more]]></user_review>
+        </item>
+      </channel></rss>`;
+    const excerpt = fromGoodreadsRss(xml)[0]?.excerpt ?? "";
+    expect(excerpt.startsWith("First line. word0")).toBe(true);
+    expect(excerpt.length).toBeLessThanOrEqual(280);
+    expect(excerpt.endsWith("…")).toBe(true);
+    expect(excerpt).not.toContain("<");
+  });
+
+  it("returns [] on malformed or empty xml", () => {
+    expect(fromGoodreadsRss("this is << not xml >>")).toEqual([]);
+    expect(fromGoodreadsRss("")).toEqual([]);
+    expect(fromGoodreadsRss("<html><body>404</body></html>")).toEqual([]);
+  });
+
+  it("leaves the stock nophoto placeholder alone but still sizes a bare /books/ cover", () => {
+    // Goodreads sends the placeholder for a book with no cover on file. It
+    // has no sized twin — the CDN answers 404 for `…._SX318_.png` — so the
+    // bare placeholder must reach the plate as-is, while a real cover under
+    // /books/ still gains the large width it always did.
+    const [placeholder, bare] = fromGoodreadsRss(NOPHOTO_XML);
+    expect(placeholder?.image?.src).toBe(NOPHOTO_SRC);
+    expect(bare?.image?.src).toBe(
+      "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1347360991l/1358._SX318_.jpg",
+    );
+  });
+
+  it("drops a bad item without killing the batch", () => {
+    const xml = `<?xml version="1.0"?>
+      <rss><channel>
+        <item>
+          <title>Good Book</title>
+          <link>https://www.goodreads.com/review/show/2</link>
+          <book_id>2</book_id>
+          <user_rating>3</user_rating>
+        </item>
+        <item><author_name>no title at all</author_name></item>
+      </channel></rss>`;
+    const parsed = fromGoodreadsRss(xml);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({ title: "Good Book", rating: 3 });
   });
 });
 
@@ -479,6 +656,37 @@ describe("refresh-media.mjs / normalize.ts parity", () => {
       expect(viaScript).toEqual(fromAnyApiLinkedIn(input));
     }
   });
+
+  it("normalizes Goodreads shelves identically to the app's normalizer", async () => {
+    const script = await loadScript();
+    const inputs: [string, "read" | "currently-reading"][] = [
+      [fixture("goodreads.rss.xml"), "read"],
+      [fixture("goodreads-reading.rss.xml"), "currently-reading"],
+      [
+        `<?xml version="1.0"?>
+          <rss><channel>
+            <item>
+              <title>Edge Cases</title>
+              <link>https://www.goodreads.com/review/show/3</link>
+              <user_rating>0</user_rating>
+              <user_read_at></user_read_at>
+              <book_published>-380</book_published>
+              <user_review><![CDATA[kept &amp; counted<br/>${"x".repeat(900)}]]></user_review>
+            </item>
+            <item><author_name>no title at all</author_name></item>
+          </channel></rss>`,
+        "read",
+      ],
+      [NOPHOTO_XML, "read"],
+    ];
+
+    for (const [xml, shelf] of inputs) {
+      const viaScript = script
+        .fromGoodreadsRss(xml, shelf)
+        .map((item) => MediaItemSchema.parse(JSON.parse(JSON.stringify(item))));
+      expect(viaScript).toEqual(fromGoodreadsRss(xml, shelf));
+    }
+  });
 });
 
 describe("fromAnyApiLinkedIn", () => {
@@ -673,6 +881,56 @@ describe("anyapiDue", () => {
   });
 });
 
+describe("snapshotUnchanged", () => {
+  // Twelve cycles a day find the same films eleven times; the snapshot must
+  // only be rewritten — and published, and deployed — when the items moved.
+  const film = {
+    id: "letterboxd:1",
+    source: "letterboxd",
+    kind: "film",
+    title: "Past Lives",
+    year: 2023,
+    image: { src: "/media/thumbs/abc.jpg", alt: "Poster for Past Lives" },
+  };
+
+  it("treats identical item lists as unchanged whatever generatedAt says", async () => {
+    const { snapshotUnchanged } = await loadScript();
+    const previous = JSON.parse(
+      JSON.stringify({ items: [film], generatedAt: "2026-08-01T00:00:00.000Z" }),
+    ) as { items: unknown[] };
+    expect(snapshotUnchanged(previous.items, [film])).toBe(true);
+    expect(snapshotUnchanged([], [])).toBe(true);
+  });
+
+  it("ignores key order and undefined fields, which a normalizer leaves behind", async () => {
+    const { snapshotUnchanged } = await loadScript();
+    // A freshly normalized item carries `excerpt: undefined`; the one read
+    // back from disk never had the key at all. JSON.stringify agrees they
+    // are the same item, and so must the guard.
+    const fresh = { ...film, excerpt: undefined, year: 2023, kind: "film" };
+    const { image, ...rest } = film;
+    const reordered = { image, ...rest };
+    expect(snapshotUnchanged([film], [fresh])).toBe(true);
+    expect(snapshotUnchanged([film], [reordered])).toBe(true);
+  });
+
+  it("notices any real difference: a field, an item, or the order", async () => {
+    const { snapshotUnchanged } = await loadScript();
+    const rewatch = { ...film, isRewatch: true };
+    const second = { ...film, id: "letterboxd:2", title: "Perfect Days" };
+    expect(snapshotUnchanged([film], [rewatch])).toBe(false);
+    expect(snapshotUnchanged([film], [film, second])).toBe(false);
+    expect(snapshotUnchanged([film, second], [film])).toBe(false);
+    expect(snapshotUnchanged([film, second], [second, film])).toBe(false);
+    expect(
+      snapshotUnchanged(
+        [film],
+        [{ ...film, image: { ...film.image, src: "/media/thumbs/def.jpg" } }],
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("media store", () => {
   it("mergeMedia lets the seed win on id collisions", () => {
     const seed = [
@@ -744,5 +1002,95 @@ describe("media store", () => {
         expect(item.publishedAt).toBeUndefined();
       }
     }
+  });
+});
+
+describe("carriedUnconfigured", () => {
+  // A keyless laptop registers no X or LinkedIn feed at all; their posts must
+  // ride through the refresh untouched rather than vanish with their thumbs.
+  const post = { id: "x:1", source: "x", kind: "post", title: "A post" };
+  const film = { id: "letterboxd:1", source: "letterboxd", kind: "film", title: "Past Lives" };
+
+  it("keeps every previous item whose source has no feed this run", async () => {
+    const { carriedUnconfigured } = await loadScript();
+    expect(carriedUnconfigured([post, film], ["letterboxd", "goodreads"])).toEqual([post]);
+  });
+
+  it("carries nothing when every source is configured, and skips malformed items", async () => {
+    const { carriedUnconfigured } = await loadScript();
+    expect(carriedUnconfigured([post, film], ["letterboxd", "x"])).toEqual([]);
+    expect(carriedUnconfigured([null, { id: "?" }, post], ["x"])).toEqual([]);
+  });
+});
+
+describe("isRssDocument / assertRssBody", () => {
+  // The goodreads lane is two shelf fetches flattened into one result. A
+  // shelf that answers 200 with a page that is not a feed parses to nothing,
+  // and flattened into the other shelf that would pass the per-feed "0 items"
+  // guard — so each body has to prove it is a feed before it counts.
+  const EMPTY_SHELF = `<?xml version="1.0"?>
+    <rss version="2.0"><channel>
+      <title>Alan's bookshelf: currently-reading</title>
+      <link>https://www.goodreads.com/review/list_rss/1?shelf=currently-reading</link>
+    </channel></rss>`;
+  const INTERSTITIAL = `<!DOCTYPE html>
+    <html><head><title>Goodreads</title><meta charset="utf-8"></head>
+    <body><p>Please wait while we verify your browser.</p></body></html>`;
+
+  it("accepts a real feed and a well-formed shelf with nothing on it", async () => {
+    const { isRssDocument, assertRssBody } = await loadScript();
+    expect(isRssDocument(fixture("goodreads.rss.xml"))).toBe(true);
+    expect(isRssDocument(fixture("goodreads-reading.rss.xml"))).toBe(true);
+    expect(isRssDocument(fixture("letterboxd.rss.xml"))).toBe(true);
+    expect(isRssDocument(EMPTY_SHELF)).toBe(true);
+    expect(assertRssBody(EMPTY_SHELF, "goodreads/currently-reading")).toBe(
+      EMPTY_SHELF,
+    );
+  });
+
+  it("rejects an HTML page, JSON, an empty body, and xml with no channel", async () => {
+    const { isRssDocument, assertRssBody } = await loadScript();
+    for (const body of [
+      INTERSTITIAL,
+      "<html><body>404</body></html>",
+      '{"error":"rate limited"}',
+      "",
+      "<rss></rss>",
+      "<feed><entry/></feed>",
+      null,
+      undefined,
+    ]) {
+      expect(isRssDocument(body)).toBe(false);
+    }
+    expect(() => assertRssBody(INTERSTITIAL, "goodreads/read")).toThrow(
+      /goodreads\/read: body is not an RSS document/,
+    );
+  });
+});
+
+describe("numeric character references", () => {
+  // Letterboxd spells an apostrophe as &#039; in both <title> and
+  // <letterboxd:filmTitle>; the plate must print the apostrophe, not the code.
+  const xml = `<?xml version="1.0"?>
+    <rss><channel>
+      <item>
+        <title>Good Luck, Have Fun, Don&#039;t Die, 2025 - ★★★</title>
+        <link>https://letterboxd.com/alantai/film/good-luck-have-fun-dont-die/</link>
+        <guid>letterboxd-watch-1</guid>
+        <letterboxd:filmTitle>Good Luck, Have Fun, Don&#039;t Die</letterboxd:filmTitle>
+        <letterboxd:filmYear>2025</letterboxd:filmYear>
+      </item>
+    </channel></rss>`;
+
+  it("decodes them in the app normalizer", () => {
+    const [film] = fromLetterboxdRss(xml);
+    expect(film?.title).toBe("Good Luck, Have Fun, Don't Die");
+    expect(film?.image).toBeUndefined();
+  });
+
+  it("decodes them identically in the cron script", async () => {
+    const script = await loadScript();
+    const [film] = script.fromLetterboxdRss(xml) as Array<{ title: string }>;
+    expect(film?.title).toBe("Good Luck, Have Fun, Don't Die");
   });
 });

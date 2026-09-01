@@ -21,6 +21,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      # main only carries a hand-refreshed baseline of the media library; the
+      # live snapshot is a parentless commit on the media-snapshot branch (see
+      # refresh-media.yml). Lay it over the checkout before lint, test, and
+      # build so the site ships what the last refresh found. Fetching a
+      # branch is a read, so `contents: read` above is enough.
+      - name: Overlay the live media snapshot
+        uses: ./.github/actions/overlay-media-snapshot
+
       - name: Set up Node
         uses: actions/setup-node@v6
         with:
@@ -41,6 +49,7 @@ jobs:
         env:
           VITE_BASE: /
           SITE_URL: https://alantai.me
+          CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}
 
       - name: Configure Pages
         uses: actions/configure-pages@v6

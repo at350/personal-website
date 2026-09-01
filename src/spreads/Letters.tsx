@@ -23,7 +23,7 @@ const COLOPHON_ENTRIES: ReadonlyArray<{ term: string; desc: ReactNode }> = [
     desc: (
       <>
         React 19, Vite, three.js; a homemade WebGL page-flip; no template, no
-        tracker.
+        cookies.
       </>
     ),
   },
@@ -31,7 +31,8 @@ const COLOPHON_ENTRIES: ReadonlyArray<{ term: string; desc: ReactNode }> = [
     term: "Proofs",
     desc: (
       <>
-        <kbd className="colophon__key">g</kbd> / printer&rsquo;s proof
+        <kbd className="colophon__key">g</kbd> / printer&rsquo;s proof &middot;{" "}
+        <kbd className="colophon__key">?</kbd> / the keys
       </>
     ),
   },

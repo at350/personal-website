@@ -26,15 +26,20 @@ html.ignite-hides-cursor .bstage__spread {
   cursor: none !important;
 }
 
+/* Chrome keeps a native cursor: the dock, the HUD and the keys sheet, which
+   the flame cursor's canvas paints beneath rather than over. */
 html.ignite-hides-cursor .experience-dock,
 html.ignite-hides-cursor .experience-dock *,
 html.ignite-hides-cursor .ignite-hud,
-html.ignite-hides-cursor .ignite-hud * {
+html.ignite-hides-cursor .ignite-hud *,
+html.ignite-hides-cursor .keys,
+html.ignite-hides-cursor .keys * {
   cursor: auto !important;
 }
 
 html.ignite-hides-cursor .experience-dock button,
-html.ignite-hides-cursor .ignite-hud button {
+html.ignite-hides-cursor .ignite-hud button,
+html.ignite-hides-cursor .keys button {
   cursor: pointer !important;
 }
 

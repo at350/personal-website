@@ -41,6 +41,7 @@ import type { ExperienceMode } from "@/components/ExperienceDock";
 import type { IgnitePointerState } from "@/ignite/types";
 import type { DriftPointerState } from "@/drift/types";
 import { EditorialTerminal } from "@/components/brand/EditorialTerminal";
+import { SHORTCUT_SHEET_ID, ShortcutSheet } from "@/components/ShortcutSheet";
 import "@/styles/book-stage.css";
 import "@/styles/drift.css";
 
@@ -145,6 +146,12 @@ export function BookStage({
   const { pw, ph } = usePageSize();
   const [showGrid, setShowGrid] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
+  /* The keys sheet is stage furniture, not a mode: it opens over ignite and
+     drift alike, since those are exactly the moments a hand goes looking for
+     the way out. */
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const shortcutSheetRef = useRef<HTMLDialogElement>(null);
+  const shortcutToggleRef = useRef<HTMLButtonElement>(null);
   const [textureProgress, setTextureProgress] = useState(getTextureProgress);
   const [texturesReady, setTexturesReady] = useState(
     () => textureProgress.total > 0 && textureProgress.loaded === textureProgress.total,
@@ -516,8 +523,10 @@ export function BookStage({
       const u = (event.clientX - left) / (pw * 2);
       const v = 1 - (event.clientY - top) / ph;
       const target = event.target instanceof Element ? event.target : null;
+      // The keys sheet counts as chrome: a hand reading it is not a hand
+      // holding a flame to the paper underneath.
       const overChrome = Boolean(
-        target?.closest(".experience-dock, .ignite-hud, .bstage__nav"),
+        target?.closest(".experience-dock, .ignite-hud, .bstage__nav, .keys"),
       );
       const onExistingFace = u < 0.5
         ? currentSpread > 0
@@ -590,8 +599,10 @@ export function BookStage({
       driftPointer.y = window.innerHeight / 2 - event.clientY;
       driftPointer.pointerType = event.pointerType || "mouse";
       const target = event.target instanceof Element ? event.target : null;
+      // The keys sheet counts as chrome: a pointer over the slip is reading,
+      // not stirring the leaves beneath it.
       const overChrome = Boolean(
-        target?.closest(".experience-dock, .drift-hud, .bstage__nav"),
+        target?.closest(".experience-dock, .drift-hud, .bstage__nav, .keys"),
       );
       driftPointer.inside = driftStageRef.current === "adrift" && !overChrome;
     },
@@ -1082,17 +1093,47 @@ export function BookStage({
       if (e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target instanceof Element ? e.target : null;
+      const editing = t?.closest(
+        "input, textarea, select, [contenteditable='true']",
+      );
+      // The keys sheet answers first. "?" toggles it from anywhere short of
+      // an editing context — including from inside the sheet, whose buttons
+      // the interactive-target guard below would otherwise swallow — and
+      // while it is open the book's own keys stay off the paper: Escape puts
+      // the slip away rather than landing the drift, and an arrow must not
+      // turn a page behind a sheet that is explaining what the arrow does.
+      if (e.key === "?" && !editing) {
+        setShortcutsOpen((open) => !open);
+        e.preventDefault();
+        return;
+      }
+      if (shortcutsOpen) {
+        if (e.key === "Escape") {
+          setShortcutsOpen(false);
+          e.preventDefault();
+        } else if (
+          ["ArrowRight", "ArrowLeft", "Home", "End", "g"].includes(e.key)
+        ) {
+          e.preventDefault();
+        }
+        return;
+      }
       // Escape lands the drift from any focus short of an editing context —
       // the hand that just clicked the dock is exactly the one pressing it,
       // so the interactive-element guard below must not swallow this key.
       // (A landing already in progress just rides.)
-      if (
-        e.key === "Escape" &&
-        driftRequested &&
-        !t?.closest("input, textarea, select, [contenteditable='true']")
-      ) {
+      if (e.key === "Escape" && driftRequested && !editing) {
         setTocOpen(false);
         onExperienceModeChange?.("read");
+        e.preventDefault();
+        return;
+      }
+      // Escape folds the contents slip from wherever focus sits — usually
+      // the folio button that just opened it, or a row inside the menu —
+      // both of which the interactive-target guard below would otherwise
+      // keep the key from reaching.
+      if (e.key === "Escape" && tocOpen && !editing) {
+        setTocOpen(false);
         e.preventDefault();
         return;
       }
@@ -1109,7 +1150,6 @@ export function BookStage({
         ) {
           e.preventDefault();
         }
-        if (e.key === "Escape") setTocOpen(false);
         return;
       }
       const arrowDirection: ArrowDirection | null =
@@ -1131,7 +1171,6 @@ export function BookStage({
       if (e.key === "Home") goAbsolute(0);
       else if (e.key === "End") goAbsolute(TOTAL - 1);
       else if (e.key === "g") setShowGrid((v) => !v);
-      else if (e.key === "Escape") setTocOpen(false);
       else return;
       e.preventDefault();
     };
@@ -1177,8 +1216,27 @@ export function BookStage({
     goAdjacent,
     modeLocked,
     onExperienceModeChange,
+    shortcutsOpen,
     texturesReady,
+    tocOpen,
   ]);
+
+  // A press anywhere beside the keys sheet puts it away. The nav's "?"
+  // button is exempt: its click already toggles, and closing on its
+  // pointerdown first would only reopen the sheet a beat later.
+  useEffect(() => {
+    if (!shortcutsOpen) return;
+    const onPointerDownOutside = (e: PointerEvent) => {
+      const target = e.target instanceof Node ? e.target : null;
+      if (!target) return;
+      if (shortcutSheetRef.current?.contains(target)) return;
+      if (shortcutToggleRef.current?.contains(target)) return;
+      setShortcutsOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDownOutside);
+    return () =>
+      document.removeEventListener("pointerdown", onPointerDownOutside);
+  }, [shortcutsOpen]);
 
   // Every completed button activation is one relative turn intent. Drain at
   // most one valid entry per resting boundary so rapid taps remain distinct,
@@ -1463,6 +1521,20 @@ export function BookStage({
         >
           →
         </button>
+        <button
+          ref={shortcutToggleRef}
+          className="bstage__help mono-label"
+          aria-label="Keyboard shortcuts"
+          aria-expanded={shortcutsOpen}
+          aria-controls={SHORTCUT_SHEET_ID}
+          // The nav folds away with the arrows in ignite and drift, and a
+          // button nobody can see must not stay a Tab stop; "?" on the
+          // keyboard still opens the sheet in those modes.
+          disabled={!texturesReady || modeLocked}
+          onClick={() => setShortcutsOpen((v) => !v)}
+        >
+          ?
+        </button>
         {tocOpen ? (
           <div className="bstage__toc" role="menu">
             {SPREADS.map((def, i) => {
@@ -1487,6 +1559,13 @@ export function BookStage({
           </div>
         ) : null}
       </nav>
+
+      {shortcutsOpen ? (
+        <ShortcutSheet
+          ref={shortcutSheetRef}
+          onClose={() => setShortcutsOpen(false)}
+        />
+      ) : null}
 
       <div aria-live="polite" className="visually-hidden">
         {`${pageLabel(state.current)} · ${SPREADS[state.current]?.label ?? ""}`}
