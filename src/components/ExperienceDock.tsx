@@ -9,7 +9,7 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import "@/styles/experience-dock.css";
 
-export type ExperienceMode = "read" | "ignite" | "drift" | "focus" | "shuffle";
+export type ExperienceMode = "read" | "ignite" | "drift";
 
 interface ExperienceDockProps {
   defaultMode?: ExperienceMode;
@@ -80,32 +80,15 @@ function DriftIcon({ className }: IconProps) {
   );
 }
 
-function FocusIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M8 4.75H5.75a1 1 0 0 0-1 1V8M16 4.75h2.25a1 1 0 0 1 1 1V8M19.25 16v2.25a1 1 0 0 1-1 1H16M8 19.25H5.75a1 1 0 0 1-1-1V16" />
-      <circle cx="12" cy="12" r="3.1" />
-    </svg>
-  );
-}
-
-function ShuffleIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4.5 7h2.1c4.85 0 5.32 10 10.35 10h2.55" />
-      <path d="m17.25 14.75 2.25 2.25-2.25 2.25" />
-      <path d="M4.5 17h2.1c1.88 0 3.1-1.5 4.16-3.36M13.32 8.9c.96-1.12 2.08-1.9 3.63-1.9h2.55" />
-      <path d="m17.25 4.75 2.25 2.25-2.25 2.25" />
-    </svg>
-  );
-}
-
+/** The dock lists only the experiences the book actually stages. An orb that
+    promised a mode the pages could not deliver would be a blank spread in the
+    table of contents, so a new mode earns its slot here in the same change
+    that teaches the book to perform it. Every height and index below derives
+    from this list, and the union above is its type-level twin. */
 const EXPERIENCE_MODES: readonly ModeDefinition[] = [
   { id: "read", label: "Read", detail: "Regular experience", Icon: ReadIcon },
   { id: "ignite", label: "Ignite", detail: "Flame playground", Icon: FlameIcon },
   { id: "drift", label: "Drift", detail: "Weightless mode", Icon: DriftIcon },
-  { id: "focus", label: "Focus", detail: "Spotlight mode", Icon: FocusIcon },
-  { id: "shuffle", label: "Shuffle", detail: "Remix the issue", Icon: ShuffleIcon },
 ];
 
 const OPEN_HEIGHT =

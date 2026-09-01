@@ -24,7 +24,7 @@ afterEach(() => {
 });
 
 describe("ExperienceDock", () => {
-  it("starts as one selected orb and reveals all five modes after hover intent", () => {
+  it("starts as one selected orb and reveals every implemented mode after hover intent", () => {
     vi.useFakeTimers();
     render(<ExperienceDock />);
 
@@ -41,7 +41,17 @@ describe("ExperienceDock", () => {
     act(() => vi.advanceTimersByTime(70));
 
     expect(dock.getAttribute("data-expanded")).toBe("true");
-    expect(screen.getAllByRole("button")).toHaveLength(5);
+    expect(screen.getAllByRole("button")).toHaveLength(3);
+    // Only modes the book can actually stage get an orb, in reading order.
+    expect(
+      screen
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual([
+      "Read: Regular experience, selected",
+      "Ignite: Flame playground",
+      "Drift: Weightless mode",
+    ]);
   });
 
   it("selects a new mode and collapses back to that orb", () => {
@@ -97,7 +107,7 @@ describe("ExperienceDock", () => {
     fireEvent.click(read);
 
     expect(dock.getAttribute("data-expanded")).toBe("true");
-    expect(screen.getAllByRole("button")).toHaveLength(5);
+    expect(screen.getAllByRole("button")).toHaveLength(3);
   });
 
   it("supports arrow navigation and Escape", () => {
@@ -202,8 +212,8 @@ describe("ExperienceDock", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /Read: Regular experience/ }),
     );
-    // The dock still shows all five modes; the unavailable one only dims.
-    expect(screen.getAllByRole("button")).toHaveLength(5);
+    // The dock still shows every mode; the unavailable one only dims.
+    expect(screen.getAllByRole("button")).toHaveLength(3);
     const drift = screen.getByRole("button", {
       name: /Drift: Weightless mode, unavailable/,
     });
