@@ -12,7 +12,8 @@ Use those as the source of truth:
 - `npm run dev` — dev server at http://localhost:5173 (the one service to run)
 - `npm run lint` — ESLint
 - `npm test` — Vitest (jsdom); tests live under `tests/`
-- `npm run build` — `tsc -b` type-check + Vite bundle + `scripts/build-feeds.mjs`
+- `npm run build` — `tsc -b` type-check + Vite bundle + Vite SSR bundle +
+  `scripts/prerender.mjs` (static HTML per route, rss.xml, sitemap.xml)
 
 Non-obvious notes:
 
