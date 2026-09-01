@@ -23,7 +23,7 @@ const COLOPHON_ENTRIES: ReadonlyArray<{ term: string; desc: ReactNode }> = [
     desc: (
       <>
         React 19, Vite, three.js; a homemade WebGL page-flip; no template, no
-        tracker.
+        cookies.
       </>
     ),
   },

@@ -147,3 +147,42 @@ Studio Co.). All licenses permit self-hosted web embedding; files live in
 
 White `#FFFFFF`. Ink `#0E0E0C`. One red: `#D7261E`. Hairlines at 14% ink.
 No gradients. The book's lighting does the shading.
+
+## Analytics
+
+One counter, and it keeps nothing: [Cloudflare Web
+Analytics](https://developers.cloudflare.com/web-analytics/). It is free,
+cookieless, and sets no client-side state at all (no cookies, no
+`localStorage`), and Cloudflare does not fingerprint visitors by IP or user
+agent, so there is no consent banner to draw. The colophon says "no cookies"
+and means it.
+
+The beacon is a single deferred script with a per-site token in a
+`data-cf-beacon` JSON attribute. The token is public by design (it ships in
+the page source), so it lives in a repository **variable**, not a secret, and
+`scripts/cf-beacon-plugin.mjs` prints the tag into `<head>` of
+`dist/index.html` at build time. No token, no tag: local builds and forks
+ship no counter.
+
+- **Get the token** — Cloudflare dashboard → **Analytics & Logs → Web
+  Analytics → Add a site**, hostname `alantai.me` (it is not proxied, so
+  choose the manual JS snippet), then copy the `token` out of the snippet
+  shown under **Manage site**.
+- **Set it** — `gh variable set CF_BEACON_TOKEN --body "<token>"`, then push
+  or re-run the *Deploy to GitHub Pages* workflow. `deploy.yml` hands the
+  variable to `npm run build` as `CF_BEACON_TOKEN`.
+- **Verify locally** — `CF_BEACON_TOKEN=test npm run build && grep -c
+  cloudflareinsights dist/index.html` prints `1`; without the variable it
+  prints `0`. The tag is
+  `<script defer src="https://static.cloudflareinsights.com/beacon.min.js"
+  data-cf-beacon='{"token":"<token>","spa":true}'></script>`.
+- **Verify in production** — open the network panel on alantai.me and look
+  for a request to `cloudflareinsights.com` (the script) and a `POST` to
+  `/cdn-cgi/rum`; the dashboard shows page views within a few minutes.
+- **Routes** — the site is a single-page book, so turns are History-API
+  navigations, not page loads. The beacon watches the History and Navigation
+  APIs and reports each route change as its own page view; `spa` is `true` by
+  default in the beacon and is written out anyway so the page source says so.
+  Checked against `beacon.min.js` itself: the attribute is parsed as JSON,
+  `spa` is on unless it is explicitly `false`, and the script never touches
+  `document.cookie` or `localStorage`.
