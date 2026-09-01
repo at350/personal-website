@@ -19,11 +19,18 @@ const scene = vi.hoisted(() => ({
     foilPointerY: number;
   },
   onRiffleComplete: null as null | (() => void),
+  ignite: undefined as
+    | undefined
+    | {
+        active: boolean;
+        pointer: { inside: boolean };
+      },
   drift: undefined as
     | undefined
     | {
         active: boolean;
         landing: boolean;
+        pointer: { inside: boolean };
         onLanded?: () => void;
       },
 }));
@@ -32,14 +39,17 @@ vi.mock("@/book3d/BookScene", () => ({
   BookScene: ({
     motion,
     onRiffleComplete,
+    ignite,
     drift,
   }: {
     motion: NonNullable<typeof scene.motion>;
     onRiffleComplete: () => void;
+    ignite: typeof scene.ignite;
     drift: typeof scene.drift;
   }) => {
     scene.motion = motion;
     scene.onRiffleComplete = onRiffleComplete;
+    scene.ignite = ignite;
     scene.drift = drift;
     return null;
   },
@@ -152,6 +162,7 @@ afterEach(() => {
   cleanup();
   scene.motion = null;
   scene.onRiffleComplete = null;
+  scene.ignite = undefined;
   scene.drift = undefined;
   vi.unstubAllGlobals();
 });
@@ -175,6 +186,12 @@ describe("BookStage page-turn input", () => {
     expect(
       screen.getByRole<HTMLButtonElement>("button", { name: "Contents" })
         .disabled,
+    ).toBe(true);
+    // The "?" folds away with the nav: an invisible button is no Tab stop.
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", {
+        name: "Keyboard shortcuts",
+      }).disabled,
     ).toBe(true);
     expect(screen.getByRole("status").textContent).toContain(
       "Flattening the paper",
@@ -206,6 +223,11 @@ describe("BookStage page-turn input", () => {
     expect(
       screen.getByRole<HTMLButtonElement>("button", { name: "Contents" })
         .disabled,
+    ).toBe(true);
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", {
+        name: "Keyboard shortcuts",
+      }).disabled,
     ).toBe(true);
     await settleModeTransition();
     // Still flattening: the floating book has not mounted yet.
@@ -766,6 +788,100 @@ describe("BookStage page-turn input", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onExperienceModeChange).toHaveBeenCalledTimes(1);
     expect(onExperienceModeChange).toHaveBeenLastCalledWith("read");
+  });
+
+  it("closes the contents menu on Escape while the folio or a row holds focus", () => {
+    stubMatchMedia();
+    renderStage(1);
+    const folio = screen.getByRole("button", { name: "Contents" });
+
+    // Opening by click leaves focus on the folio button itself — exactly
+    // where the interactive-target guard would otherwise swallow Escape.
+    folio.focus();
+    fireEvent.click(folio);
+    expect(screen.getByRole("menu")).toBeTruthy();
+    expect(document.activeElement).toBe(folio);
+    fireEvent.keyDown(folio, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+
+    // The same from a row inside the menu.
+    fireEvent.click(folio);
+    const row = screen.getAllByRole("menuitem")[2]!;
+    row.focus();
+    fireEvent.keyDown(row, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+
+    // Typing into a field is not the moment to fold a menu.
+    fireEvent.click(folio);
+    const field = document.createElement("input");
+    document.body.appendChild(field);
+    field.focus();
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(screen.getByRole("menu")).toBeTruthy();
+    field.remove();
+  });
+
+  it("keeps the ? key live in Ignite while the nav button is folded away", async () => {
+    stubMatchMedia();
+    renderStage(1, "ignite");
+    await settleModeTransition();
+    const help = screen.getByRole<HTMLButtonElement>("button", {
+      name: "Keyboard shortcuts",
+    });
+    expect(help.disabled).toBe(true);
+
+    fireEvent.keyDown(window, { key: "?" });
+    const sheet = screen.getByRole("dialog", { name: "Keys" });
+    expect(sheet.contains(document.activeElement)).toBe(true);
+    expect(help.getAttribute("aria-expanded")).toBe("true");
+
+    // Closing must not hand focus to the disabled, invisible opener.
+    fireEvent.keyDown(sheet, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Keys" })).toBeNull();
+    expect(document.activeElement).not.toBe(help);
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("treats the keys sheet as chrome for the drift pointer channel", async () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1, "drift");
+    await settleModeTransition();
+    await reportFlatPose();
+    const pointer = scene.drift?.pointer;
+    expect(pointer).toBeTruthy();
+
+    const at = { clientX: 512, clientY: 384, pointerType: "mouse" };
+    fireEvent.pointerMove(stage, at);
+    expect(pointer?.inside).toBe(true);
+
+    // Over the open sheet the pointer is reading, not stirring the leaves.
+    fireEvent.keyDown(window, { key: "?" });
+    const sheet = screen.getByRole("dialog", { name: "Keys" });
+    fireEvent.pointerMove(sheet, at);
+    expect(pointer?.inside).toBe(false);
+    fireEvent.pointerMove(stage, at);
+    expect(pointer?.inside).toBe(true);
+  });
+
+  it("treats the keys sheet as chrome for the ignite pointer channel", async () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1, "ignite");
+    await settleModeTransition();
+    await reportFlatPose();
+    const pointer = scene.ignite?.pointer;
+    expect(pointer).toBeTruthy();
+
+    // The window's centre lands on the open spread in jsdom's viewport.
+    const at = { clientX: 512, clientY: 384, pointerType: "mouse" };
+    fireEvent.pointerMove(stage, at);
+    expect(pointer?.inside).toBe(true);
+
+    fireEvent.keyDown(window, { key: "?" });
+    const sheet = screen.getByRole("dialog", { name: "Keys" });
+    fireEvent.pointerMove(sheet, at);
+    expect(pointer?.inside).toBe(false);
+    fireEvent.pointerMove(stage, at);
+    expect(pointer?.inside).toBe(true);
   });
 
   it("finishes finite taps before resuming a held arrow", () => {

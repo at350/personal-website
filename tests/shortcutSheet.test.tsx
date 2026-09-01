@@ -20,9 +20,14 @@ describe("ShortcutSheet", () => {
 
     // The pointer gestures and the dock have no key, so they are named in
     // plain mono rather than boxed as one.
-    for (const gesture of ["drag", "tap", "click", "dock"]) {
-      expect(dialog.textContent).toContain(gesture);
-    }
+    const gestures = Array.from(dialog.querySelectorAll(".keys__gesture")).map(
+      (gesture) => gesture.textContent,
+    );
+    expect(gestures).toEqual(["drag", "click", "dock"]);
+    // A tap on the fore-edge only lifts the corner and lets it fall — the
+    // engine commits a turn past a pull threshold, never from a bare
+    // press — so the sheet must not promise one.
+    expect(dialog.textContent).not.toContain("tap");
     expect(dialog.textContent).toContain("printer's grid");
     expect(dialog.textContent).toContain("read, ignite, drift");
   });
@@ -52,6 +57,20 @@ describe("ShortcutSheet", () => {
 
     unmount();
     expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+
+  it("leaves focus on the document when the opener has since been disabled", () => {
+    // The nav's "?" folds away with the arrows in ignite and drift; a sheet
+    // opened from it must not hand focus back to a button nobody can see.
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const { unmount } = render(<ShortcutSheet onClose={vi.fn()} />);
+    opener.disabled = true;
+    expect(() => unmount()).not.toThrow();
+    expect(document.activeElement).toBe(document.body);
     opener.remove();
   });
 

@@ -31,7 +31,6 @@ const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { keys: ["←", "→"], desc: "previous / next spread. hold to keep turning." },
       { keys: ["home", "end"], desc: "cover / back cover." },
       { gesture: "drag", desc: "a corner or edge turns the page with the pointer." },
-      { gesture: "tap", desc: "the page edge does the same." },
     ],
   },
   {
@@ -64,12 +63,19 @@ export function ShortcutSheet({ onClose, ref }: ShortcutSheetProps) {
 
   // Focus walks onto the slip when it opens and back to whatever held it
   // when it closes — usually the "?" button in the nav, or nothing at all
-  // when the key was pressed with the page itself in focus.
+  // when the key was pressed with the page itself in focus. An opener that
+  // has since been disabled or hidden (the nav folds away in ignite and
+  // drift) is not a place to send focus back to; the hand-off is skipped and
+  // focus settles on the document, where the next Tab starts from the top.
   useEffect(() => {
     const previous = document.activeElement;
     sheetRef.current?.focus();
     return () => {
-      if (previous instanceof HTMLElement && previous.isConnected) {
+      if (
+        previous instanceof HTMLElement &&
+        previous.isConnected &&
+        !previous.matches(":disabled, [hidden], [aria-hidden='true'] *")
+      ) {
         previous.focus();
       }
     };

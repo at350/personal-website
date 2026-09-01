@@ -490,7 +490,7 @@ export function DriftCursor() {
     const overChrome = (event: PointerEvent) => {
       const target = event.target instanceof Element ? event.target : null;
       return Boolean(
-        target?.closest(".experience-dock, .drift-hud, .bstage__nav"),
+        target?.closest(".experience-dock, .drift-hud, .bstage__nav, .keys"),
       );
     };
 

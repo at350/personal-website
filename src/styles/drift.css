@@ -18,15 +18,20 @@ html.drift-hides-cursor .bstage__spread {
   cursor: none !important;
 }
 
+/* Chrome keeps a native cursor: the dock, the HUD and the keys sheet, which
+   the drift cursor's canvas paints beneath rather than over. */
 html.drift-hides-cursor .experience-dock,
 html.drift-hides-cursor .experience-dock *,
 html.drift-hides-cursor .drift-hud,
-html.drift-hides-cursor .drift-hud * {
+html.drift-hides-cursor .drift-hud *,
+html.drift-hides-cursor .keys,
+html.drift-hides-cursor .keys * {
   cursor: auto !important;
 }
 
 html.drift-hides-cursor .experience-dock button,
-html.drift-hides-cursor .drift-hud button {
+html.drift-hides-cursor .drift-hud button,
+html.drift-hides-cursor .keys button {
   cursor: pointer !important;
 }
 

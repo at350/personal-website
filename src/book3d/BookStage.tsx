@@ -523,8 +523,10 @@ export function BookStage({
       const u = (event.clientX - left) / (pw * 2);
       const v = 1 - (event.clientY - top) / ph;
       const target = event.target instanceof Element ? event.target : null;
+      // The keys sheet counts as chrome: a hand reading it is not a hand
+      // holding a flame to the paper underneath.
       const overChrome = Boolean(
-        target?.closest(".experience-dock, .ignite-hud, .bstage__nav"),
+        target?.closest(".experience-dock, .ignite-hud, .bstage__nav, .keys"),
       );
       const onExistingFace = u < 0.5
         ? currentSpread > 0
@@ -597,8 +599,10 @@ export function BookStage({
       driftPointer.y = window.innerHeight / 2 - event.clientY;
       driftPointer.pointerType = event.pointerType || "mouse";
       const target = event.target instanceof Element ? event.target : null;
+      // The keys sheet counts as chrome: a pointer over the slip is reading,
+      // not stirring the leaves beneath it.
       const overChrome = Boolean(
-        target?.closest(".experience-dock, .drift-hud, .bstage__nav"),
+        target?.closest(".experience-dock, .drift-hud, .bstage__nav, .keys"),
       );
       driftPointer.inside = driftStageRef.current === "adrift" && !overChrome;
     },
@@ -1124,6 +1128,15 @@ export function BookStage({
         e.preventDefault();
         return;
       }
+      // Escape folds the contents slip from wherever focus sits — usually
+      // the folio button that just opened it, or a row inside the menu —
+      // both of which the interactive-target guard below would otherwise
+      // keep the key from reaching.
+      if (e.key === "Escape" && tocOpen && !editing) {
+        setTocOpen(false);
+        e.preventDefault();
+        return;
+      }
       if (
         t?.closest(
           "button, a, input, textarea, select, [contenteditable='true'], [role='toolbar']",
@@ -1137,7 +1150,6 @@ export function BookStage({
         ) {
           e.preventDefault();
         }
-        if (e.key === "Escape") setTocOpen(false);
         return;
       }
       const arrowDirection: ArrowDirection | null =
@@ -1159,7 +1171,6 @@ export function BookStage({
       if (e.key === "Home") goAbsolute(0);
       else if (e.key === "End") goAbsolute(TOTAL - 1);
       else if (e.key === "g") setShowGrid((v) => !v);
-      else if (e.key === "Escape") setTocOpen(false);
       else return;
       e.preventDefault();
     };
@@ -1207,6 +1218,7 @@ export function BookStage({
     onExperienceModeChange,
     shortcutsOpen,
     texturesReady,
+    tocOpen,
   ]);
 
   // A press anywhere beside the keys sheet puts it away. The nav's "?"
@@ -1515,7 +1527,10 @@ export function BookStage({
           aria-label="Keyboard shortcuts"
           aria-expanded={shortcutsOpen}
           aria-controls={SHORTCUT_SHEET_ID}
-          disabled={!texturesReady}
+          // The nav folds away with the arrows in ignite and drift, and a
+          // button nobody can see must not stay a Tab stop; "?" on the
+          // keyboard still opens the sheet in those modes.
+          disabled={!texturesReady || modeLocked}
           onClick={() => setShortcutsOpen((v) => !v)}
         >
           ?
