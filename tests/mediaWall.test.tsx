@@ -1,7 +1,12 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
-import { MediaWall, mosaicColumnCount, setLibraryFilter } from "@/components/MediaWall";
+import {
+  LIBRARY_FILTERS,
+  MediaWall,
+  mosaicColumnCount,
+  setLibraryFilter,
+} from "@/components/MediaWall";
 import { MediaItemSchema, type MediaItem } from "@/lib/media/types";
 
 const film = (overrides: Partial<MediaItem> = {}): MediaItem =>
@@ -87,6 +92,72 @@ describe("MediaWall film plates", () => {
     wall([film(), post]);
     expect(screen.queryAllByText("A post, not a film")).toHaveLength(0);
     expect(screen.getAllByText("Past Lives")[0]).toBeTruthy();
+  });
+});
+
+const book = (overrides: Partial<MediaItem> = {}): MediaItem =>
+  MediaItemSchema.parse({
+    id: "goodreads:127280527",
+    source: "goodreads",
+    kind: "book",
+    title: "Big Ideas, Little Pictures",
+    url: "https://www.goodreads.com/review/show/7869033955",
+    author: "Jono Hey",
+    rating: 5,
+    // Shelved two days after it was finished — the gap the plate has to get right.
+    publishedAt: "2025-10-31T15:34:46.000Z",
+    readAt: "2025-10-29T00:00:00.000Z",
+    image: {
+      src: "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1719396734l/127280527._SX318_.jpg",
+      alt: "Cover of Big Ideas, Little Pictures",
+    },
+    ...overrides,
+  });
+
+describe("MediaWall book plates", () => {
+  it("seats the BOOKS chip right after FILMS", () => {
+    const ids = LIBRARY_FILTERS.map((entry) => entry.id);
+    expect(ids.indexOf("book")).toBe(ids.indexOf("film") + 1);
+    expect(LIBRARY_FILTERS.find((entry) => entry.id === "book")?.label).toBe(
+      "BOOKS",
+    );
+  });
+
+  it("shows only books once the BOOKS chip is active", () => {
+    setLibraryFilter("book");
+    wall([film(), book()]);
+    expect(screen.queryAllByText("Past Lives")).toHaveLength(0);
+    expect(screen.getAllByText("Big Ideas, Little Pictures")[0]).toBeTruthy();
+  });
+
+  it("prints the day it was finished, not the day it was shelved", () => {
+    wall([book()]);
+    const source = screen.getAllByText(/GOODREADS/)[0];
+    expect(source.textContent).toContain("Jono Hey");
+    expect(source.textContent).toContain("2025.10.29");
+    expect(source.textContent).not.toContain("2025.10.31");
+    expect(source.textContent).not.toContain("READING");
+  });
+
+  it("marks an open book READING and falls back to the shelving date", () => {
+    wall([
+      book({ isReading: true, readAt: undefined, rating: undefined }),
+    ]);
+    const source = screen.getAllByText(/GOODREADS/)[0];
+    expect(source.textContent).toContain("READING");
+    expect(source.textContent).toContain("2025.10.31");
+  });
+
+  it("links the plate to the shelf entry with its stars and cover", () => {
+    const { container } = wall([book()]);
+    const live = within(
+      container.querySelector<HTMLElement>('[data-copy="0"]') as HTMLElement,
+    );
+    expect(live.getByRole("link").getAttribute("href")).toBe(
+      "https://www.goodreads.com/review/show/7869033955",
+    );
+    expect(live.getByLabelText("Rated 5 of 5")).toBeTruthy();
+    expect(container.querySelector(".media-cell--book img")).toBeTruthy();
   });
 });
 

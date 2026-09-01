@@ -15,6 +15,7 @@ export const LIBRARY_FILTERS: readonly { id: LibraryFilter; label: string }[] = 
   { id: "all", label: "ALL" },
   { id: "post", label: "POSTS" },
   { id: "film", label: "FILMS" },
+  { id: "book", label: "BOOKS" },
   { id: "article", label: "ARTICLES" },
   { id: "video", label: "VIDEO" },
   { id: "photo", label: "PHOTOS" },
@@ -78,6 +79,7 @@ const SOURCE_LABELS: Record<MediaSource, string> = {
   x: "X",
   linkedin: "LINKEDIN",
   letterboxd: "LETTERBOXD",
+  goodreads: "GOODREADS",
   substack: "SUBSTACK",
   youtube: "YOUTUBE",
   web: "WEB",
@@ -180,15 +182,17 @@ function catalogDate(iso: string): string {
 }
 
 function sourceLine(item: MediaItem): string {
-  // A diary entry carries two dates; the night it was watched is the fact
-  // worth printing, so it outranks the moment the entry was posted.
-  const logged = item.watchedAt ?? item.publishedAt;
+  // A diary entry carries two dates; the night a film was watched — or the
+  // day a book was finished — is the fact worth printing, so it outranks
+  // the moment the entry was posted.
+  const logged = item.readAt ?? item.watchedAt ?? item.publishedAt;
   return [
     item.author,
     SOURCE_LABELS[item.source],
     item.year !== undefined ? String(item.year) : undefined,
     logged !== undefined ? catalogDate(logged) : undefined,
     item.isRewatch ? "REWATCH" : undefined,
+    item.isReading ? "READING" : undefined,
   ]
     .filter(Boolean)
     .join(" · ");

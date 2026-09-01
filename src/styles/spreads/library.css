@@ -227,7 +227,7 @@ a.media-plate:focus-visible .media-plate__title {
   text-decoration-color: var(--ink);
 }
 
-/* Films: red stars. */
+/* Films and books: red stars. */
 .media-plate__rating {
   margin-top: 0.5cqh;
   font-size: max(11px, 1.8cqw);
@@ -453,7 +453,10 @@ a.media-plate:focus-visible .media-plate__title {
   display: none;
 }
 
-.media-cell--film .media-plate__rating {
+/* Books share the film treatment: a portrait cover sized exactly like a
+   poster, red stars beneath. Only the source line differs — see below. */
+.media-cell--film .media-plate__rating,
+.media-cell--book .media-plate__rating {
   position: static;
   background: transparent;
   padding: 0;
@@ -487,7 +490,8 @@ a.media-plate:focus-visible .media-plate__title {
 /* Tile edges: images get a hairline frame so the mosaic reads as set tiles. */
 .media-cell--photo,
 .media-cell--video,
-.media-cell--film {
+.media-cell--film,
+.media-cell--book {
   outline: 1px solid var(--hairline);
   outline-offset: -1px;
   background: var(--paper-shade);
@@ -497,9 +501,13 @@ a.media-plate:focus-visible .media-plate__title {
   display: none;
 }
 
+/* Books keep the source line films drop: a poster names its film, but a
+   cover is not a byline. The author, the finish date, and the READING mark
+   are the plate's facts, so they stay on the paper. */
 .media-cell--post .media-plate__source,
 .media-cell--article .media-plate__source,
-.media-cell--link .media-plate__source {
+.media-cell--link .media-plate__source,
+.media-cell--book .media-plate__source {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;

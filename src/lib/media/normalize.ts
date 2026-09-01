@@ -274,6 +274,78 @@ export function fromLetterboxdRss(xml: string): MediaItem[] {
   }
 }
 
+/** The two Goodreads shelves the library reads; the name is the RSS `shelf=`. */
+export type GoodreadsShelf = "read" | "currently-reading";
+
+/**
+ * Goodreads writes 0 where a book was shelved without a rating, and prints
+ * "rating: 0" in the description to match. Zero stars is not a verdict, so it
+ * never reaches the plate.
+ */
+function bookRating(value: unknown): number | undefined {
+  const rating = numOf(value);
+  return rating !== undefined && rating > 0 ? rating : undefined;
+}
+
+/**
+ * `book_published` is the first edition's year, and for a classical text that
+ * is negative — Gorgias' Encomium of Helen arrives as -380. The schema's year
+ * range belongs to the film era, and a value outside it would sink the whole
+ * item rather than just the year, so only a year the schema accepts is kept.
+ */
+function bookYear(value: unknown): number | undefined {
+  const year = numOf(value);
+  return year !== undefined && MediaItemSchema.shape.year.safeParse(year).success
+    ? year
+    : undefined;
+}
+
+/** The member's own review, as written; Goodreads allows light HTML in it. */
+function goodreadsReview(value: unknown): string | undefined {
+  const text = textOf(value);
+  if (!text) return undefined;
+  const copy = stripHtml(text);
+  return copy ? truncate(copy, 280) : undefined;
+}
+
+/**
+ * Goodreads publishes every fact twice: once as its own element and once
+ * folded into an HTML description ("author: …", "rating: …"). The elements are
+ * read; the description is furniture and is never parsed. The `read` shelf
+ * is the default; pass `"currently-reading"` for the open books, which the
+ * feed itself does not label.
+ */
+export function fromGoodreadsRss(
+  xml: string,
+  shelf: GoodreadsShelf = "read",
+): MediaItem[] {
+  try {
+    const candidates = rssItems(xml).map((item) => {
+      const title = textOf(item.title) ?? "";
+      const link = textOf(item.link);
+      const cover = textOf(item.book_large_image_url);
+      return {
+        id: `goodreads:${textOf(item.book_id) ?? textOf(item.guid) ?? link ?? title}`,
+        source: "goodreads",
+        kind: "book",
+        title,
+        url: link,
+        author: textOf(item.author_name),
+        excerpt: goodreadsReview(item.user_review),
+        publishedAt: isoDate(item.pubDate),
+        readAt: isoDate(item.user_read_at),
+        rating: bookRating(item.user_rating),
+        year: bookYear(item.book_published),
+        isReading: shelf === "currently-reading",
+        image: cover ? { src: cover, alt: `Cover of ${title}` } : undefined,
+      };
+    });
+    return validateItems(candidates);
+  } catch {
+    return [];
+  }
+}
+
 export function fromSubstackRss(xml: string): MediaItem[] {
   try {
     const candidates = rssItems(xml).map((item) => {

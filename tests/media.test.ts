@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   fromAnyApiLinkedIn,
   fromAnyApiX,
+  fromGoodreadsRss,
   fromLetterboxdRss,
   fromSubstackRss,
   fromXApi,
@@ -24,6 +25,7 @@ const fixture = (name: string): string =>
 interface RefreshScript {
   fromAnyApiX: (json: unknown, handle?: string) => unknown[];
   fromAnyApiLinkedIn: (json: unknown) => unknown[];
+  fromGoodreadsRss: (xml: string, shelf?: string) => unknown[];
   anyapiDue: (env: Record<string, string>, now?: Date) => boolean;
 }
 
@@ -156,6 +158,126 @@ describe("fromLetterboxdRss", () => {
       isRewatch: false,
     });
     expect(parsed[0]?.watchedAt).toBeUndefined();
+  });
+});
+
+describe("fromGoodreadsRss", () => {
+  const items = fromGoodreadsRss(fixture("goodreads.rss.xml"));
+  const reading = fromGoodreadsRss(
+    fixture("goodreads-reading.rss.xml"),
+    "currently-reading",
+  );
+
+  it("parses every item with source and kind", () => {
+    expect(items).toHaveLength(3);
+    for (const item of items) {
+      expect(item.source).toBe("goodreads");
+      expect(item.kind).toBe("book");
+      expect(item.id).toMatch(/^goodreads:\d+$/);
+      expect(MediaItemSchema.safeParse(item).success).toBe(true);
+    }
+  });
+
+  it("reads title, author, link, and the day it was finished", () => {
+    expect(items[0]).toMatchObject({
+      id: "goodreads:127280527",
+      title: "Big Ideas, Little Pictures: Explaining the World One Sketch at a Time",
+      author: "Jono Hey",
+      url: "https://www.goodreads.com/review/show/7869033955?utm_medium=api&utm_source=rss",
+      publishedAt: "2025-10-29T15:34:46.000Z",
+      readAt: "2025-10-29T00:00:00.000Z",
+      rating: 5,
+      excerpt: "super cool",
+      isReading: false,
+    });
+  });
+
+  it("treats Goodreads' rating 0 as unrated, not as zero stars", () => {
+    expect(items[1]?.title).toBe("Encomium of Helen");
+    expect(items[1]?.rating).toBeUndefined();
+    expect(items[1]?.excerpt).toBe("making my way through critical works");
+  });
+
+  it("leaves readAt unset when the shelf carries no finish date", () => {
+    expect(items[1]?.readAt).toBeUndefined();
+    expect(items[1]?.publishedAt).toBe("2025-10-24T02:11:11.000Z");
+  });
+
+  it("leaves an empty review with no excerpt to print", () => {
+    expect(items[2]?.title).toContain("The Power of Habit");
+    expect(items[2]?.excerpt).toBeUndefined();
+    expect(items[2]?.rating).toBe(5);
+    expect(items[2]?.readAt).toBe("2025-10-21T00:00:00.000Z");
+  });
+
+  it("keeps a first-edition year only when the schema can hold it", () => {
+    // Gorgias arrives as -380; sending that through would drop the whole
+    // item, so the year is left off and the book stays in the library.
+    expect(items[1]?.year).toBeUndefined();
+    expect(items[2]?.year).toBe(2012);
+    expect(items[0]?.year).toBeUndefined(); // feed sent an empty element
+  });
+
+  it("uses the large cover with an alt that names the book", () => {
+    expect(items[0]?.image).toEqual({
+      src: "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1719396734l/127280527._SX318_.jpg",
+      alt: "Cover of Big Ideas, Little Pictures: Explaining the World One Sketch at a Time",
+    });
+  });
+
+  it("marks the currently-reading shelf as an open book", () => {
+    expect(reading).toHaveLength(1);
+    expect(reading[0]).toMatchObject({
+      id: "goodreads:30659",
+      title: "Meditations",
+      author: "Marcus Aurelius",
+      isReading: true,
+    });
+    expect(reading[0]?.readAt).toBeUndefined();
+    expect(reading[0]?.rating).toBeUndefined();
+    expect(reading[0]?.year).toBeUndefined(); // published 180, pre-schema
+    expect(fromGoodreadsRss(fixture("goodreads-reading.rss.xml"))[0]?.isReading).
+      toBe(false);
+  });
+
+  it("strips the light html a review may carry and truncates to 280", () => {
+    const body = Array.from({ length: 80 }, (_, i) => `word${i}`).join(" ");
+    const xml = `<?xml version="1.0"?>
+      <rss><channel>
+        <item>
+          <title>Long One</title>
+          <link>https://www.goodreads.com/review/show/1</link>
+          <book_id>1</book_id>
+          <user_review><![CDATA[First line.<br/>${body} &amp; more]]></user_review>
+        </item>
+      </channel></rss>`;
+    const excerpt = fromGoodreadsRss(xml)[0]?.excerpt ?? "";
+    expect(excerpt.startsWith("First line. word0")).toBe(true);
+    expect(excerpt.length).toBeLessThanOrEqual(280);
+    expect(excerpt.endsWith("…")).toBe(true);
+    expect(excerpt).not.toContain("<");
+  });
+
+  it("returns [] on malformed or empty xml", () => {
+    expect(fromGoodreadsRss("this is << not xml >>")).toEqual([]);
+    expect(fromGoodreadsRss("")).toEqual([]);
+    expect(fromGoodreadsRss("<html><body>404</body></html>")).toEqual([]);
+  });
+
+  it("drops a bad item without killing the batch", () => {
+    const xml = `<?xml version="1.0"?>
+      <rss><channel>
+        <item>
+          <title>Good Book</title>
+          <link>https://www.goodreads.com/review/show/2</link>
+          <book_id>2</book_id>
+          <user_rating>3</user_rating>
+        </item>
+        <item><author_name>no title at all</author_name></item>
+      </channel></rss>`;
+    const parsed = fromGoodreadsRss(xml);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({ title: "Good Book", rating: 3 });
   });
 });
 
@@ -477,6 +599,36 @@ describe("refresh-media.mjs / normalize.ts parity", () => {
         .fromAnyApiLinkedIn(input)
         .map((item) => MediaItemSchema.parse(JSON.parse(JSON.stringify(item))));
       expect(viaScript).toEqual(fromAnyApiLinkedIn(input));
+    }
+  });
+
+  it("normalizes Goodreads shelves identically to the app's normalizer", async () => {
+    const script = await loadScript();
+    const inputs: [string, "read" | "currently-reading"][] = [
+      [fixture("goodreads.rss.xml"), "read"],
+      [fixture("goodreads-reading.rss.xml"), "currently-reading"],
+      [
+        `<?xml version="1.0"?>
+          <rss><channel>
+            <item>
+              <title>Edge Cases</title>
+              <link>https://www.goodreads.com/review/show/3</link>
+              <user_rating>0</user_rating>
+              <user_read_at></user_read_at>
+              <book_published>-380</book_published>
+              <user_review><![CDATA[kept &amp; counted<br/>${"x".repeat(900)}]]></user_review>
+            </item>
+            <item><author_name>no title at all</author_name></item>
+          </channel></rss>`,
+        "read",
+      ],
+    ];
+
+    for (const [xml, shelf] of inputs) {
+      const viaScript = script
+        .fromGoodreadsRss(xml, shelf)
+        .map((item) => MediaItemSchema.parse(JSON.parse(JSON.stringify(item))));
+      expect(viaScript).toEqual(fromGoodreadsRss(xml, shelf));
     }
   });
 });

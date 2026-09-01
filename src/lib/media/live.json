@@ -772,6 +772,264 @@
       }
     },
     {
+      "id": "goodreads:127280527",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "Big Ideas, Little Pictures: Explaining the World One Sketch at a Time",
+      "url": "https://www.goodreads.com/review/show/7869033955?utm_medium=api&utm_source=rss",
+      "author": "Jono Hey",
+      "excerpt": "super cool",
+      "publishedAt": "2025-10-29T15:34:46.000Z",
+      "readAt": "2025-10-29T00:00:00.000Z",
+      "rating": 5,
+      "image": {
+        "src": "/media/thumbs/7706987b5b24.jpg",
+        "alt": "Cover of Big Ideas, Little Pictures: Explaining the World One Sketch at a Time"
+      }
+    },
+    {
+      "id": "goodreads:1358",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "Encomium of Helen",
+      "url": "https://www.goodreads.com/review/show/8016129521?utm_medium=api&utm_source=rss",
+      "author": "Gorgias of Leontini",
+      "excerpt": "making my way through critical works",
+      "publishedAt": "2025-10-24T02:11:11.000Z",
+      "image": {
+        "src": "/media/thumbs/103a78e8e47a.jpg",
+        "alt": "Cover of Encomium of Helen"
+      }
+    },
+    {
+      "id": "goodreads:12609433",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "The Power of Habit: Why We Do What We Do in Life and Business",
+      "url": "https://www.goodreads.com/review/show/7845328111?utm_medium=api&utm_source=rss",
+      "author": "Charles Duhigg",
+      "publishedAt": "2025-10-22T04:55:15.000Z",
+      "readAt": "2025-10-21T00:00:00.000Z",
+      "rating": 5,
+      "year": 2012,
+      "image": {
+        "src": "/media/thumbs/06705aeac9e4.jpg",
+        "alt": "Cover of The Power of Habit: Why We Do What We Do in Life and Business"
+      }
+    },
+    {
+      "id": "goodreads:24885533",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "The Paper Menagerie and Other Stories",
+      "url": "https://www.goodreads.com/review/show/7869035764?utm_medium=api&utm_source=rss",
+      "author": "Ken Liu",
+      "publishedAt": "2025-08-28T17:58:12.000Z",
+      "year": 2016,
+      "image": {
+        "src": "/media/thumbs/f58c20a9f5d4.jpg",
+        "alt": "Cover of The Paper Menagerie and Other Stories"
+      }
+    },
+    {
+      "id": "goodreads:60149573",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "Our Missing Hearts",
+      "url": "https://www.goodreads.com/review/show/7852462012?utm_medium=api&utm_source=rss",
+      "author": "Celeste Ng",
+      "publishedAt": "2025-08-24T23:23:13.000Z",
+      "readAt": "2025-08-24T00:00:00.000Z",
+      "year": 2022,
+      "image": {
+        "src": "/media/thumbs/9c06be123022.jpg",
+        "alt": "Cover of Our Missing Hearts"
+      }
+    },
+    {
+      "id": "goodreads:868",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "Fullmetal Alchemist, Vol. 3",
+      "url": "https://www.goodreads.com/review/show/7846291886?utm_medium=api&utm_source=rss",
+      "author": "Hiromu Arakawa",
+      "publishedAt": "2025-08-20T16:00:53.000Z",
+      "year": 2002,
+      "image": {
+        "src": "/media/thumbs/5632ad337c76.jpg",
+        "alt": "Cover of Fullmetal Alchemist, Vol. 3"
+      }
+    },
+    {
+      "id": "goodreads:195820770",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "The Freshman Survival Guide: Soulful Advice for Studying, Socializing, and Everything In Between",
+      "url": "https://www.goodreads.com/review/show/7845134536?utm_medium=api&utm_source=rss",
+      "author": "Nora Bradbury-Haehl",
+      "publishedAt": "2025-08-20T04:22:29.000Z",
+      "image": {
+        "src": "/media/thumbs/7d13e4a606f2.jpg",
+        "alt": "Cover of The Freshman Survival Guide: Soulful Advice for Studying, Socializing, and Everything In Between"
+      }
+    },
+    {
+      "id": "goodreads:173754979",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "James",
+      "url": "https://www.goodreads.com/review/show/7627260596?utm_medium=api&utm_source=rss",
+      "author": "Percival Everett",
+      "publishedAt": "2025-08-18T06:43:47.000Z",
+      "readAt": "2025-08-17T00:00:00.000Z",
+      "year": 2024,
+      "image": {
+        "src": "/media/thumbs/5a0ea2ed8621.jpg",
+        "alt": "Cover of James"
+      }
+    },
+    {
+      "id": "goodreads:873",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "Fullmetal Alchemist, Vol. 2",
+      "url": "https://www.goodreads.com/review/show/7806285543?utm_medium=api&utm_source=rss",
+      "author": "Hiromu Arakawa",
+      "publishedAt": "2025-08-07T08:46:39.000Z",
+      "readAt": "2025-08-06T00:00:00.000Z",
+      "year": 2002,
+      "image": {
+        "src": "/media/thumbs/69971f2b94ba.jpg",
+        "alt": "Cover of Fullmetal Alchemist, Vol. 2"
+      }
+    },
+    {
+      "id": "goodreads:870",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "Fullmetal Alchemist, Vol. 1",
+      "url": "https://www.goodreads.com/review/show/7783926869?utm_medium=api&utm_source=rss",
+      "author": "Hiromu Arakawa",
+      "publishedAt": "2025-08-07T08:39:43.000Z",
+      "readAt": "2025-08-01T00:00:00.000Z",
+      "year": 2002,
+      "image": {
+        "src": "/media/thumbs/a53cc64f4465.jpg",
+        "alt": "Cover of Fullmetal Alchemist, Vol. 1"
+      }
+    },
+    {
+      "id": "goodreads:253197",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "How to Win at College: Surprising Secrets for Success from the Country's Top Students",
+      "url": "https://www.goodreads.com/review/show/7806254386?utm_medium=api&utm_source=rss",
+      "author": "Cal Newport",
+      "excerpt": "Cal Newport manages to package a butt load of digestible information that most students need to hear before starting their college journey. However, some of the advice definitely comes off as outdated (with the wild development of the internet since this book was published) or i…",
+      "publishedAt": "2025-08-07T08:39:11.000Z",
+      "readAt": "2025-08-06T00:00:00.000Z",
+      "rating": 4,
+      "year": 2005,
+      "image": {
+        "src": "/media/thumbs/387bf673e8a8.jpg",
+        "alt": "Cover of How to Win at College: Surprising Secrets for Success from the Country's Top Students"
+      }
+    },
+    {
+      "id": "goodreads:55145261",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "The Anthropocene Reviewed: Essays on a Human-Centered Planet",
+      "url": "https://www.goodreads.com/review/show/7559502983?utm_medium=api&utm_source=rss",
+      "author": "John  Green",
+      "excerpt": "It's an interesting look at the chaos that permeates the Anthropocene, and I found myself resonating with Green's comments, which were poetically framed. Part of the book sometimes came off as an unresolved existentialist ire to me, but perhaps this is what it means to be human…",
+      "publishedAt": "2025-07-05T03:21:15.000Z",
+      "readAt": "2025-07-04T00:00:00.000Z",
+      "rating": 4,
+      "year": 2021,
+      "image": {
+        "src": "/media/thumbs/a8aed68fb06e.jpg",
+        "alt": "Cover of The Anthropocene Reviewed: Essays on a Human-Centered Planet"
+      }
+    },
+    {
+      "id": "goodreads:1618",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "The Curious Incident of the Dog in the Night-Time",
+      "url": "https://www.goodreads.com/review/show/7684211880?utm_medium=api&utm_source=rss",
+      "author": "Mark Haddon",
+      "excerpt": "Unique read, and as someone with a brother with autism, it offers a way of looking at things that I witness often in my own life. The novel offers quirkiness that made me smile, but it's not a story that I will find memorable in the long-run.",
+      "publishedAt": "2025-07-02T05:10:23.000Z",
+      "readAt": "2025-07-01T00:00:00.000Z",
+      "rating": 3,
+      "year": 2003,
+      "image": {
+        "src": "/media/thumbs/13baa4fb97bb.jpg",
+        "alt": "Cover of The Curious Incident of the Dog in the Night-Time"
+      }
+    },
+    {
+      "id": "goodreads:6867",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "Atonement",
+      "url": "https://www.goodreads.com/review/show/7869036763?utm_medium=api&utm_source=rss",
+      "author": "Ian McEwan",
+      "publishedAt": "2025-11-09T07:14:16.000Z",
+      "year": 2001,
+      "isReading": true,
+      "image": {
+        "src": "/media/thumbs/f3ee989d6d1a.jpg",
+        "alt": "Cover of Atonement"
+      }
+    },
+    {
+      "id": "goodreads:219743621",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "Flashlight",
+      "url": "https://www.goodreads.com/review/show/8049187371?utm_medium=api&utm_source=rss",
+      "author": "Susan Choi",
+      "publishedAt": "2025-11-06T07:25:32.000Z",
+      "year": 2025,
+      "isReading": true,
+      "image": {
+        "src": "/media/thumbs/842c5ab20dda.jpg",
+        "alt": "Cover of Flashlight"
+      }
+    },
+    {
+      "id": "goodreads:197103196",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "Second Class: How the Elites Betrayed America's Working Men and Women",
+      "url": "https://www.goodreads.com/review/show/7845327810?utm_medium=api&utm_source=rss",
+      "author": "Batya Ungar-Sargon",
+      "publishedAt": "2025-08-22T03:04:25.000Z",
+      "year": 2024,
+      "isReading": true,
+      "image": {
+        "src": "/media/thumbs/e13cb9f17295.jpg",
+        "alt": "Cover of Second Class: How the Elites Betrayed America's Working Men and Women"
+      }
+    },
+    {
+      "id": "goodreads:17165596",
+      "source": "goodreads",
+      "kind": "book",
+      "title": "The Kite Runner",
+      "url": "https://www.goodreads.com/review/show/7710446249?utm_medium=api&utm_source=rss",
+      "author": "Khaled Hosseini",
+      "publishedAt": "2025-07-05T03:22:18.000Z",
+      "year": 2003,
+      "isReading": true,
+      "image": {
+        "src": "/media/thumbs/22a9d118c154.jpg",
+        "alt": "Cover of The Kite Runner"
+      }
+    },
+    {
       "id": "x:2089814680672117117",
       "source": "x",
       "kind": "post",
@@ -1152,5 +1410,5 @@
       }
     }
   ],
-  "generatedAt": "2026-09-01T16:41:23.834Z"
+  "generatedAt": "2026-09-01T20:22:19.075Z"
 }
