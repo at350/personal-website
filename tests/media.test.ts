@@ -28,6 +28,7 @@ interface RefreshScript {
   fromGoodreadsRss: (xml: string, shelf?: string) => unknown[];
   anyapiDue: (env: Record<string, string>, now?: Date) => boolean;
   snapshotUnchanged: (previous: unknown[], next: unknown[]) => boolean;
+  carriedUnconfigured: (previous: unknown[], feedNames: string[]) => unknown[];
 }
 
 const loadScript = async (): Promise<RefreshScript> =>
@@ -163,6 +164,23 @@ describe("fromLetterboxdRss", () => {
 });
 
 describe("fromGoodreadsRss", () => {
+  it("gives a bare cover URL the CDN's large-width suffix and leaves sized ones alone", () => {
+    // A bare URL is the full scan (one weighed 2.5 MB); the sized twin is
+    // what the plate wants, and the CDN honours the suffix on every cover.
+    const items = fromGoodreadsRss(fixture("goodreads.rss.xml"));
+    const bySrc = items.map((item) => item.image?.src);
+    expect(bySrc).toContain(
+      "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1347360991l/1358._SX318_.jpg",
+    );
+    expect(bySrc).toContain(
+      "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1719396734l/127280527._SX318_.jpg",
+    );
+    expect(bySrc).toContain(
+      "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1545854312l/12609433._SY475_.jpg",
+    );
+    expect(bySrc.some((src) => src?.endsWith("/1358.jpg"))).toBe(false);
+  });
+
   const items = fromGoodreadsRss(fixture("goodreads.rss.xml"));
   const reading = fromGoodreadsRss(
     fixture("goodreads-reading.rss.xml"),
@@ -947,5 +965,23 @@ describe("media store", () => {
         expect(item.publishedAt).toBeUndefined();
       }
     }
+  });
+});
+
+describe("carriedUnconfigured", () => {
+  // A keyless laptop registers no X or LinkedIn feed at all; their posts must
+  // ride through the refresh untouched rather than vanish with their thumbs.
+  const post = { id: "x:1", source: "x", kind: "post", title: "A post" };
+  const film = { id: "letterboxd:1", source: "letterboxd", kind: "film", title: "Past Lives" };
+
+  it("keeps every previous item whose source has no feed this run", async () => {
+    const { carriedUnconfigured } = await loadScript();
+    expect(carriedUnconfigured([post, film], ["letterboxd", "goodreads"])).toEqual([post]);
+  });
+
+  it("carries nothing when every source is configured, and skips malformed items", async () => {
+    const { carriedUnconfigured } = await loadScript();
+    expect(carriedUnconfigured([post, film], ["letterboxd", "x"])).toEqual([]);
+    expect(carriedUnconfigured([null, { id: "?" }, post], ["x"])).toEqual([]);
   });
 });

@@ -309,6 +309,24 @@ function goodreadsReview(value: unknown): string | undefined {
 }
 
 /**
+ * A Goodreads cover URL usually ends in a size suffix (`._SX318_.jpg`,
+ * `._SY475_.jpg`) that the CDN resolves to a plate-sized file. Some covers
+ * arrive bare, and a bare URL is the full scan: one such cover weighed 2.5 MB
+ * against 32 KB for its sized twin. The CDN honours the suffix on any cover,
+ * so a bare URL is given the standard large width before it is ever fetched
+ * or mirrored.
+ */
+const GOODREADS_SIZED = /\._S[XY]\d+_\.(?:jpe?g|png|gif|webp)$/i;
+const GOODREADS_BARE = /\.(?:jpe?g|png|gif|webp)$/i;
+
+function goodreadsCover(value: unknown): string | undefined {
+  const src = textOf(value);
+  if (!src) return undefined;
+  if (GOODREADS_SIZED.test(src)) return src;
+  return src.replace(GOODREADS_BARE, "._SX318_$&");
+}
+
+/**
  * Goodreads publishes every fact twice: once as its own element and once
  * folded into an HTML description ("author: …", "rating: …"). The elements are
  * read; the description is furniture and is never parsed. The `read` shelf
@@ -323,7 +341,7 @@ export function fromGoodreadsRss(
     const candidates = rssItems(xml).map((item) => {
       const title = textOf(item.title) ?? "";
       const link = textOf(item.link);
-      const cover = textOf(item.book_large_image_url);
+      const cover = goodreadsCover(item.book_large_image_url);
       return {
         id: `goodreads:${textOf(item.book_id) ?? textOf(item.guid) ?? link ?? title}`,
         source: "goodreads",

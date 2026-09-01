@@ -360,6 +360,20 @@ function goodreadsReview(value) {
   return copy ? truncate(copy, 280) : undefined;
 }
 
+// A size suffix (._SX318_.jpg, ._SY475_.jpg) is what makes a Goodreads cover
+// plate-sized; a bare URL is the full scan (2.5 MB where the sized twin is
+// 32 KB), so a bare one is given the standard large width before it is
+// fetched or mirrored. Mirrors normalize.ts.
+const GOODREADS_SIZED = /\._S[XY]\d+_\.(?:jpe?g|png|gif|webp)$/i;
+const GOODREADS_BARE = /\.(?:jpe?g|png|gif|webp)$/i;
+
+function goodreadsCover(value) {
+  const src = textOf(value);
+  if (!src) return undefined;
+  if (GOODREADS_SIZED.test(src)) return src;
+  return src.replace(GOODREADS_BARE, "._SX318_$&");
+}
+
 // Every fact arrives twice, as an element and folded into an HTML description;
 // only the elements are read. The feed does not label its shelf, so the call
 // site passes it and the currently-reading shelf becomes the READING mark.
@@ -368,7 +382,7 @@ function fromGoodreadsRss(xml, shelf = "read") {
     .map((item) => {
       const title = textOf(item.title) ?? "";
       const link = textOf(item.link);
-      const cover = textOf(item.book_large_image_url);
+      const cover = goodreadsCover(item.book_large_image_url);
       return {
         id: `goodreads:${textOf(item.book_id) ?? textOf(item.guid) ?? link ?? title}`,
         source: "goodreads",
@@ -788,6 +802,21 @@ function snapshotUnchanged(previousItems, nextItems) {
   );
 }
 
+/**
+ * The previous snapshot's items whose source has no feed registered this run.
+ * A source that is not configured — the paid lanes on a keyless laptop, say —
+ * is not a feed that failed; it is simply absent, and absent must never mean
+ * deleted. Without this, a by-hand baseline refresh would drop every post CI
+ * last fetched and the thumbnail prune would delete their pictures with them.
+ * To retire a source on purpose, remove its items from live.json by hand.
+ */
+function carriedUnconfigured(previousItems, feedNames) {
+  const configured = new Set(feedNames);
+  return previousItems.filter(
+    (item) => typeof item?.source === "string" && !configured.has(item.source),
+  );
+}
+
 /** The previous snapshot's items, or [] when there is nothing readable yet. */
 async function previousItems() {
   try {
@@ -862,6 +891,19 @@ async function main() {
     console.log(`refresh-media: ${feed.name}: ok, ${feedItems.length} item(s)`);
   }
 
+  const unconfigured = carriedUnconfigured(
+    previous,
+    feeds.map((feed) => feed.name),
+  );
+  if (unconfigured.length > 0) {
+    items.push(...unconfigured);
+    const sources = [...new Set(unconfigured.map((item) => item.source))];
+    console.log(
+      `refresh-media: ${sources.join(", ")}: not configured this run, ` +
+        `keeping ${unconfigured.length} item(s) from the previous snapshot`,
+    );
+  }
+
   if (succeeded === 0) {
     console.warn(
       "refresh-media: every configured feed failed; leaving live.json untouched.",
@@ -908,6 +950,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 // Exported for the parity test only; the script's real interface is the CLI.
 export {
   anyapiDue,
+  carriedUnconfigured,
   fromAnyApiLinkedIn,
   fromAnyApiX,
   fromGoodreadsRss,
