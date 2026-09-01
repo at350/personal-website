@@ -17,6 +17,9 @@
 //   LETTERBOXD_USER            letterboxd username -> https://letterboxd.com/<user>/rss/
 //                              defaults to DEFAULT_LETTERBOXD_USER below, so
 //                              `npm run refresh-media` works with no env at all
+//   GOODREADS_USER_ID          numeric goodreads user id -> the "read" and
+//                              "currently-reading" shelf feeds (free RSS);
+//                              defaults to DEFAULT_GOODREADS_USER_ID below
 //   SUBSTACK_RSS_URL           full substack feed url
 //   ANYAPI_KEY                 anyapi.com key -> recent X posts AND linkedin
 //                              posts (preferred; one key serves both)
@@ -83,6 +86,13 @@ function anyapiDue(env, now = new Date()) {
 // the repo rather than in a secret: the film log then keeps refreshing without
 // any configuration at all. LETTERBOXD_USER overrides it (say, on a fork).
 const DEFAULT_LETTERBOXD_USER = "alantai";
+
+// Same reasoning for the goodreads account: the numeric id is in every public
+// profile URL, so the bookshelf keeps refreshing with no configuration at
+// all. GOODREADS_USER_ID overrides it. Both shelves are read: finished books
+// carry a finish date, open ones carry the READING mark.
+const DEFAULT_GOODREADS_USER_ID = "169946288";
+const GOODREADS_SHELVES = ["read", "currently-reading"];
 
 // Same reasoning for the X handle: it is public, so baking it in keeps the
 // posts flowing with only ANYAPI_KEY set. X_HANDLE overrides it.
@@ -325,6 +335,60 @@ function fromLetterboxdRss(xml) {
     .filter(isUsable);
 }
 
+// Goodreads writes 0 where a book was shelved unrated; zero stars is not a
+// verdict, so it never reaches the plate.
+function bookRating(value) {
+  const rating = numOf(value);
+  return rating !== undefined && rating > 0 ? rating : undefined;
+}
+
+// `book_published` is the first edition's year, negative for a classical text
+// (Gorgias arrives as -380). Mirrors MediaItemSchema's year range: a value
+// outside it would sink the whole item on load rather than just the year.
+function bookYear(value) {
+  const year = numOf(value);
+  return year !== undefined && Number.isInteger(year) && year >= 1888 && year <= 2200
+    ? year
+    : undefined;
+}
+
+// The member's own review, as written; Goodreads allows light HTML in it.
+function goodreadsReview(value) {
+  const text = textOf(value);
+  if (!text) return undefined;
+  const copy = stripHtml(text);
+  return copy ? truncate(copy, 280) : undefined;
+}
+
+// Every fact arrives twice, as an element and folded into an HTML description;
+// only the elements are read. The feed does not label its shelf, so the call
+// site passes it and the currently-reading shelf becomes the READING mark.
+function fromGoodreadsRss(xml, shelf = "read") {
+  return rssItems(xml)
+    .map((item) => {
+      const title = textOf(item.title) ?? "";
+      const link = textOf(item.link);
+      const cover = textOf(item.book_large_image_url);
+      return {
+        id: `goodreads:${textOf(item.book_id) ?? textOf(item.guid) ?? link ?? title}`,
+        source: "goodreads",
+        kind: "book",
+        title,
+        url: link,
+        author: textOf(item.author_name),
+        excerpt: goodreadsReview(item.user_review),
+        publishedAt: isoDate(item.pubDate),
+        readAt: isoDate(item.user_read_at),
+        rating: bookRating(item.user_rating),
+        year: bookYear(item.book_published),
+        // Undefined keys drop out of JSON.stringify, keeping the snapshot terse.
+        isReading: shelf === "currently-reading" || undefined,
+        image: cover ? { src: cover, alt: `Cover of ${title}` } : undefined,
+      };
+    })
+    .filter(isUsable);
+}
+
 function fromSubstackRss(xml) {
   return rssItems(xml)
     .map((item) => {
@@ -464,6 +528,31 @@ function configuredFeeds(env) {
     feeds.push({
       name: "letterboxd",
       run: async () => fromLetterboxdRss(await (await fetchWithTimeout(url)).text()),
+    });
+  }
+  // Goodreads' shelf feeds are public RSS like letterboxd's, so the book lane
+  // rides the same two-hourly cadence with no key and no due gate. One feed
+  // covers both shelves: its name doubles as the `source` every book carries,
+  // so a shelf that fails carries the whole lane forward instead of deleting
+  // the other shelf's history.
+  const goodreadsUserId = env.GOODREADS_USER_ID || DEFAULT_GOODREADS_USER_ID;
+  if (goodreadsUserId) {
+    const shelfUrl = (shelf) =>
+      `https://www.goodreads.com/review/list_rss/` +
+      `${encodeURIComponent(goodreadsUserId)}?shelf=${shelf}`;
+    feeds.push({
+      name: "goodreads",
+      run: async () => {
+        const shelves = await Promise.all(
+          GOODREADS_SHELVES.map(async (shelf) =>
+            fromGoodreadsRss(
+              await (await fetchWithTimeout(shelfUrl(shelf))).text(),
+              shelf,
+            ),
+          ),
+        );
+        return shelves.flat();
+      },
     });
   }
   if (env.SUBSTACK_RSS_URL) {
@@ -821,6 +910,7 @@ export {
   anyapiDue,
   fromAnyApiLinkedIn,
   fromAnyApiX,
+  fromGoodreadsRss,
   snapshotUnchanged,
   xMediaFromSyndication,
 };

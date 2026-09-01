@@ -68,6 +68,12 @@ when the items actually changed (the `generatedAt` stamp alone never counts).
 A film logged on [letterboxd.com/alantai](https://letterboxd.com/alantai/)
 is on the site within one cycle, and it needs no configuring at all — the
 username lives in `scripts/refresh-media.mjs` as `DEFAULT_LETTERBOXD_USER`.
+Books work the same way: the Goodreads lane reads both the **read** and
+**currently-reading** shelves of
+[goodreads.com/user/show/169946288-alan-tai](https://www.goodreads.com/user/show/169946288-alan-tai)
+as free RSS on the same two-hour clock — no key, the numeric id lives
+beside the letterboxd username as `DEFAULT_GOODREADS_USER_ID` — and an
+open book lands with a **READING** mark until it moves to the read shelf.
 The X and LinkedIn lanes cost money per call, so they ride a slower clock;
 see [Social posts](#social-posts) below.
 
@@ -112,6 +118,7 @@ repo secrets, none required:
 | Secret | Purpose |
 |---|---|
 | `LETTERBOXD_USER` | Point the film log at a different account |
+| `GOODREADS_USER_ID` | Point the bookshelf at a different Goodreads account (the numeric id from its profile URL) |
 | `SUBSTACK_RSS_URL` | Substack feed URL once the newsletter exists |
 | `ANYAPI_KEY` | Recent X **and** LinkedIn posts via [AnyAPI](https://getanyapi.com) — one key, both lanes |
 | `X_HANDLE` | Point the X feed at a different handle (defaults to `DEFAULT_X_HANDLE`) |

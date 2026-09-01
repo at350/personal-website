@@ -5,6 +5,7 @@ export const MediaSourceSchema = z.enum([
   "x",
   "linkedin",
   "letterboxd",
+  "goodreads",
   "substack",
   "youtube",
   "web",
@@ -14,6 +15,7 @@ export const MediaKindSchema = z.enum([
   "photo",
   "post",
   "film",
+  "book",
   "article",
   "video",
   "link",
@@ -66,6 +68,13 @@ export const MediaItemSchema = z.object({
    * `publishedAt` (the shared activity axis across every source).
    */
   watchedAt: z.string().datetime({ offset: true }).optional(),
+  /**
+   * The same distinction for a book. Goodreads stamps a shelf entry with
+   * the day it was posted and, separately, the day the book was finished;
+   * book plates print the finish, and a title still on the
+   * currently-reading shelf has none yet.
+   */
+  readAt: z.string().datetime({ offset: true }).optional(),
   image: MediaImageSchema.optional(),
   relatedLinks: z.array(MediaRelatedLinkSchema).max(4).default([]),
   tags: z.array(z.string().trim().min(1).max(48)).max(12).default([]),
@@ -73,6 +82,8 @@ export const MediaItemSchema = z.object({
   year: z.number().int().min(1888).max(2200).optional(),
   /** Letterboxd marks a repeat viewing; printed as a mark on the plate. */
   isRewatch: z.boolean().default(false),
+  /** Goodreads' currently-reading shelf: an open book, not a finished one. */
+  isReading: z.boolean().default(false),
   isFallback: z.boolean().default(false),
 });
 
