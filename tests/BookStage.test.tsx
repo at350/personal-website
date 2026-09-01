@@ -665,6 +665,109 @@ describe("BookStage page-turn input", () => {
     expect(overlay.style.pointerEvents).toBe("auto");
   });
 
+  it("opens the keys sheet on ? and keeps the arrows off the paper while it shows", () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1);
+    expect(screen.queryByRole("dialog", { name: "Keys" })).toBeNull();
+
+    fireEvent.keyDown(window, { key: "?" });
+    const sheet = screen.getByRole("dialog", { name: "Keys" });
+    expect(sheet.getAttribute("aria-modal")).toBe("true");
+    expect(
+      screen
+        .getByRole("button", { name: "Keyboard shortcuts" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+
+    // The arrow is explained on the sheet, not acted on behind it.
+    fireEvent.keyDown(window, { key: "ArrowRight", repeat: false });
+    fireEvent.keyDown(window, { key: "Home" });
+    fireEvent.keyDown(window, { key: "g" });
+    expect(stage.getAttribute("aria-busy")).toBe("false");
+    expect(screen.getByRole("button", { name: "Contents" }).textContent).toBe(
+      "02-03",
+    );
+    expect(stage.querySelector(".grid-overlay")).toBeNull();
+
+    // A second ? puts the sheet away again, and the arrow is live once more.
+    fireEvent.keyDown(window, { key: "?" });
+    expect(screen.queryByRole("dialog", { name: "Keys" })).toBeNull();
+    fireEvent.keyDown(window, { key: "ArrowRight", repeat: false });
+    expect(stage.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("closes the keys sheet on Escape and returns focus to where it was", () => {
+    stubMatchMedia();
+    renderStage(1);
+    const next = screen.getByRole("button", { name: "Next spread" });
+    next.focus();
+
+    // "?" toggles even from a button — the interactive-target guard that
+    // keeps arrows away from focused controls must not swallow it.
+    fireEvent.keyDown(next, { key: "?" });
+    const sheet = screen.getByRole("dialog", { name: "Keys" });
+    expect(sheet.contains(document.activeElement)).toBe(true);
+
+    fireEvent.keyDown(sheet, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Keys" })).toBeNull();
+    expect(document.activeElement).toBe(next);
+  });
+
+  it("toggles the keys sheet from the nav button without a press-and-click double flip", () => {
+    stubMatchMedia();
+    renderStage(1);
+    const help = screen.getByRole("button", { name: "Keyboard shortcuts" });
+    expect(help.getAttribute("aria-expanded")).toBe("false");
+
+    pointerTap(help, 1);
+    expect(screen.getByRole("dialog", { name: "Keys" })).toBeTruthy();
+    expect(help.getAttribute("aria-expanded")).toBe("true");
+
+    // The outside-press listener must leave the toggle alone, or the
+    // pointerdown would close what the click then reopens.
+    pointerTap(help, 2);
+    expect(screen.queryByRole("dialog", { name: "Keys" })).toBeNull();
+    expect(help.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("puts the keys sheet away on a press beside it and via its close button", () => {
+    stubMatchMedia();
+    const { stage } = renderStage(1);
+
+    fireEvent.keyDown(window, { key: "?" });
+    expect(screen.getByRole("dialog", { name: "Keys" })).toBeTruthy();
+    fireEvent.pointerDown(stage, { button: 0, pointerId: 3, pointerType: "mouse" });
+    expect(screen.queryByRole("dialog", { name: "Keys" })).toBeNull();
+
+    fireEvent.keyDown(window, { key: "?" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close keyboard shortcuts" }),
+    );
+    expect(screen.queryByRole("dialog", { name: "Keys" })).toBeNull();
+  });
+
+  it("opens the keys sheet over an active drift and lets Escape close it first", async () => {
+    stubMatchMedia();
+    const onExperienceModeChange = vi.fn();
+    renderStage(1, "drift", onExperienceModeChange);
+    await settleModeTransition();
+    await reportFlatPose();
+    expect(scene.drift?.active).toBe(true);
+
+    // The lock keeps the arrows off the paper, not the sheet off the stage.
+    fireEvent.keyDown(window, { key: "?" });
+    expect(screen.getByRole("dialog", { name: "Keys" })).toBeTruthy();
+
+    // One Escape puts the slip away; only the next one lands the leaves.
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Keys" })).toBeNull();
+    expect(onExperienceModeChange).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onExperienceModeChange).toHaveBeenCalledTimes(1);
+    expect(onExperienceModeChange).toHaveBeenLastCalledWith("read");
+  });
+
   it("finishes finite taps before resuming a held arrow", () => {
     stubMatchMedia();
     const { stage } = renderStage(1);
