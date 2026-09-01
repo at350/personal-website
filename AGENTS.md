@@ -32,5 +32,10 @@ Non-obvious notes:
 - `npm run refresh-media` pulls the letterboxd film log with no configuration
   (the account is baked into the script) and needs network access; the substack
   and X feeds stay off until their optional secrets are set (see `README.md`).
-  The GitHub workflow runs it every two hours and then dispatches `deploy.yml`
-  itself, because a `GITHUB_TOKEN` push cannot trigger another workflow.
+  The GitHub workflow runs it every two hours, force-publishes a changed
+  snapshot as one parentless commit on the `media-snapshot` branch (never to
+  `main`), and then dispatches `deploy.yml` itself, because a `GITHUB_TOKEN`
+  push cannot trigger another workflow. Both workflows overlay that branch
+  onto the checkout first via `.github/actions/overlay-media-snapshot`. The
+  `live.json` and `public/media/thumbs/` on `main` are an offline baseline,
+  refreshed only by hand; do not expect them to match the live site.

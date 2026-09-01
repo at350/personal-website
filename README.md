@@ -63,21 +63,42 @@ npm run lint
 
 The library restocks itself. `.github/workflows/refresh-media.yml` runs
 **every two hours**: it reads each configured feed, mirrors every remote image
-into `public/media/thumbs/`, and commits a new `src/lib/media/live.json` when
-anything changed. A film logged on [letterboxd.com/alantai](https://letterboxd.com/alantai/)
+into `public/media/thumbs/`, and publishes a new `src/lib/media/live.json`
+when the items actually changed (the `generatedAt` stamp alone never counts).
+A film logged on [letterboxd.com/alantai](https://letterboxd.com/alantai/)
 is on the site within one cycle, and it needs no configuring at all — the
 username lives in `scripts/refresh-media.mjs` as `DEFAULT_LETTERBOXD_USER`.
 The X and LinkedIn lanes cost money per call, so they ride a slower clock;
 see [Social posts](#social-posts) below.
 
-Two details in that workflow are load-bearing:
+The snapshot never lands on `main`. It lives on the **`media-snapshot`**
+branch as a single commit with no parent that holds only `live.json` and
+`public/media/thumbs/`; every changed refresh force-replaces that commit, so
+the branch is always one commit deep and `main`'s log stays a log of real
+work. `main` keeps a baseline copy of both paths so local dev and the tests
+work with no network — refreshed **only by hand**, when it drifts far enough
+to matter: `npm run refresh-media`, then commit. To read what the site is
+actually serving:
 
+```bash
+git fetch origin media-snapshot && git show FETCH_HEAD:src/lib/media/live.json
+```
+
+Three details in that workflow are load-bearing:
+
+- **Both workflows overlay the branch before anything else.**
+  `.github/actions/overlay-media-snapshot` fetches `media-snapshot` (falling
+  back to `main`'s baseline until the first refresh creates it) and checks
+  the two paths out over the checkout. `refresh-media.yml` does it so
+  carry-forward and change detection start from the live snapshot rather
+  than the stale baseline; `deploy.yml` does it so the build ships what the
+  last refresh found. One shared action means the two cannot drift.
 - **It dispatches the deploy itself.** A push authenticated with
-  `GITHUB_TOKEN` deliberately does not start another workflow run, so
-  `deploy.yml` — which triggers on push — never sees the snapshot commit.
-  `workflow_dispatch` is the documented exception, so the refresh job calls it
-  explicitly. Remove that step and the commits keep landing while the
-  published site quietly stops changing.
+  `GITHUB_TOKEN` deliberately does not start another workflow run — and
+  `deploy.yml` only watches `main`, which the snapshot never touches.
+  `workflow_dispatch` is the documented exception, so the refresh job calls
+  it explicitly after a changed publish. Remove that step and the snapshots
+  keep landing while the published site quietly stops changing.
 - **A feed that fails keeps its last-known items.** `refresh-media.mjs`
   carries a failed feed's contribution forward from the previous snapshot
   (and treats a `200` that yields zero items as a failure, since that is

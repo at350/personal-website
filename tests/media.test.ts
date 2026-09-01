@@ -25,6 +25,7 @@ interface RefreshScript {
   fromAnyApiX: (json: unknown, handle?: string) => unknown[];
   fromAnyApiLinkedIn: (json: unknown) => unknown[];
   anyapiDue: (env: Record<string, string>, now?: Date) => boolean;
+  snapshotUnchanged: (previous: unknown[], next: unknown[]) => boolean;
 }
 
 const loadScript = async (): Promise<RefreshScript> =>
@@ -670,6 +671,56 @@ describe("anyapiDue", () => {
     const { anyapiDue } = await loadScript();
     expect(anyapiDue({ ANYAPI_ALWAYS: "1" }, at(2026, 7, 16, 3))).toBe(true);
     expect(anyapiDue({ ANYAPI_ALWAYS: "0" }, at(2026, 7, 16, 3))).toBe(false);
+  });
+});
+
+describe("snapshotUnchanged", () => {
+  // Twelve cycles a day find the same films eleven times; the snapshot must
+  // only be rewritten — and published, and deployed — when the items moved.
+  const film = {
+    id: "letterboxd:1",
+    source: "letterboxd",
+    kind: "film",
+    title: "Past Lives",
+    year: 2023,
+    image: { src: "/media/thumbs/abc.jpg", alt: "Poster for Past Lives" },
+  };
+
+  it("treats identical item lists as unchanged whatever generatedAt says", async () => {
+    const { snapshotUnchanged } = await loadScript();
+    const previous = JSON.parse(
+      JSON.stringify({ items: [film], generatedAt: "2026-08-01T00:00:00.000Z" }),
+    ) as { items: unknown[] };
+    expect(snapshotUnchanged(previous.items, [film])).toBe(true);
+    expect(snapshotUnchanged([], [])).toBe(true);
+  });
+
+  it("ignores key order and undefined fields, which a normalizer leaves behind", async () => {
+    const { snapshotUnchanged } = await loadScript();
+    // A freshly normalized item carries `excerpt: undefined`; the one read
+    // back from disk never had the key at all. JSON.stringify agrees they
+    // are the same item, and so must the guard.
+    const fresh = { ...film, excerpt: undefined, year: 2023, kind: "film" };
+    const { image, ...rest } = film;
+    const reordered = { image, ...rest };
+    expect(snapshotUnchanged([film], [fresh])).toBe(true);
+    expect(snapshotUnchanged([film], [reordered])).toBe(true);
+  });
+
+  it("notices any real difference: a field, an item, or the order", async () => {
+    const { snapshotUnchanged } = await loadScript();
+    const rewatch = { ...film, isRewatch: true };
+    const second = { ...film, id: "letterboxd:2", title: "Perfect Days" };
+    expect(snapshotUnchanged([film], [rewatch])).toBe(false);
+    expect(snapshotUnchanged([film], [film, second])).toBe(false);
+    expect(snapshotUnchanged([film, second], [film])).toBe(false);
+    expect(snapshotUnchanged([film, second], [second, film])).toBe(false);
+    expect(
+      snapshotUnchanged(
+        [film],
+        [{ ...film, image: { ...film.image, src: "/media/thumbs/def.jpg" } }],
+      ),
+    ).toBe(false);
   });
 });
 
