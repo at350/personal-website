@@ -52,7 +52,8 @@ const PAGE_FOLIOS = { verso: "014", recto: "015" } as const;
 
    Each column's track holds its plates TWICE. The loop translates by exactly
    one copy, so the moment the first copy leaves the frame the second sits
-   precisely where it began and the seam never lands on screen. */
+   precisely where it began and the seam never lands on screen — which only
+   holds while a copy is taller than the frame. See `columnLoops`. */
 const MOSAIC_COLUMNS = 3;
 const MOSAIC_NARROW_COLUMNS = 2;
 /** Phone paper is ~360px; three catalog columns become unreadable there. */
@@ -130,46 +131,111 @@ export function MediaWall({ items, page }: MediaWallProps) {
     >
       {columns.map((plates, column) =>
         plates.length === 0 ? null : (
-          <div
-            key={column}
-            className="media-col"
-            /* Middle column runs the other way; see the sketch. */
-            data-drift={column % 2 === 1 ? "down" : "up"}
-            style={
-              { "--column-seconds": `${COLUMN_SECONDS[column]}s` } as CSSProperties
-            }
-          >
-            <ul
-              /* The filter in the key remounts the track, so a changed
-                 filter restarts the loop instead of jumping mid-travel. */
-              key={filter}
-              className="media-col__track"
-            >
-              {[0, 1].map((copy) =>
-                plates.map((item, order) => (
-                  <li
-                    key={`${copy}:${item.id}`}
-                    className={`media-cell media-cell--${item.kind}`}
-                    data-copy={copy}
-                    /* The second copy exists only to close the loop. `inert`
-                       — not just aria-hidden — because these plates are
-                       links: hidden-but-focusable would put every headline in
-                       the tab order twice and read it out of nowhere. */
-                    inert={copy === 1}
-                  >
-                    <MediaPlate
-                      item={item}
-                      index={`${PAGE_FOLIOS[page]}·${String(
-                        column + order * columnCount + 1,
-                      ).padStart(2, "0")}`}
-                    />
-                  </li>
-                )),
-              )}
-            </ul>
-          </div>
+          <MediaColumn
+            /* The filter in the key remounts the column, so a changed filter
+               restarts the loop instead of jumping mid-travel — and remeasures
+               a set of plates that may be a fraction of the last one's height. */
+            key={`${filter}:${column}`}
+            plates={plates}
+            column={column}
+            columnCount={columnCount}
+            page={page}
+          />
         ),
       )}
+    </div>
+  );
+}
+
+/* ————— One column —————
+
+   The doubled track only takes turns while a copy is taller than the window it
+   travels through. Narrow the library with a chip that matches two or three
+   entries and one copy no longer fills the frame: the loop copy comes to rest
+   whole on screen beside the original, and the page prints every video — or
+   the one photo — twice over. That is the state this measurement rules out.
+
+   The test is simply whether a copy fits inside the window, which splits the
+   two cases cleanly. A copy that fits has nothing to scroll to, so the column
+   holds still and shows each entry once. A copy that overflows has to travel
+   for the reader to reach the far end of it, and at its seam a plate leaves
+   the top edge while its twin enters the bottom — two edges of one tile, which
+   is what a loop looks like, not a repeat. */
+export function columnLoops(copyHeight: number, columnHeight: number): boolean {
+  // Unmeasured — jsdom, the prerender, a pane with no viewport yet — keeps the
+  // printed spread rather than flattening a wall nobody has laid out.
+  if (!Number.isFinite(copyHeight) || !Number.isFinite(columnHeight)) return true;
+  if (columnHeight <= 0) return true;
+  return copyHeight > columnHeight;
+}
+
+interface MediaColumnProps {
+  plates: MediaItem[];
+  column: number;
+  columnCount: number;
+  page: "verso" | "recto";
+}
+
+function MediaColumn({ plates, column, columnCount, page }: MediaColumnProps) {
+  const columnRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLUListElement>(null);
+  /* Loop until measured: an unlaid-out wall — jsdom, the prerender, a pane
+     with no viewport yet — should hold the printed spread, not flatten it. */
+  const [loops, setLoops] = useState(true);
+
+  useEffect(() => {
+    const columnEl = columnRef.current;
+    const track = trackRef.current;
+    if (!columnEl || !track) return;
+    /* Measure the first copy off the DOM rather than halving the track, so
+       the number means the same thing whether one copy is mounted or two and
+       the decision cannot oscillate between them. */
+    const measure = () => {
+      const last = [...track.querySelectorAll<HTMLElement>('[data-copy="0"]')].at(-1);
+      const copyHeight = last === undefined ? 0 : last.offsetTop + last.offsetHeight;
+      setLoops(columnLoops(copyHeight, columnEl.clientHeight));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    // Plates grow as their thumbnails land; the window changes with the page.
+    const observer = new ResizeObserver(measure);
+    observer.observe(columnEl);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={columnRef}
+      className="media-col"
+      /* Middle column runs the other way; see the sketch. */
+      data-drift={column % 2 === 1 ? "down" : "up"}
+      data-static={!loops || undefined}
+      style={{ "--column-seconds": `${COLUMN_SECONDS[column]}s` } as CSSProperties}
+    >
+      <ul ref={trackRef} className="media-col__track">
+        {(loops ? [0, 1] : [0]).map((copy) =>
+          plates.map((item, order) => (
+            <li
+              key={`${copy}:${item.id}`}
+              className={`media-cell media-cell--${item.kind}`}
+              data-copy={copy}
+              /* The second copy exists only to close the loop. `inert`
+                 — not just aria-hidden — because these plates are
+                 links: hidden-but-focusable would put every headline in
+                 the tab order twice and read it out of nowhere. */
+              inert={copy === 1}
+            >
+              <MediaPlate
+                item={item}
+                index={`${PAGE_FOLIOS[page]}·${String(
+                  column + order * columnCount + 1,
+                ).padStart(2, "0")}`}
+              />
+            </li>
+          )),
+        )}
+      </ul>
     </div>
   );
 }
