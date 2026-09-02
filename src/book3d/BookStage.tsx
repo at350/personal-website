@@ -24,12 +24,15 @@ import {
   CaptureFarm,
   pageRasterLayout,
   getTextureProgress,
+  canComposeDrift,
+  composeDriftTextures,
   isSpreadTextureFresh,
   prefetchAround,
   refreshSpreadTextures,
   type TextureProgress,
 } from "./pageTextures";
 import { settleOverlay } from "./overlayReadiness";
+import { NO_DRIFT, driftPhase, hasDrift, type DriftPhase } from "./driftPhase";
 import { useLibraryFilter } from "@/components/MediaWall";
 import {
   usePersistentInteraction,
@@ -473,6 +476,23 @@ export function BookStage({
   const overlaySpread = landingSpread(state);
   const overlaySettledRef = useRef(false);
   const overlaySwapped = useRef(false);
+
+  /* The library wall never settles, so the still that replaces it must be
+     redrawn to whatever phase the live columns had reached — see
+     composeDriftTextures. The phase is sampled every frame the overlay is
+     fully up, because by the time a turn hides it the departing spread's DOM
+     has already been replaced by the destination's and can no longer be read.
+     `driftSpreadRef` remembers which spread the sample belongs to. */
+  const overlaySpreadRef = useRef(overlaySpread);
+  overlaySpreadRef.current = overlaySpread;
+  const driftPhaseRef = useRef<DriftPhase>(NO_DRIFT);
+  const driftSpreadRef = useRef<number | null>(null);
+  const prevShownRef = useRef(0);
+  const redrawDrift = useCallback((spread: number | null, phase: DriftPhase) => {
+    if (spread === null || !hasDrift(phase)) return;
+    if (!canComposeDrift(spread)) return;
+    composeDriftTextures(spread, phase);
+  }, []);
   useLayoutEffect(() => {
     overlaySettledRef.current = false;
     const el = overlayRef.current;
@@ -483,6 +503,12 @@ export function BookStage({
     // initial mount keeps its inline opacity: touch devices read the overlay
     // while the canvas is still loading, and there is no swap to hide.
     if (overlaySwapped.current && el) {
+      // Before the swap paints: repaint the spread being left so its texture
+      // shows the phase its live columns just had. This runs ahead of paint,
+      // so the jump never reaches a frame.
+      redrawDrift(driftSpreadRef.current, driftPhaseRef.current);
+      driftSpreadRef.current = null;
+      prevShownRef.current = 0;
       el.style.opacity = "0";
       el.style.visibility = "hidden";
       el.style.pointerEvents = "none";
@@ -495,7 +521,7 @@ export function BookStage({
     return () => {
       live = false;
     };
-  }, [overlaySpread]);
+  }, [overlaySpread, redrawDrift]);
 
   // The overlay only appears once the landed mesh reaches its new resting
   // center. During a cover turn, BookScene moves that center with the sheet.
@@ -967,6 +993,15 @@ export function BookStage({
   // The scene reports exact transform alignment every frame. The DOM only
   // replaces the canvas once rotation, scale, and center are all subpixel.
   useEffect(() => {
+    const hideOverlay = (el: HTMLDivElement) => {
+      if (prevShownRef.current > 0.02) {
+        redrawDrift(driftSpreadRef.current, driftPhaseRef.current);
+      }
+      prevShownRef.current = 0;
+      el.style.opacity = "0";
+      el.style.visibility = "hidden";
+      el.style.pointerEvents = "none";
+    };
     motion.onPose = (_pose: number, handoff: number) => {
       const el = overlayRef.current;
       if (!el) return;
@@ -980,9 +1015,7 @@ export function BookStage({
           setIgniteReady(true);
         }
         if (igniteReadyRef.current) {
-          el.style.opacity = "0";
-          el.style.visibility = "hidden";
-          el.style.pointerEvents = "none";
+          hideOverlay(el);
           return;
         }
       }
@@ -1006,15 +1039,28 @@ export function BookStage({
       ) {
         // Textures only while any leaf is off the pile; the overlay returns
         // through the normal handoff path after landing.
-        el.style.opacity = "0";
-        el.style.visibility = "hidden";
-        el.style.pointerEvents = "none";
+        hideOverlay(el);
         return;
       }
       // Geometry alone is not enough: until the landed spread's images have
       // decoded and its entrance motion finished, the mesh — whose texture
       // already shows the finished page — keeps the stage.
       const shown = overlaySettledRef.current ? handoff : 0;
+      // Keep the sample fresh while the wall is the thing being looked at.
+      if (shown > 0.98) {
+        driftPhaseRef.current = driftPhase(el);
+        driftSpreadRef.current = overlaySpreadRef.current;
+      }
+      const wasShown = prevShownRef.current;
+      if (wasShown > 0.02 && shown <= 0.02) {
+        // Handing the stage to WebGL — pose the still to match.
+        redrawDrift(driftSpreadRef.current, driftPhaseRef.current);
+      } else if (wasShown <= 0.02 && shown > 0.02) {
+        // Taking it back — pose the still to the phase the DOM will show, so
+        // the frame the overlay reappears on is identical to the one before.
+        redrawDrift(overlaySpreadRef.current, driftPhase(el));
+      }
+      prevShownRef.current = shown;
       el.style.opacity = String(shown);
       el.style.visibility = shown < 0.02 ? "hidden" : "visible";
       el.style.pointerEvents = shown > 0.98 ? "auto" : "none";
@@ -1022,7 +1068,7 @@ export function BookStage({
     return () => {
       motion.onPose = null;
     };
-  }, [busy, driftRequested, igniteActive, motion]);
+  }, [busy, driftRequested, igniteActive, motion, redrawDrift]);
 
   // Deliberate absolute jumps (TOC, Home/End) keep their latest destination.
   const goAbsolute = useCallback(
