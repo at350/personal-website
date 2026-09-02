@@ -378,6 +378,15 @@ a.media-plate:focus-visible .media-plate__title {
   }
 }
 
+/* A column whose plates do not fill its window cannot close the loop — the
+   second copy would sit on screen beside the first, printing every entry
+   twice — so it drops to one copy and holds still. Set by `columnLoops` in
+   MediaWall.tsx, which measures it. */
+.media-col[data-static] .media-col__track {
+  animation: none;
+  will-change: auto;
+}
+
 /* The page is paper first. If the reader would rather it held still, it
    holds still — and the plates simply stack as a static mosaic. */
 @media (prefers-reduced-motion: reduce) {

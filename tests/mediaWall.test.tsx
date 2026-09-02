@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  columnLoops,
   LIBRARY_FILTERS,
   MediaWall,
   mosaicColumnCount,
@@ -200,5 +201,84 @@ describe("MediaWall columns", () => {
     expect(mosaicColumnCount(640)).toBe(3);
     expect(mosaicColumnCount(420)).toBe(2);
     expect(mosaicColumnCount(360)).toBe(2);
+  });
+});
+
+/* The loop copy is only invisible while it is off screen. A chip that matches
+   two or three entries leaves a copy far shorter than the column, both copies
+   land in the frame together, and the page prints every video — or the one
+   photo — twice. */
+
+describe("MediaWall loop threshold", () => {
+  it("loops only while a copy overflows its window", () => {
+    expect(columnLoops(1400, 572)).toBe(true);
+    // Two or three plates under a narrow chip: both copies fit, side by side.
+    expect(columnLoops(210, 572)).toBe(false);
+    // An exact fit has nothing to scroll to, so there is nothing to loop.
+    expect(columnLoops(572, 572)).toBe(false);
+  });
+
+  it("keeps the printed loop when nothing has been laid out", () => {
+    // jsdom, the prerender and a pane with no viewport all measure 0.
+    expect(columnLoops(0, 0)).toBe(true);
+    expect(columnLoops(Number.NaN, 572)).toBe(true);
+  });
+});
+
+/** jsdom lays nothing out — every box measures 0 — so give the column a window
+    and its cells a height for the measurement to decide on. */
+function stubLayout(columnHeight: number, cellHeight: number): () => void {
+  const proto = HTMLElement.prototype;
+  const originals = (["clientHeight", "offsetHeight", "offsetTop"] as const).map(
+    (name) => [name, Object.getOwnPropertyDescriptor(proto, name)] as const,
+  );
+  const define = (name: string, get: (this: HTMLElement) => number) =>
+    Object.defineProperty(proto, name, { configurable: true, get });
+
+  define("clientHeight", function () {
+    return this.classList.contains("media-col") ? columnHeight : 0;
+  });
+  define("offsetHeight", function () {
+    return this.classList.contains("media-cell") ? cellHeight : 0;
+  });
+  define("offsetTop", function () {
+    // Cells stack, so a cell's top is the run of cells above it.
+    return [...(this.parentElement?.children ?? [])].indexOf(this) * cellHeight;
+  });
+
+  return () => {
+    for (const [name, descriptor] of originals) {
+      if (descriptor !== undefined) Object.defineProperty(proto, name, descriptor);
+    }
+  };
+}
+
+describe("MediaWall short columns", () => {
+  it("drops the loop copy when one plate cannot fill the column", () => {
+    const restore = stubLayout(600, 100);
+    try {
+      const { container } = wall([film()]);
+      expect(container.querySelectorAll('[data-copy="0"]')).toHaveLength(1);
+      expect(container.querySelectorAll('[data-copy="1"]')).toHaveLength(0);
+      // The CSS reads this attribute to stop a column that has nowhere to go.
+      expect(container.querySelector(".media-col")?.getAttribute("data-static")).toBe(
+        "true",
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it("keeps both copies drifting once a copy fills the column", () => {
+    const restore = stubLayout(100, 600);
+    try {
+      const { container } = wall([film()]);
+      expect(container.querySelectorAll('[data-copy="1"]')).toHaveLength(1);
+      expect(container.querySelector(".media-col")?.hasAttribute("data-static")).toBe(
+        false,
+      );
+    } finally {
+      restore();
+    }
   });
 });
