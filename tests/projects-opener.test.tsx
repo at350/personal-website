@@ -16,15 +16,15 @@ function renderIndex() {
 describe("project archive index", () => {
   it("opens and closes a focused row by keyboard-style activation", () => {
     renderIndex();
-    const row = screen.getByRole("button", { name: /Prophis/ });
+    const row = screen.getByRole("button", { name: /GreenChain/ });
 
     fireEvent.focus(row);
     expect(row.getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.click(row);
     expect(row.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByText(/County Health Rankings/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: /GitHub for Prophis/ })).toBeTruthy();
+    expect(screen.getByText(/supplier-research workflows/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Team repository for GreenChain/ })).toBeTruthy();
 
     fireEvent.click(row);
     expect(row.getAttribute("aria-expanded")).toBe("false");

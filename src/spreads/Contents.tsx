@@ -33,25 +33,25 @@ const FEATURES: readonly Feature[] = [
     no: "08",
     route: "/projects",
     title: "the project index",
-    dek: "an index of working experiments",
+    dek: "software, prototypes, and client work",
     image: "/images/editorial/index-projects.webp",
   },
   {
     no: "12",
     route: "/resume",
-    title: "the annotated resume",
+    title: "the annotated résumé",
     dek: "roles, research, recognition",
     image: "/images/editorial/index-resume.webp",
   },
 ];
 
 const DEPARTMENTS = [
-  { no: "06", route: "/profile", title: "news" },
-  { no: "08", route: "/projects", title: "features" },
-  { no: "12", route: "/resume", title: "sports" },
-  { no: "14", route: "/library", title: "arts & ent" },
-  { no: "16", route: "/writing", title: "opinion" },
-  { no: "18", route: "/contact", title: "letters" },
+  { no: "06", route: "/profile", title: "News / Profile" },
+  { no: "08", route: "/projects", title: "Features / Projects" },
+  { no: "12", route: "/resume", title: "Sports / Résumé" },
+  { no: "14", route: "/library", title: "Arts & entertainment / Library" },
+  { no: "16", route: "/writing", title: "Opinion / Writing" },
+  { no: "18", route: "/contact", title: "Letters / Contact" },
 ] as const;
 
 /* Verso — the table of contents is the artwork: four Tanker folios in a rail,

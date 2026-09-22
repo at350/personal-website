@@ -37,39 +37,19 @@
   border-bottom: 2px solid var(--red);
 }
 
-/* Five unequal crops make the count literal. The repeated white plates turn
-   the black page into a contact sheet instead of another title card. */
+/* Every selected project gets a named place in the contact sheet. */
 .proj-count__plates {
   margin-top: auto;
   display: grid;
-  grid-template-columns: 1.05fr 0.72fr 1.22fr 0.84fr 1fr;
-  align-items: end;
-  gap: 1cqw;
-  height: 33cqh;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2.2cqh 2cqw;
 }
 
 .proj-count__plate {
   min-width: 0;
-  height: 26cqh;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: 15cqh auto;
   gap: 0.8cqh;
-}
-
-.proj-count__plate:nth-child(2) {
-  height: 31cqh;
-}
-
-.proj-count__plate:nth-child(3) {
-  height: 23cqh;
-}
-
-.proj-count__plate:nth-child(4) {
-  height: 29cqh;
-}
-
-.proj-count__plate:nth-child(5) {
-  height: 25cqh;
 }
 
 .proj-count__plate img {
@@ -79,12 +59,25 @@
   border: 1px solid rgb(255 255 255 / 0.35);
 }
 
-.proj-count__plate:nth-child(1) img {
-  object-position: 43% center;
+.proj-count__placeholder {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  font-family: var(--font-display);
+  font-size: 12cqw;
+  line-height: 1;
+  color: var(--paper);
 }
 
-.proj-count__plate:nth-child(4) img {
-  object-position: 75% center;
+.proj-count__plate-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6cqw;
+  flex-wrap: wrap;
+  font-family: var(--font-ui);
+  font-size: max(11px, 1.7cqw);
+  line-height: 1.3;
+  color: var(--paper);
 }
 
 .proj-count__plate-no {
@@ -92,6 +85,13 @@
   font-size: max(11px, 1.35cqw);
   color: var(--red);
   letter-spacing: 0.08em;
+}
+
+.proj-count__caption {
+  margin-top: 2cqh;
+  color: var(--paper);
+  opacity: 0.65;
+  font-size: max(11px, 1.35cqw);
 }
 
 /* ————— p.9 · the index ————— */
@@ -115,6 +115,7 @@
 .proj-index__list {
   display: flex;
   flex-direction: column;
+  flex: 1;
   border-top: 1px solid var(--hairline);
 }
 
@@ -330,6 +331,7 @@
 }
 
 .proj-feature__plate {
+  position: relative;
   border: 1px solid var(--hairline);
   background: var(--paper);
   overflow: hidden;
@@ -356,6 +358,16 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.proj-feature__caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  padding: 0.5em 0.8em;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: max(11px, 1.35cqw);
 }
 
 .proj-feature__head {
@@ -406,6 +418,53 @@
   
   color: var(--ink);
   max-width: 62cqw;
+}
+
+.proj-feature__detail {
+  margin-top: 2cqh;
+  font-family: var(--font-body);
+  line-height: 1.58;
+  font-size: clamp(13px, 2.3cqw, 17px);
+  color: var(--ink-2);
+  max-width: 66cqw;
+}
+
+/* Image-free features use the story itself as the page's lead. */
+.proj-feature[data-has-image="false"] .proj-feature__head {
+  margin-top: 4cqh;
+  padding-bottom: 3cqh;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.proj-feature[data-has-image="false"] .proj-feature__no {
+  font-size: 16cqw;
+  color: var(--red);
+}
+
+.proj-feature[data-has-image="false"] .proj-feature__name {
+  font-size: clamp(28px, 9cqw, 64px);
+}
+
+.proj-feature[data-has-image="false"] .proj-feature__summary {
+  margin-top: 4cqh;
+  font-size: clamp(18px, 3.8cqw, 28px);
+  line-height: 1.35;
+  max-width: 76cqw;
+}
+
+.proj-feature[data-has-image="false"] .proj-rest {
+  margin-top: auto;
+}
+
+.proj-feature:is([data-mode="book"], [data-mode="single"]) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-3) transparent;
+}
+
+.proj-feature > * {
+  flex-shrink: 0;
 }
 
 .proj-feature .proj-feature__stack {

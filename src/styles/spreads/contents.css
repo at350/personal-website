@@ -141,7 +141,7 @@
 .contents2__ledger {
   display: flex;
   flex-direction: column;
-  width: 40cqw;
+  width: 68cqw;
 }
 
 /* The hung folio: numbers sit left of the text edge, under a rule that

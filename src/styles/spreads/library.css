@@ -32,6 +32,13 @@
   gap: 1.8cqw;
 }
 
+.library__context {
+  font-family: var(--font-body);
+  font-size: clamp(11px, 2cqw, 14px);
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
 .library__chip {
   color: var(--ink-3);
   font-size: max(11px, 1.45cqw);
@@ -92,6 +99,12 @@
 
 .library[data-face="verso"] .media-wall {
   margin-top: 2.4cqh;
+}
+
+/* The reader can grow its paper when wrapped filters and source context
+   would otherwise leave only a narrow slit for the collection. */
+.reader__page .library .media-wall {
+  min-height: 60cqw;
 }
 
 .media-wall__col {

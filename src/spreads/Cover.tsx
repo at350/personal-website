@@ -4,6 +4,7 @@ import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { isLiveMode, type SpreadFaceProps } from "@/magazine/spread-types";
 import { withBasePath } from "@/lib/basePath";
+import { siteMeta } from "@/lib/content";
 import { Barcode } from "@/components/furniture/Barcode";
 import { EditorialTerminal } from "@/components/brand/EditorialTerminal";
 import { motionOK } from "@/lib/motion";
@@ -103,6 +104,8 @@ export function Cover({ face, mode }: SpreadFaceProps) {
 
       <div className="cover2__rule" aria-hidden />
 
+      <p className="cover2__identity">{siteMeta.description}</p>
+
       <nav className="cover2__lines" aria-label="In this issue">
         {COVER_LINES.map((line) => (
           <Link key={line.page} className="cover2__line" to={line.href}>
@@ -113,7 +116,7 @@ export function Cover({ face, mode }: SpreadFaceProps) {
       </nav>
 
       <footer className="cover2__foot">
-        <span className="mono-label cover2__place">CUPERTINO, CALIF.</span>
+        <span className="mono-label cover2__place">{siteMeta.location}</span>
         <div className="cover2__barcode">
           <Barcode text="ALANTAI.01" height={26} />
         </div>

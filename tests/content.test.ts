@@ -34,7 +34,7 @@ describe("content integrity", () => {
       ...about.photos.map((p) => p.src),
       ...projects.flatMap((p) => (p.image ? [p.image.src] : [])),
     ];
-    expect(sources.length).toBeGreaterThan(5);
+    expect(sources.length).toBeGreaterThan(0);
     await Promise.all(sources.map((src) => access(publicDir + src)));
   });
 

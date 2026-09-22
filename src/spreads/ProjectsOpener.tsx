@@ -16,8 +16,6 @@ export function ProjectsOpener({ face, mode }: SpreadFaceProps) {
 
 /* p.8 — the numeral is the page. */
 function Count() {
-  const visiblePlates = projects.slice(0, 5);
-
   return (
     <div className="proj-count" data-page-tone="dark">
       <h2
@@ -27,8 +25,8 @@ function Count() {
         {String(projects.length).padStart(2, "0")}
       </h2>
       <p className="proj-count__sub">project files</p>
-      <ol className="proj-count__plates" aria-label="Project image index">
-        {visiblePlates.map((project, index) => (
+      <ol className="proj-count__plates" aria-label="Selected project index">
+        {projects.map((project, index) => (
           <li className="proj-count__plate" key={project.id}>
             {project.image ? (
               <img
@@ -36,13 +34,23 @@ function Count() {
                 alt=""
                 decoding="async"
               />
-            ) : null}
-            <span className="proj-count__plate-no" aria-hidden>
-              {String(index + 1).padStart(2, "0")}
+            ) : (
+              <span className="proj-count__placeholder" aria-hidden>
+                {project.name.slice(0, 1)}
+              </span>
+            )}
+            <span className="proj-count__plate-caption">
+              <span className="proj-count__plate-no" aria-hidden>
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              {project.name}
             </span>
           </li>
         ))}
       </ol>
+      <p className="proj-count__caption mono-label">
+        Images are conceptual studies.
+      </p>
     </div>
   );
 }

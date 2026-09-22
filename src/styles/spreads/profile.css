@@ -181,6 +181,21 @@
   white-space: nowrap;
 }
 
+.profile__poster-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqh;
+}
+
+.profile__poster-context {
+  max-width: 30ch;
+  font-family: var(--font-body);
+  font-size: clamp(11px, 2cqw, 14px);
+  line-height: 1.4;
+  color: var(--paper);
+  opacity: 0.7;
+}
+
 /* Second row steps right — the page's grid break. */
 .profile__poster-row:nth-child(2) {
   margin-left: 9cqw;
