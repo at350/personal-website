@@ -31,7 +31,7 @@ describe("persistent page interactions", () => {
         </div>
       </MemoryRouter>,
     );
-    const rows = screen.getAllByRole("button", { name: /Prophis/ });
+    const rows = screen.getAllByRole("button", { name: /GreenChain/ });
     const initialRevision = getPersistentInteractionSnapshot("features").revision;
 
     fireEvent.click(rows[0]!);
@@ -41,7 +41,7 @@ describe("persistent page interactions", () => {
       true,
     );
     expect(getPersistentInteractionSnapshot("features")).toEqual({
-      openKey: "prophis",
+      openKey: "greenchain",
       revision: initialRevision + 1,
     });
 
@@ -89,8 +89,8 @@ describe("persistent page interactions", () => {
   });
 
   it("does not increment a spread revision for an unchanged key", () => {
-    const first = setPersistentInteractionOpenKey("features", "prophis");
-    const unchanged = setPersistentInteractionOpenKey("features", "prophis");
+    const first = setPersistentInteractionOpenKey("features", "greenchain");
+    const unchanged = setPersistentInteractionOpenKey("features", "greenchain");
 
     expect(unchanged).toBe(first);
     expect(unchanged.revision).toBe(first.revision);

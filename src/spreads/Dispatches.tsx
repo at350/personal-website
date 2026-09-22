@@ -15,13 +15,11 @@ function DispatchIndex() {
               {String(index + 1).padStart(2, "0")}
             </span>
             <div className="dispatches__text">
-              {d.status !== "Site sample" && (
-                <p className="dispatches__status mono-label">{d.status}</p>
-              )}
+              <p className="dispatches__status mono-label">{d.status}</p>
               <h3 className="dispatches__title">{d.title}</h3>
               <p className="dispatches__dek">{d.dek}</p>
               <Link className="dispatches__jump" to={`/writing/${d.id}`}>
-                read dispatch
+                read site note
               </Link>
             </div>
           </article>

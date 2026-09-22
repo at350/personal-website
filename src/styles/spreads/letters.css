@@ -20,6 +20,7 @@
 
 .letters__heading {
   margin-top: 5cqh;
+  margin-bottom: 2.5cqw;
   font-family: var(--font-display);
   font-weight: 800;
   font-size: clamp(18px, 4.4cqw, 32px);

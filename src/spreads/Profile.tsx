@@ -4,7 +4,7 @@ import "@/styles/spreads/profile.css";
 
 const STATEMENT = ["Ask first", "build second"] as const;
 
-/* Off-hours nouns, all verified in the about copy. */
+/* Personal interests and language, grounded in the candidate profile. */
 const POSTER_WORDS = ["GEOCACHES", "FIRE HYDRANTS", "ROADSIDE LANDMARKS", "MANDARIN"] as const;
 
 /** THE PROFILE (pages 06–07). Verso: the working rule and four notes as a
@@ -20,7 +20,14 @@ export function Profile({ face }: SpreadFaceProps) {
           {POSTER_WORDS.map((word, i) => (
             <li className="profile__poster-row" key={word}>
               <span className="profile__poster-no">{String(i + 1).padStart(2, "0")}</span>
-              <span className="profile__poster-word">{word}</span>
+              <span className="profile__poster-label">
+                <span className="profile__poster-word">{word}</span>
+                {word === "MANDARIN" && (
+                  <span className="profile__poster-context">
+                    Fluent speaking; working written proficiency.
+                  </span>
+                )}
+              </span>
             </li>
           ))}
         </ul>

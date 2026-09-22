@@ -7,6 +7,7 @@ import { Contents } from "@/spreads/Contents";
 import { EditorsLetter } from "@/spreads/EditorsLetter";
 import { Profile } from "@/spreads/Profile";
 import { ProjectsOpener } from "@/spreads/ProjectsOpener";
+import { Resume } from "@/spreads/Resume";
 import { ProjectWell } from "@/spreads/ProjectWell";
 
 afterEach(cleanup);
@@ -44,14 +45,14 @@ describe("editorial copy allocation", () => {
     expect(contents).not.toContain(about.pullQuote);
   });
 
-  it("uses summaries in the project index and details in the following well", () => {
+  it("gives each feature enough context to read independently of the index", () => {
     const index = textOf(<ProjectsOpener face="recto" {...readerProps} />);
-    const architec = textOf(
+    const firstFeature = textOf(
       <MemoryRouter>
         <ProjectWell face="verso" {...readerProps} />
       </MemoryRouter>,
     );
-    const greenchain = textOf(
+    const secondFeature = textOf(
       <MemoryRouter>
         <ProjectWell face="recto" {...readerProps} />
       </MemoryRouter>,
@@ -61,13 +62,31 @@ describe("editorial copy allocation", () => {
     expect(index).toContain(projects[1].summary);
     expect(index).not.toContain(projects[0].detail);
     expect(index).not.toContain(projects[1].detail);
-    expect(architec).toContain(projects[0].detail);
-    expect(architec).not.toContain(projects[0].summary);
-    expect(greenchain).toContain(projects[1].detail);
-    expect(greenchain).not.toContain(projects[1].summary);
+    expect(firstFeature).toContain(projects[0].detail);
+    expect(firstFeature).toContain(projects[0].summary);
+    expect(secondFeature).toContain(projects[1].detail);
+    expect(secondFeature).toContain(projects[1].summary);
     for (const project of projects.slice(2)) {
-      expect(greenchain).not.toContain(project.name);
+      expect(secondFeature).not.toContain(project.name);
     }
+  });
+
+  it("renders past-role summaries and evidence without opening a margin note", () => {
+    const { container } = render(<>
+      <Resume face="verso" {...readerProps} />
+      <Resume face="recto" {...readerProps} />
+    </>);
+    const mainCopy = Array.from(container.querySelectorAll(".resume2__row"))
+      .map((row) => row.querySelector(".resume2__summary")?.textContent ?? "")
+      .join(" ");
+    for (const entry of resume.entries) {
+      expect(mainCopy).toContain(entry.summary);
+      for (const highlight of entry.highlights) expect(mainCopy).toContain(highlight);
+    }
+    const now = container.querySelector('[aria-label="Now"]');
+    expect(now?.textContent).not.toContain("Ember Studios");
+    expect(container.querySelector('[aria-label="Professional experience"]')?.textContent)
+      .toContain("Ember Studios");
   });
 
   it("does not give every current resume entry the same opening verb", () => {

@@ -5,7 +5,7 @@
    a scraper sees and the head a visitor's tab shows never disagree. */
 
 import { SPREADS, spreadForRoute } from "@/magazine/folio";
-import { dispatches } from "@/lib/content";
+import { dispatches, siteMeta } from "@/lib/content";
 
 /* The production origin. The build passes it in from the environment (the
    deploy workflow sets SITE_URL) and the browser bundle has no `process`,
@@ -17,8 +17,7 @@ export const SITE_URL = (
 ).replace(/\/$/, "");
 
 export const BASE_TITLE = "Alan Tai";
-export const BASE_DESCRIPTION =
-  "Alan Tai builds software, research, and early-stage products. Issue No. 01.";
+export const BASE_DESCRIPTION = siteMeta.description;
 
 /** The share plate, one absolute image for every route. It follows SITE_URL
     like the canonical does, so a build for another origin points scrapers at
@@ -48,13 +47,13 @@ export interface RouteMeta {
 const ROUTE_META: Record<string, { title: string; description: string }> = {
   "/": { title: BASE_TITLE, description: BASE_DESCRIPTION },
   "/contents": { title: `Contents · ${BASE_TITLE}`, description: "What's in Issue No. 01." },
-  "/about": { title: `Letter · ${BASE_TITLE}`, description: "A short letter from Alan." },
+  "/about": { title: `Letter · ${BASE_TITLE}`, description: BASE_DESCRIPTION },
   "/profile": { title: `Profile · ${BASE_TITLE}`, description: "Work habits and off-hours notes." },
   "/projects": { title: `Projects · ${BASE_TITLE}`, description: "A growing archive of working prototypes, tools, and product systems." },
   "/resume": { title: `Resume · ${BASE_TITLE}`, description: "The annotated resume." },
-  "/library": { title: `Library · ${BASE_TITLE}`, description: "Films, articles, posts." },
-  "/writing": { title: `Dispatches · ${BASE_TITLE}`, description: "Occasional writing." },
-  "/contact": { title: `Letters · ${BASE_TITLE}`, description: "Send a note." },
+  "/library": { title: `Library · ${BASE_TITLE}`, description: "Books, films, posts, and other things I'm reading and watching." },
+  "/writing": { title: `Site notes · ${BASE_TITLE}`, description: "Notes on the ideas and design behind this site." },
+  "/contact": { title: `Contact · ${BASE_TITLE}`, description: "Get in touch about internships, research, or a project." },
   "/colophon": { title: `Colophon · ${BASE_TITLE}`, description: "What Issue No. 01 is set in and built with." },
   "/reader": { title: `Reader · ${BASE_TITLE}`, description: BASE_DESCRIPTION },
 };
@@ -87,8 +86,8 @@ export function metaForPath(pathname: string): RouteMeta {
     const dispatch = dispatches.find((d) => d.id === slug);
     if (dispatch) {
       return {
-        title: `${dispatch.title} · ${BASE_TITLE}`,
-        description: dispatch.dek,
+        title: `${dispatch.title} · ${dispatch.status} · ${BASE_TITLE}`,
+        description: `${dispatch.status}: ${dispatch.dek}`,
         path,
         url: canonicalUrl(path),
         type: "article",

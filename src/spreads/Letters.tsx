@@ -22,8 +22,7 @@ const COLOPHON_ENTRIES: ReadonlyArray<{ term: string; desc: ReactNode }> = [
     term: "Press",
     desc: (
       <>
-        React 19, Vite, three.js; a homemade WebGL page-flip; no template, no
-        cookies.
+        React 19, Vite, three.js; a homemade WebGL page-flip; no template.
       </>
     ),
   },
@@ -38,7 +37,7 @@ const COLOPHON_ENTRIES: ReadonlyArray<{ term: string; desc: ReactNode }> = [
   },
   {
     term: "Issue",
-    desc: <>No. 01, August 2026. Cupertino, Calif.</>,
+    desc: <>No. 01. Originally published August 2026. Cupertino, CA / Evanston, IL.</>,
   },
 ];
 

@@ -10,7 +10,7 @@ const featuredProjects = [...projects]
   .filter((project) => project.featureOrder !== undefined)
   .sort((a, b) => a.featureOrder! - b.featureOrder!);
 
-/** Pages 10–11 — the well: Architec verso, GreenChain recto, mirrored. */
+/** Pages 10–11 — two selected projects, mirrored. */
 export function ProjectWell({ face, mode }: SpreadFaceProps) {
   const featureIndex = face === "verso" ? 0 : 1;
   const project = featuredProjects[featureIndex];
@@ -19,7 +19,12 @@ export function ProjectWell({ face, mode }: SpreadFaceProps) {
   const no = String(project.featureOrder).padStart(2, "0");
 
   return (
-    <article className="proj-feature" data-face={face} data-mode={mode}>
+    <article
+      className="proj-feature"
+      data-face={face}
+      data-mode={mode}
+      data-has-image={Boolean(project.image)}
+    >
       {face === "verso" && <Plate project={project} />}
 
       <header className="proj-feature__head">
@@ -34,7 +39,8 @@ export function ProjectWell({ face, mode }: SpreadFaceProps) {
         </div>
       </header>
 
-      <p className="proj-feature__summary">{project.detail}</p>
+      <p className="proj-feature__summary">{project.summary}</p>
+      <p className="proj-feature__detail">{project.detail}</p>
 
       <ProjectTechnologyList
         items={project.stack}
@@ -93,6 +99,9 @@ function Plate({ project }: { project: Project }) {
         loading="lazy"
         decoding="async"
       />
+      <figcaption className="proj-feature__caption mono-label">
+        Conceptual study
+      </figcaption>
     </figure>
   );
 }

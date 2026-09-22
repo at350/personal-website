@@ -8,6 +8,17 @@ import "@/styles/spreads/resume.css";
 const byKind = (kind: ResumeEntry["kind"]) =>
   resume.entries.filter((entry) => entry.kind === kind);
 
+const currentEntries = byKind("current");
+const researchEntries = byKind("research");
+const experienceEntries = byKind("experience");
+const leadershipEntries = byKind("leadership");
+const readingOrder = [
+  ...currentEntries,
+  ...researchEntries,
+  ...experienceEntries,
+  ...leadershipEntries,
+];
+
 /* "Apr 2026 to Present" → "apr 2026–now" */
 const compactDates = (dates: string) =>
   dates.replace(" to ", "-").replace("Present", "now").toLowerCase();
@@ -54,7 +65,7 @@ function SpreadWord({ face, mode }: SpreadFaceProps) {
         <p className="resume2__legend">
           <span className="resume2__legend-mark" aria-hidden>
           </span>{" "}
-          notes 01-13 live in the margins
+          notes 01-{String(readingOrder.length).padStart(2, "0")} live in the margins
         </p>
       ) : null}
       {face === "verso" ? (
@@ -74,7 +85,6 @@ interface LedgerGroupProps {
   face: "verso" | "recto";
   /** Continues the digit pop-in stagger across groups on a page. */
   rowStart: number;
-  summaries?: boolean;
   /** Bottom-of-page group: notes open upward to stay on the paper. */
   notesUp?: boolean;
 }
@@ -84,13 +94,11 @@ function LedgerGroup({
   entries,
   face,
   rowStart,
-  summaries = true,
   notesUp,
 }: LedgerGroupProps) {
   const className = [
     "resume2__group",
     notesUp ? "resume2__group--up" : "",
-    summaries ? "" : "resume2__group--tight",
   ]
     .filter(Boolean)
     .join(" ");
@@ -104,7 +112,7 @@ function LedgerGroup({
               <Marginalia
                 label={entry.marginalia.label}
                 ariaLabel={entry.marginalia.ariaLabel}
-                index={resume.entries.findIndex((e) => e.id === entry.id) + 1}
+                index={readingOrder.findIndex((e) => e.id === entry.id) + 1}
                 stateKey={entry.id}
                 stateSpread="resume"
               >
@@ -114,23 +122,49 @@ function LedgerGroup({
           );
           const main = (
             <span className="resume2__main" key="main">
-              <span className="resume2__org">
-                {entry.organization}
-                <em className="resume2__role">, {entry.role}</em>
+              <span className="resume2__heading">
+                <span className="resume2__org">
+                  {entry.organization}
+                  <em className="resume2__role">, {entry.role}</em>
+                </span>
+                <DateStamp text={entry.dates} row={rowStart + index} />
               </span>
-              {summaries ? (
-                <span className="resume2__summary">{entry.summary}</span>
-              ) : null}
+              <span className="resume2__summary">
+                {entry.summary} {entry.highlights.join(" ")}
+              </span>
             </span>
           );
-          const dates = <DateStamp text={entry.dates} row={rowStart + index} key="dates" />;
           return (
             <li key={entry.id} className="resume2__row">
-              {face === "verso" ? [mark, main, dates] : [main, dates, mark]}
+              {face === "verso" ? [mark, main] : [main, mark]}
             </li>
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+function Recognition() {
+  return (
+    <section className="resume2__recognition" aria-label="Recognition">
+      <h3 className="resume2__label mono-label">Recognition</h3>
+      <ol className="resume2__recs">
+        {resume.recognition.map((item, index) => (
+          <li className="resume2__rec" key={item.title}>
+            <span className="resume2__rec-no" aria-hidden>
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <span className="resume2__rec-body">
+              <span className="resume2__rec-title">{item.title}</span>
+              <span className="resume2__rec-meta mono-label">
+                {item.issuer} · {item.year}
+              </span>
+              {item.note ? <span className="resume2__rec-note">{item.note}</span> : null}
+            </span>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }
@@ -158,14 +192,15 @@ function ResumeVerso({ mode }: { mode: SpreadFaceProps["mode"] }) {
         ))}
       </section>
 
-      <LedgerGroup label="Now" entries={byKind("current")} face="verso" rowStart={0} />
+      <LedgerGroup label="Now" entries={currentEntries} face="verso" rowStart={0} />
       <LedgerGroup
         label="Research"
-        entries={byKind("research")}
+        entries={researchEntries}
         face="verso"
-        rowStart={3}
+        rowStart={currentEntries.length}
         notesUp
       />
+      <Recognition />
     </>
   );
 }
@@ -176,38 +211,18 @@ function ResumeRecto({ mode }: { mode: SpreadFaceProps["mode"] }) {
       <SpreadWord face="recto" mode={mode} />
 
       <LedgerGroup
-        label="Leadership"
-        entries={byKind("leadership")}
+        label="Professional experience"
+        entries={experienceEntries}
         face="recto"
         rowStart={0}
       />
       <LedgerGroup
-        label="Earlier"
-        entries={byKind("experience")}
+        label="Leadership"
+        entries={leadershipEntries}
         face="recto"
-        rowStart={3}
-        summaries={false}
+        rowStart={experienceEntries.length}
+        notesUp
       />
-
-      <section className="resume2__recognition" aria-label="Recognition">
-        <h3 className="resume2__label mono-label">Recognition</h3>
-        <ol className="resume2__recs">
-          {resume.recognition.map((item, index) => (
-            <li className="resume2__rec" key={item.title}>
-              <span className="resume2__rec-no" aria-hidden>
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <span className="resume2__rec-body">
-                <span className="resume2__rec-title">{item.title}</span>
-                <span className="resume2__rec-meta mono-label">
-                  {item.issuer} · {item.year}
-                </span>
-                <span className="resume2__rec-note">{item.note}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-      </section>
     </>
   );
 }

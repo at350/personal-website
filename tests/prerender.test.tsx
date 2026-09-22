@@ -78,10 +78,10 @@ describe("the press run", () => {
     const dispatch = dispatches.find((d) => d.id === "why-a-magazine")!;
     const { head, body } = render("/writing/why-a-magazine");
 
-    expect(head).toContain(`<title>${dispatch.title} · ${BASE_TITLE}</title>`);
+    expect(head).toContain(`<title>${dispatch.title} · ${dispatch.status} · ${BASE_TITLE}</title>`);
     expect(head).toContain('<meta property="og:type" content="article" />');
     expect(head).toContain(
-      `<meta name="description" content="${dispatch.dek}" />`,
+      `<meta name="description" content="${dispatch.status}: ${dispatch.dek}" />`,
     );
     expect(body).toContain(dispatch.title);
     expect(body).toContain('class="prerender"');
