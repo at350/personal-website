@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { toCanvas } from "html-to-image";
 import { FACES, SPREADS } from "@/magazine/folio";
 import { PageFace, hasPageFace } from "@/magazine/PageFace";
+import { driftBlit, type DriftPhase, type FaceSide } from "./driftPhase";
 
 export const CAPTURE_W = 640;
 export const CAPTURE_H = (CAPTURE_W * 4) / 3;
@@ -209,7 +210,13 @@ function capture(key: string, refresh = false): Promise<boolean> {
       return false;
     }
     cache.set(key, texture);
+    // Keep the pristine phase-0 canvas: every recompose draws from it, so
+    // repeated recomposes never accumulate on top of one another.
+    baseCanvases.set(key, canvas);
     listeners.forEach((fn) => fn());
+    // Deliberately not awaited. Strips are an enhancement — until they exist
+    // the book behaves exactly as it did before, showing a phase-0 still.
+    void captureDriftStrips(key);
     return true;
   })().catch(() => {
     if (import.meta.env.DEV && !import.meta.env.TEST) {
@@ -289,6 +296,11 @@ export function refreshSpreadTextures(spread: number): Promise<boolean> {
       for (const face of ["verso", "recto"] as const) {
         const key = pageKey(spread, face);
         if (!ALL_PAGE_KEYS.includes(key)) continue;
+        // The wall's contents changed, so its strips are stale too. Dropping
+        // them here is what stops a filter chip leaving the old plates
+        // drifting inside the new capture.
+        driftStrips.delete(key);
+        stripCaptures.delete(key);
         const old = cache.get(key) ?? null;
         const pending = inFlight.get(key);
         const task = pending
@@ -348,6 +360,9 @@ export function dropAllTextures() {
   textureEpoch += 1;
   cache.forEach((t) => t.dispose());
   cache.clear();
+  baseCanvases.clear();
+  driftStrips.clear();
+  stripCaptures.clear();
   preloadPromise = null;
   completedCaptures = 0;
   spreadRefreshes.clear();
@@ -438,4 +453,171 @@ export function CaptureFarm({
       ))}
     </div>
   );
+}
+
+/* ————— The drifting wall —————
+
+   The library's columns never settle, so its page texture cannot be a single
+   still: the moment the DOM overlay hands over, a frozen still disagrees with
+   whatever phase the live columns had reached, and the plates visibly jump.
+
+   Rather than re-rasterizing the face at handoff time — which costs hundreds of
+   milliseconds and would stall the very gesture that triggered it — each column
+   is captured ONCE, un-clipped, as a tall strip. Redrawing the face at an
+   arbitrary phase is then a base blit plus one windowed blit per column, which
+   is a few milliseconds and can run synchronously inside the frame that swaps
+   the renderers. */
+
+interface DriftStrip {
+  canvas: HTMLCanvasElement;
+  /** Column box in capture-space CSS pixels, relative to the face. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** One copy's travel: the distance a full loop covers. */
+  travel: number;
+}
+
+const baseCanvases = new Map<string, HTMLCanvasElement>();
+const driftStrips = new Map<string, DriftStrip[]>();
+const stripCaptures = new Map<string, Promise<void>>();
+
+/** Mirrors `--mosaic-gap` in src/styles/spreads/library.css. */
+const MOSAIC_GAP = 3;
+
+/**
+ * Capture each drifting column of a face as one un-clipped strip, two copies
+ * tall. The clone is posed static and untransformed so the strip always lands
+ * at phase zero regardless of what the farm's own animation was doing.
+ */
+function captureDriftStrips(key: string): Promise<void> {
+  if (driftStrips.has(key)) return Promise.resolve();
+  const existing = stripCaptures.get(key);
+  if (existing) return existing;
+
+  const epoch = textureEpoch;
+  const task = (async () => {
+    const root = document.querySelector<HTMLElement>(
+      `[data-capture-key="${CSS.escape(key)}"]`,
+    );
+    if (!root) return;
+    const columns = [...root.querySelectorAll<HTMLElement>(".media-col")];
+    if (columns.length === 0) return;
+
+    const rootBox = root.getBoundingClientRect();
+    const ratio = capturePixelRatio();
+    const strips: DriftStrip[] = [];
+
+    for (const column of columns) {
+      const track = column.querySelector<HTMLElement>(".media-col__track");
+      if (!track) return;
+      const box = column.getBoundingClientRect();
+      const trackHeight = track.offsetHeight;
+      // The keyframe travels `-50% - gap/2` of a two-copy track.
+      const travel = trackHeight / 2 + MOSAIC_GAP / 2;
+      if (!(travel > 0) || !(box.width > 0) || !(box.height > 0)) return;
+      const width = Math.round(box.width);
+      const canvas = await toCanvas(track, {
+        pixelRatio: ratio,
+        width,
+        height: trackHeight,
+        backgroundColor: "#ffffff",
+        // Applied to the clone only — the live farm DOM is never touched.
+        style: {
+          position: "static",
+          inset: "auto",
+          margin: "0",
+          transform: "none",
+          animation: "none",
+        },
+      });
+      strips.push({
+        canvas,
+        x: Math.round(box.left - rootBox.left),
+        y: Math.round(box.top - rootBox.top),
+        width,
+        height: Math.round(box.height),
+        travel,
+      });
+    }
+
+    if (epoch !== textureEpoch) return;
+    driftStrips.set(key, strips);
+  })()
+    .catch(() => {
+      // A face whose strips will not capture simply keeps the phase-0 still,
+      // which is exactly the behaviour that shipped before this existed.
+      if (import.meta.env.DEV && !import.meta.env.TEST) {
+        console.warn(`Drift strip capture failed: ${key}`);
+      }
+    })
+    .finally(() => {
+      stripCaptures.delete(key);
+    });
+
+  stripCaptures.set(key, task);
+  return task;
+}
+
+/** Whether a spread can be redrawn at an arbitrary drift phase yet. */
+export function canComposeDrift(spread: number): boolean {
+  return (["verso", "recto"] as const).some((face) => {
+    const key = pageKey(spread, face);
+    return (driftStrips.get(key)?.length ?? 0) > 0 && baseCanvases.has(key);
+  });
+}
+
+/**
+ * Redraw a spread's page textures so their wall sits at `phase`. Synchronous
+ * on purpose: the caller runs inside the frame that swaps DOM for WebGL, and
+ * `onTexturesChanged` applies the new map to the material directly rather than
+ * through a React render, so the mesh shows it in that same frame.
+ */
+export function composeDriftTextures(spread: number, phase: DriftPhase): void {
+  for (const face of ["verso", "recto"] as const) {
+    const key = pageKey(spread, face);
+    const base = baseCanvases.get(key);
+    const strips = driftStrips.get(key);
+    const fractions = phase[face as FaceSide];
+    if (!base || !strips || strips.length === 0) continue;
+    if (fractions.length !== strips.length) continue;
+
+    const ratio = base.width / CAPTURE_W;
+    const canvas = document.createElement("canvas");
+    canvas.width = base.width;
+    canvas.height = base.height;
+    const context = canvas.getContext("2d");
+    if (!context) continue;
+    context.drawImage(base, 0, 0);
+
+    strips.forEach((strip, index) => {
+      const blit = driftBlit(
+        { ...strip, stripHeight: strip.canvas.height },
+        fractions[index] ?? 0,
+        ratio,
+      );
+      context.drawImage(
+        strip.canvas,
+        blit.sx,
+        blit.sy,
+        blit.sw,
+        blit.sh,
+        blit.dx,
+        blit.dy,
+        blit.sw,
+        blit.sh,
+      );
+    });
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 8;
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    const previous = cache.get(key);
+    cache.set(key, texture);
+    if (previous) previous.dispose();
+  }
+  listeners.forEach((fn) => fn());
 }
