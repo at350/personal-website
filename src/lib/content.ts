@@ -62,6 +62,10 @@ export const about = {
 export const projects: readonly Project[] = [
   {
     id: "peel",
+    image: {
+      src: "/images/projects/editorial/peel-study.webp",
+      alt: "Conceptual Peel study with a white capsule, connected evidence cards, and a translucent red strip.",
+    },
     name: "Peel",
     discipline: "AI evidence retrieval",
     year: "2026",
@@ -79,6 +83,10 @@ export const projects: readonly Project[] = [
   },
   {
     id: "turfiq",
+    image: {
+      src: "/images/projects/editorial/turfiq-study.webp",
+      alt: "Conceptual TurfIQ study with layered topographic terrain, a soil sensor, and a red maintenance route.",
+    },
     name: "TurfIQ",
     discipline: "Field operations",
     year: "2026",
@@ -134,6 +142,10 @@ export const projects: readonly Project[] = [
   },
   {
     id: "arrival",
+    image: {
+      src: "/images/projects/editorial/arrival-study.webp",
+      alt: "Conceptual Arrival study with financial documents passing through a translucent red gateway toward a black credit pass.",
+    },
     name: "Arrival",
     discipline: "Financial access",
     year: "2026",
