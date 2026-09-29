@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/mini";
 import { MEDIA_SEED } from "./seed";
 import { MediaItemSchema, type MediaItem } from "./types";
 // `?raw` keeps the import browser-safe and side-steps resolveJsonModule:
@@ -14,16 +14,16 @@ import liveRaw from "./live.json?raw";
  */
 
 const LiveSnapshotSchema = z.object({
-  items: z.array(z.unknown()).default([]),
-  generatedAt: z.string().nullable().default(null),
+  items: z._default(z.array(z.unknown()), []),
+  generatedAt: z._default(z.nullable(z.string()), null),
 });
 
 function parseLiveItems(raw: string): MediaItem[] {
   try {
-    const snapshot = LiveSnapshotSchema.safeParse(JSON.parse(raw));
+    const snapshot = z.safeParse(LiveSnapshotSchema, JSON.parse(raw));
     if (!snapshot.success) return [];
     return snapshot.data.items.flatMap((entry) => {
-      const item = MediaItemSchema.safeParse(entry);
+      const item = z.safeParse(MediaItemSchema, entry);
       return item.success ? [item.data] : [];
     });
   } catch {

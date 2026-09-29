@@ -45,6 +45,11 @@ import { SHORTCUT_SHEET_ID, ShortcutSheet } from "@/components/ShortcutSheet";
 import "@/styles/book-stage.css";
 import "@/styles/drift.css";
 
+/* The Ignite and Drift cursors ship in this chunk; App renders them from
+   here once the book has loaded (see App.tsx). */
+export { IgniteCursor } from "@/components/IgniteCursor";
+export { DriftCursor } from "@/components/DriftCursor";
+
 const TOTAL = SPREADS.length;
 type ArrowDirection = -1 | 1;
 

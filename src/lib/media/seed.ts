@@ -1,8 +1,9 @@
+import { z } from "zod/mini";
 import { MediaItemSchema, type MediaItem } from "./types";
 
 // These are exact, verified posts from @alan_tai1. They keep the library useful
 // when the X API is not configured or temporarily unavailable.
-export const RECENT_X_FALLBACKS: MediaItem[] = MediaItemSchema.array().parse([
+export const RECENT_X_FALLBACKS: MediaItem[] = z.parse(z.array(MediaItemSchema), [
   {
     id: "x:2087075973703578015",
     source: "x",
@@ -61,7 +62,7 @@ export const RECENT_X_FALLBACKS: MediaItem[] = MediaItemSchema.array().parse([
 
 // Curated sources are intentionally descriptive only. `note` stays absent until
 // Alan supplies a personal take, keeping source claims separate from commentary.
-export const CURATED_MEDIA_SEED: MediaItem[] = MediaItemSchema.array().parse([
+export const CURATED_MEDIA_SEED: MediaItem[] = z.parse(z.array(MediaItemSchema), [
   {
     id: "library:x:2080711672159998357",
     source: "x",
@@ -151,7 +152,7 @@ export const CURATED_MEDIA_SEED: MediaItem[] = MediaItemSchema.array().parse([
   },
 ]);
 
-export const LOCAL_PHOTO_SEED: MediaItem[] = MediaItemSchema.array().parse([
+export const LOCAL_PHOTO_SEED: MediaItem[] = z.parse(z.array(MediaItemSchema), [
   {
     id: "photo:headshot",
     source: "local",

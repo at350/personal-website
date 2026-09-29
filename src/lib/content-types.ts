@@ -1,4 +1,9 @@
-import { z } from "zod";
+import { z } from "zod/mini";
+
+const imagePath = z.string().check(z.startsWith("/images/"));
+const positiveInteger = z.number().check(z.int(), z.positive());
+const stringArrayAtLeast = (minimum: number) =>
+  z.array(z.string()).check(z.minLength(minimum));
 
 export const SiteMetaSchema = z.object({
   name: z.string(),
@@ -14,8 +19,8 @@ export const SiteMetaSchema = z.object({
 export type SiteMeta = z.infer<typeof SiteMetaSchema>;
 
 export const PhotoSchema = z.object({
-  src: z.string().startsWith("/images/"),
-  alt: z.string().min(8),
+  src: imagePath,
+  alt: z.string().check(z.minLength(8)),
   caption: z.string(),
   shape: z.enum(["square", "portrait", "landscape"]),
 });
@@ -25,12 +30,12 @@ export const AboutSchema = z.object({
   eyebrow: z.string(),
   heading: z.string(),
   lede: z.string(),
-  paragraphs: z.array(z.string()).min(1),
+  paragraphs: stringArrayAtLeast(1),
   pullQuote: z.string(),
   notes: z
     .array(z.object({ label: z.string(), text: z.string() }))
-    .min(3),
-  photos: z.array(PhotoSchema).min(1),
+    .check(z.minLength(3)),
+  photos: z.array(PhotoSchema).check(z.minLength(1)),
 });
 export type AboutContent = z.infer<typeof AboutSchema>;
 
@@ -41,32 +46,31 @@ export const ProjectSchema = z.object({
   year: z.string(),
   summary: z.string(),
   detail: z.string(),
-  stack: z.array(z.string()).min(2),
-  featureOrder: z.number().int().positive().optional(),
-  recognition: z.string().optional(),
-  image: z
-    .object({
-      src: z.string().startsWith("/images/"),
-      alt: z.string().min(8),
-    })
-    .optional(),
-  links: z
-    .array(
+  stack: stringArrayAtLeast(2),
+  featureOrder: z.optional(positiveInteger),
+  recognition: z.optional(z.string()),
+  image: z.optional(
+    z.object({
+      src: imagePath,
+      alt: z.string().check(z.minLength(8)),
+    }),
+  ),
+  links: z.optional(
+    z.array(
       z.object({
         kind: z.enum(["github", "prototype", "devpost", "case-study"]),
         label: z.string(),
-        href: z.string().url(),
+        href: z.url(),
       }),
-    )
-    .min(1)
-    .optional(),
+    ).check(z.minLength(1)),
+  ),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
 export const MarginaliaSchema = z.object({
   label: z.string(),
   ariaLabel: z.string(),
-  text: z.string().min(10),
+  text: z.string().check(z.minLength(10)),
 });
 export type MarginaliaNote = z.infer<typeof MarginaliaSchema>;
 
@@ -94,7 +98,7 @@ export const ResumeSchema = z.object({
       details: z.array(z.string()),
     }),
   ),
-  entries: z.array(ResumeEntrySchema).min(8),
+  entries: z.array(ResumeEntrySchema).check(z.minLength(8)),
   recognition: z.array(
     z.object({
       title: z.string(),
@@ -116,7 +120,7 @@ export const ContactLinkSchema = z.object({
 export const ContactSchema = z.object({
   eyebrow: z.string(),
   heading: z.string(),
-  links: z.array(ContactLinkSchema).min(4),
+  links: z.array(ContactLinkSchema).check(z.minLength(4)),
 });
 export type ContactContent = z.infer<typeof ContactSchema>;
 
@@ -126,6 +130,6 @@ export const DispatchSchema = z.object({
   label: z.string(),
   title: z.string(),
   dek: z.string(),
-  body: z.array(z.string()).min(1),
+  body: stringArrayAtLeast(1),
 });
 export type Dispatch = z.infer<typeof DispatchSchema>;
