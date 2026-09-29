@@ -63,6 +63,7 @@ import { IgniteBook } from "@/ignite/IgniteBook";
 import type { IgnitePointerState } from "@/ignite/types";
 import { DriftBook } from "@/drift/DriftBook";
 import type { DriftPointerState } from "@/drift/types";
+import { RenderOnChange } from "./renderGate";
 
 export const CAM_FOV = 22;
 
@@ -952,6 +953,9 @@ export function BookScene({
     <>
       <Rig ph={ph} />
       <HiddenTicker />
+      {/* Ignite and Drift simulate every frame; the reading book mostly
+          rests, and its unchanged frames are not redrawn. */}
+      <RenderOnChange always={Boolean(ignite?.active || drift?.active)} />
       <ambientLight intensity={0.48} />
       <GlossLight pw={pw} ph={ph} />
       <directionalLight
