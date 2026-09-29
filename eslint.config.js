@@ -30,6 +30,13 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    // The benchmark scripts also run callbacks inside the page (page.evaluate),
+    // and instrument.js is injected into it whole.
+    files: ["scripts/bench/**/*.{mjs,js}"],
+    extends: [js.configs.recommended],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     // react-three-fiber is an imperative, mutation-driven world; the react
     // compiler's immutability rules do not apply to per-frame scene graph work.
     files: ["src/book3d/**/*.tsx", "src/book3d/**/*.ts"],

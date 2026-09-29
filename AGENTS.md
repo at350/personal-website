@@ -30,6 +30,11 @@ Non-obvious notes:
   before the 3D book responds. Turn pages with the Right/Left Arrow keys
   (Home/End jump to either cover; `?` opens the keys sheet) or by dragging
   horizontally across the book.
+- `npm run bench` (`scripts/bench/`) benchmarks a production build in full
+  Chrome for Testing, which must be installed once (see README →
+  Performance). Measure before and after any change to `src/book3d/` hot
+  paths; the solver, render gate, and capture selection carry pixel/bit
+  invariants their tests pin.
 - `npm run refresh-media` pulls the letterboxd film log and both Goodreads
   shelves (read and currently-reading) with no configuration — the account
   and the numeric user id are baked into the script — and needs network

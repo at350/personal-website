@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",
+    "bench": "node scripts/bench/bench.mjs",
+    "bench:ab": "node scripts/bench/ab.mjs",
+    "bench:profile": "node scripts/bench/profile.mjs",
     "refresh-media": "node scripts/refresh-media.mjs",
     "postinstall": "node scripts/patch-html-to-image.mjs"
   },
@@ -44,6 +47,7 @@
     "fast-xml-parser": "^5.10.1",
     "globals": "^17.9.0",
     "jsdom": "^29.1.1",
+    "playwright-core": "^1.63.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0",
     "vite": "^8.2.1",
