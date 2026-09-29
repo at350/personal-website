@@ -45,68 +45,6 @@ function smoothCurve(value: number) {
   return safe * safe * (3 - 2 * safe);
 }
 
-function fieldIndex(width: number, x: number, y: number) {
-  return y * width + x;
-}
-
-function sampleBilinear(
-  source: Float32Array,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-) {
-  const safeX = clamp(x, 0, width - 1);
-  const safeY = clamp(y, 0, height - 1);
-  const x0 = Math.floor(safeX);
-  const y0 = Math.floor(safeY);
-  const x1 = Math.min(width - 1, x0 + 1);
-  const y1 = Math.min(height - 1, y0 + 1);
-  const mixX = safeX - x0;
-  const mixY = safeY - y0;
-  const top = (source[fieldIndex(width, x0, y0)] ?? 0) * (1 - mixX) +
-    (source[fieldIndex(width, x1, y0)] ?? 0) * mixX;
-  const bottom = (source[fieldIndex(width, x0, y1)] ?? 0) * (1 - mixX) +
-    (source[fieldIndex(width, x1, y1)] ?? 0) * mixX;
-  return top * (1 - mixY) + bottom * mixY;
-}
-
-function neighbourAverage(
-  source: Float32Array,
-  width: number,
-  index: number,
-) {
-  return (
-    (source[index - 1] ?? 0) +
-    (source[index + 1] ?? 0) +
-    (source[index - width] ?? 0) +
-    (source[index + width] ?? 0)
-  ) * 0.25;
-}
-
-function burnSurfaceAt(burn: BurnField, x: number, y: number) {
-  const safeX = clamp(x, 0, burn.width - 1);
-  const safeY = clamp(y, 0, burn.height - 1);
-  return burn.surface[safeY * burn.width + safeX] ?? 0;
-}
-
-function burnDepthAt(
-  burn: BurnField,
-  x: number,
-  y: number,
-  fallback: number,
-) {
-  const safeX = clamp(x, 0, burn.width - 1);
-  const safeY = clamp(y, 0, burn.height - 1);
-  const index = safeY * burn.width + safeX;
-  // Cells that never held paper (the empty half of a spread, past the page
-  // edge) are no depth cliff: comparing against their permanent zero kept
-  // spine and edge cells reading as an active frontier forever, which parked
-  // immortal flames on the left margin long after the fire had moved on.
-  if ((burn.capacity[index] ?? 0) <= 0) return fallback;
-  return burn.burn[index] ?? 0;
-}
-
 function swap(
   fluid: CombustionFluid,
   current: keyof CombustionFluid,
@@ -153,35 +91,49 @@ export function createCombustionFluid(
  */
 function updateSources(fluid: CombustionFluid, burn: BurnField) {
   const { width, height, source } = fluid;
+  const burnWidth = burn.width;
+  const burnHeight = burn.height;
+  const burnCapacity = burn.capacity;
+  const burnValues = burn.burn;
+  const burnHeat = burn.heat;
+  const burnSurface = burn.surface;
+  const burnGrain = burn.grain;
   source.fill(0);
   for (let y = 1; y < height - 1; y += 1) {
     const atmosphereV = (y + 0.5) / height;
     const pageV = (atmosphereV - 0.5) * COMBUSTION_EXTENT_Y + 0.5;
     if (pageV <= 0 || pageV >= 1) continue;
-    const burnY = clamp(Math.floor(pageV * burn.height), 0, burn.height - 1);
+    const burnY = clamp(Math.floor(pageV * burnHeight), 0, burnHeight - 1);
+    const burnRow = burnY * burnWidth;
     for (let x = 1; x < width - 1; x += 1) {
       const atmosphereU = (x + 0.5) / width;
       const pageU = (atmosphereU - 0.5) * COMBUSTION_EXTENT_X + 0.5;
       if (pageU <= 0 || pageU >= 1) continue;
-      const burnX = clamp(Math.floor(pageU * burn.width), 0, burn.width - 1);
-      const burnIndex = burnY * burn.width + burnX;
-      const capacity = burn.capacity[burnIndex] ?? 0;
-      const consumed = burn.burn[burnIndex] ?? 0;
-      const heat = (burn.heat[burnIndex] ?? 0) / MAX_HEAT;
-      const surface = burn.surface[burnIndex] ?? 0;
+      const burnX = clamp(Math.floor(pageU * burnWidth), 0, burnWidth - 1);
+      const burnIndex = burnRow + burnX;
+      const capacity = burnCapacity[burnIndex] ?? 0;
+      const consumed = burnValues[burnIndex] ?? 0;
+      const heat = (burnHeat[burnIndex] ?? 0) / MAX_HEAT;
+      const surface = burnSurface[burnIndex] ?? 0;
       if (capacity <= 0 || consumed >= capacity || heat <= 0.08) continue;
 
       // A hot front is defined by a local drop into younger/cold paper. Surface
       // age alone selected the entire diamond-shaped burned interior; this
       // neighbour span retains only the thin connected reaction boundary.
-      const left = burnSurfaceAt(burn, burnX - 2, burnY);
-      const right = burnSurfaceAt(burn, burnX + 2, burnY);
-      const below = burnSurfaceAt(burn, burnX, burnY - 2);
-      const above = burnSurfaceAt(burn, burnX, burnY + 2);
-      const diagonalA = burnSurfaceAt(burn, burnX - 1, burnY - 1);
-      const diagonalB = burnSurfaceAt(burn, burnX + 1, burnY + 1);
-      const diagonalC = burnSurfaceAt(burn, burnX - 1, burnY + 1);
-      const diagonalD = burnSurfaceAt(burn, burnX + 1, burnY - 1);
+      const left = burnSurface[burnRow + clamp(burnX - 2, 0, burnWidth - 1)] ?? 0;
+      const right = burnSurface[burnRow + clamp(burnX + 2, 0, burnWidth - 1)] ?? 0;
+      const belowRow = clamp(burnY - 2, 0, burnHeight - 1) * burnWidth;
+      const aboveRow = clamp(burnY + 2, 0, burnHeight - 1) * burnWidth;
+      const below = burnSurface[belowRow + burnX] ?? 0;
+      const above = burnSurface[aboveRow + burnX] ?? 0;
+      const diagonalPreviousRow = clamp(burnY - 1, 0, burnHeight - 1) * burnWidth;
+      const diagonalNextRow = clamp(burnY + 1, 0, burnHeight - 1) * burnWidth;
+      const diagonalLeft = clamp(burnX - 1, 0, burnWidth - 1);
+      const diagonalRight = clamp(burnX + 1, 0, burnWidth - 1);
+      const diagonalA = burnSurface[diagonalPreviousRow + diagonalLeft] ?? 0;
+      const diagonalB = burnSurface[diagonalNextRow + diagonalRight] ?? 0;
+      const diagonalC = burnSurface[diagonalNextRow + diagonalLeft] ?? 0;
+      const diagonalD = burnSurface[diagonalPreviousRow + diagonalRight] ?? 0;
       const youngestNeighbour = Math.min(
         left,
         right,
@@ -210,7 +162,7 @@ function updateSources(fluid: CombustionFluid, burn: BurnField) {
       const caught = smoothCurve((surface - 0.06) / 0.105);
       const notSpent = 1 - smoothCurve((surface - 0.37) / 0.125);
       const hot = smoothCurve((heat - 0.06) / 0.48);
-      const grain = burn.grain[burnIndex] ?? 0.5;
+      const grain = burnGrain[burnIndex] ?? 0.5;
       // Two low-frequency material phases vary the fuel feed along the rim.
       // Keep a low live floor so the connected reaction never collapses into
       // isolated graphic dots; stronger patches still form the taller tongues.
@@ -230,10 +182,25 @@ function updateSources(fluid: CombustionFluid, burn: BurnField) {
       // fresher fuel — invisible to the saturated top-sheet surface span.
       // The drop is one-sided: uneven pacing between equally deep interior
       // cells is not a frontier and must not light gas.
-      const depthLeft = burnDepthAt(burn, burnX - 2, burnY, consumed);
-      const depthRight = burnDepthAt(burn, burnX + 2, burnY, consumed);
-      const depthBelow = burnDepthAt(burn, burnX, burnY - 2, consumed);
-      const depthAbove = burnDepthAt(burn, burnX, burnY + 2, consumed);
+      // Cells that never held paper (the empty half of a spread, past the
+      // page edge) are no depth cliff. Preserve the existing fallback to the
+      // center depth when looking at those cells.
+      const leftIndex = burnRow + clamp(burnX - 2, 0, burnWidth - 1);
+      const rightIndex = burnRow + clamp(burnX + 2, 0, burnWidth - 1);
+      const belowIndex = belowRow + burnX;
+      const aboveIndex = aboveRow + burnX;
+      const depthLeft = (burnCapacity[leftIndex] ?? 0) <= 0
+        ? consumed
+        : burnValues[leftIndex] ?? 0;
+      const depthRight = (burnCapacity[rightIndex] ?? 0) <= 0
+        ? consumed
+        : burnValues[rightIndex] ?? 0;
+      const depthBelow = (burnCapacity[belowIndex] ?? 0) <= 0
+        ? consumed
+        : burnValues[belowIndex] ?? 0;
+      const depthAbove = (burnCapacity[aboveIndex] ?? 0) <= 0
+        ? consumed
+        : burnValues[aboveIndex] ?? 0;
       const frontierDrop = consumed -
         Math.min(depthLeft, depthRight, depthBelow, depthAbove);
       const deepFront = smoothCurve((frontierDrop - 0.45) / 0.6);
@@ -241,7 +208,7 @@ function updateSources(fluid: CombustionFluid, burn: BurnField) {
       const deepSource = deepFront * opened * hot *
         (0.78 + grain * 0.5) * smoothCurve((patch - 0.5) / 0.3);
 
-      source[fieldIndex(width, x, y)] = Math.max(topSource, deepSource);
+      source[y * width + x] = Math.max(topSource, deepSource);
     }
   }
 }
@@ -283,7 +250,7 @@ function computeCurl(fluid: CombustionFluid) {
   curl.fill(0);
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
-      const index = fieldIndex(width, x, y);
+      const index = y * width + x;
       const dVdx = ((velocityY[index + 1] ?? 0) -
         (velocityY[index - 1] ?? 0)) * 0.5;
       const dUdy = ((velocityX[index + width] ?? 0) -
@@ -313,7 +280,7 @@ function applyForces(fluid: CombustionFluid, dt: number) {
 
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
-      const index = fieldIndex(width, x, y);
+      const index = y * width + x;
       const curlValue = curl[index] ?? 0;
       const gradientX = Math.abs(curl[index + 1] ?? 0) -
         Math.abs(curl[index - 1] ?? 0);
@@ -340,8 +307,20 @@ function applyForces(fluid: CombustionFluid, dt: number) {
         (heat * 0.72 + luminous * 0.28) * BUOYANCY -
         soot * SMOKE_WEIGHT
       ) * dt;
-      nextX += (neighbourAverage(velocityX, width, index) - nextX) * diffusion;
-      nextY += (neighbourAverage(velocityY, width, index) - nextY) * diffusion;
+      const neighbourVelocityX = (
+        (velocityX[index - 1] ?? 0) +
+        (velocityX[index + 1] ?? 0) +
+        (velocityX[index - width] ?? 0) +
+        (velocityX[index + width] ?? 0)
+      ) * 0.25;
+      const neighbourVelocityY = (
+        (velocityY[index - 1] ?? 0) +
+        (velocityY[index + 1] ?? 0) +
+        (velocityY[index - width] ?? 0) +
+        (velocityY[index + width] ?? 0)
+      ) * 0.25;
+      nextX += (neighbourVelocityX - nextX) * diffusion;
+      nextY += (neighbourVelocityY - nextY) * diffusion;
       const speed = Math.hypot(nextX, nextY);
       if (speed > MAX_VELOCITY) {
         nextX *= MAX_VELOCITY / speed;
@@ -382,26 +361,65 @@ function advect(fluid: CombustionFluid, dt: number) {
 
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
-      const index = fieldIndex(width, x, y);
+      const index = y * width + x;
       const u = velocityX[index] ?? 0;
       const v = velocityY[index] ?? 0;
       const sampleX = x - u * dt * width;
       const sampleY = y - v * dt * height;
-      const advectedFlame = sampleBilinear(flame, width, height, sampleX, sampleY);
-      const advectedHeat = sampleBilinear(
-        temperature,
-        width,
-        height,
-        sampleX,
-        sampleY,
-      );
-      const advectedSmoke = sampleBilinear(smoke, width, height, sampleX, sampleY);
+      // All five channels sample the identical back-traced position. Resolve
+      // its clamped lattice coordinates once, then keep each channel's
+      // bilinear multiply/add order intact.
+      const safeX = clamp(sampleX, 0, width - 1);
+      const safeY = clamp(sampleY, 0, height - 1);
+      const x0 = Math.floor(safeX);
+      const y0 = Math.floor(safeY);
+      const x1 = Math.min(width - 1, x0 + 1);
+      const y1 = Math.min(height - 1, y0 + 1);
+      const mixX = safeX - x0;
+      const mixY = safeY - y0;
+      const row0 = y0 * width;
+      const row1 = y1 * width;
+      const inverseMixX = 1 - mixX;
+      const inverseMixY = 1 - mixY;
+      const flameTop = (flame[row0 + x0] ?? 0) * inverseMixX +
+        (flame[row0 + x1] ?? 0) * mixX;
+      const flameBottom = (flame[row1 + x0] ?? 0) * inverseMixX +
+        (flame[row1 + x1] ?? 0) * mixX;
+      const advectedFlame = flameTop * inverseMixY + flameBottom * mixY;
+      const heatTop = (temperature[row0 + x0] ?? 0) * inverseMixX +
+        (temperature[row0 + x1] ?? 0) * mixX;
+      const heatBottom = (temperature[row1 + x0] ?? 0) * inverseMixX +
+        (temperature[row1 + x1] ?? 0) * mixX;
+      const advectedHeat = heatTop * inverseMixY + heatBottom * mixY;
+      const smokeTop = (smoke[row0 + x0] ?? 0) * inverseMixX +
+        (smoke[row0 + x1] ?? 0) * mixX;
+      const smokeBottom = (smoke[row1 + x0] ?? 0) * inverseMixX +
+        (smoke[row1 + x1] ?? 0) * mixX;
+      const advectedSmoke = smokeTop * inverseMixY + smokeBottom * mixY;
+      const neighbourFlame = (
+        (flame[index - 1] ?? 0) +
+        (flame[index + 1] ?? 0) +
+        (flame[index - width] ?? 0) +
+        (flame[index + width] ?? 0)
+      ) * 0.25;
       const diffusedFlame = advectedFlame +
-        (neighbourAverage(flame, width, index) - advectedFlame) * scalarMix;
+        (neighbourFlame - advectedFlame) * scalarMix;
+      const neighbourHeat = (
+        (temperature[index - 1] ?? 0) +
+        (temperature[index + 1] ?? 0) +
+        (temperature[index - width] ?? 0) +
+        (temperature[index + width] ?? 0)
+      ) * 0.25;
       const diffusedHeat = advectedHeat +
-        (neighbourAverage(temperature, width, index) - advectedHeat) * scalarMix;
+        (neighbourHeat - advectedHeat) * scalarMix;
+      const neighbourSmoke = (
+        (smoke[index - 1] ?? 0) +
+        (smoke[index + 1] ?? 0) +
+        (smoke[index - width] ?? 0) +
+        (smoke[index + width] ?? 0)
+      ) * 0.25;
       const diffusedSmoke = advectedSmoke +
-        (neighbourAverage(smoke, width, index) - advectedSmoke) * scalarMix;
+        (neighbourSmoke - advectedSmoke) * scalarMix;
       const cooledFlame = Math.max(0, diffusedFlame * flameDecay);
       const consumedFlame = Math.max(0, diffusedFlame - cooledFlame);
       nextFlame[index] = cooledFlame;
@@ -415,20 +433,16 @@ function advect(fluid: CombustionFluid, dt: number) {
         0,
         1,
       );
-      nextVelocityX[index] = sampleBilinear(
-        velocityX,
-        width,
-        height,
-        sampleX,
-        sampleY,
-      );
-      nextVelocityY[index] = sampleBilinear(
-        velocityY,
-        width,
-        height,
-        sampleX,
-        sampleY,
-      );
+      const velocityXTop = (velocityX[row0 + x0] ?? 0) * inverseMixX +
+        (velocityX[row0 + x1] ?? 0) * mixX;
+      const velocityXBottom = (velocityX[row1 + x0] ?? 0) * inverseMixX +
+        (velocityX[row1 + x1] ?? 0) * mixX;
+      nextVelocityX[index] = velocityXTop * inverseMixY + velocityXBottom * mixY;
+      const velocityYTop = (velocityY[row0 + x0] ?? 0) * inverseMixX +
+        (velocityY[row0 + x1] ?? 0) * mixX;
+      const velocityYBottom = (velocityY[row1 + x0] ?? 0) * inverseMixX +
+        (velocityY[row1 + x1] ?? 0) * mixX;
+      nextVelocityY[index] = velocityYTop * inverseMixY + velocityYBottom * mixY;
     }
   }
   swap(fluid, "flame", "nextFlame");
@@ -438,29 +452,34 @@ function advect(fluid: CombustionFluid, dt: number) {
   swap(fluid, "velocityY", "nextVelocityY");
 }
 
-function clearBoundary(fluid: CombustionFluid, layers = 2) {
-  const fields = [
-    fluid.flame,
-    fluid.temperature,
-    fluid.smoke,
-    fluid.velocityX,
-    fluid.velocityY,
-    fluid.source,
-  ];
-  for (const field of fields) {
-    for (let layer = 0; layer < layers; layer += 1) {
-      const top = layer * fluid.width;
-      const bottom = (fluid.height - 1 - layer) * fluid.width;
-      for (let x = 0; x < fluid.width; x += 1) {
-        field[top + x] = 0;
-        field[bottom + x] = 0;
-      }
-      for (let y = layer; y < fluid.height - layer; y += 1) {
-        field[y * fluid.width + layer] = 0;
-        field[y * fluid.width + fluid.width - 1 - layer] = 0;
-      }
+function clearBoundaryChannel(
+  field: Float32Array,
+  width: number,
+  height: number,
+  layers: number,
+) {
+  for (let layer = 0; layer < layers; layer += 1) {
+    const top = layer * width;
+    const bottom = (height - 1 - layer) * width;
+    for (let x = 0; x < width; x += 1) {
+      field[top + x] = 0;
+      field[bottom + x] = 0;
+    }
+    for (let y = layer; y < height - layer; y += 1) {
+      field[y * width + layer] = 0;
+      field[y * width + width - 1 - layer] = 0;
     }
   }
+}
+
+function clearBoundary(fluid: CombustionFluid, layers = 2) {
+  const { width, height } = fluid;
+  clearBoundaryChannel(fluid.flame, width, height, layers);
+  clearBoundaryChannel(fluid.temperature, width, height, layers);
+  clearBoundaryChannel(fluid.smoke, width, height, layers);
+  clearBoundaryChannel(fluid.velocityX, width, height, layers);
+  clearBoundaryChannel(fluid.velocityY, width, height, layers);
+  clearBoundaryChannel(fluid.source, width, height, layers);
 }
 
 export function stepCombustionFluid(

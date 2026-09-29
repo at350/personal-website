@@ -1168,9 +1168,10 @@ export function IgniteBook({
       )
     ) {
       if (field.complete) finalTextureRefreshDone.current = true;
-      writeBurnTexture(field, simulation.bytes);
-      // eslint-disable-next-line react-hooks/immutability -- R3F owns this upload flag.
-      simulation.texture.needsUpdate = true;
+      if (writeBurnTexture(field, simulation.bytes)) {
+        // eslint-disable-next-line react-hooks/immutability -- R3F owns this upload flag.
+        simulation.texture.needsUpdate = true;
+      }
 
       // Reuse the same 30 Hz cadence to skip meshes the fire cannot reach yet
       // and leaves it has entirely consumed.
