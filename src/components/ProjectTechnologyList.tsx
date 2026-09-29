@@ -1,4 +1,4 @@
-import { technologyLogo, technologyMonogram } from "@/lib/technology-icons";
+import { technologyLogo } from "@/lib/technology-icons";
 
 interface ProjectTechnologyListProps {
   items: readonly string[];
@@ -18,13 +18,11 @@ export function ProjectTechnologyList({
         const logo = technologyLogo(item);
         return (
           <li key={item} className="proj-tech__item mono-label">
-            <span className="proj-tech__mark" aria-hidden>
-              {logo ? (
+            {logo && (
+              <span className="proj-tech__mark" aria-hidden>
                 <img src={logo} alt="" decoding="async" />
-              ) : (
-                <span>{technologyMonogram(item)}</span>
-              )}
-            </span>
+              </span>
+            )}
             <span>{item}</span>
           </li>
         );
