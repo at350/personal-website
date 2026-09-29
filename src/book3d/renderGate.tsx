@@ -3,12 +3,13 @@
    scene — shadow pass, physical paper, multisampling — at display rate.
 
    Every frame the gate records what three.js reads when it draws, in two
-   phases. The first is cheap and catches motion: renderer size and state,
+   phases. The first is cheap and catches motion: the drawing surface's size,
    the camera, and every visible object's world transform, render flags and
    geometry versions. When it changes, the frame is drawn at once. Only when
-   nothing moved does the gate record the second phase — material properties,
-   shader uniforms (including the paper material's injected accent), textures,
-   lights, the scene's background — and it draws when that changed too.
+   nothing moved does the gate record the second phase — the renderer's
+   output state, material properties, shader uniforms (including the paper
+   material's injected accent), textures, lights, the scene's background —
+   and it draws when that changed too.
 
    Appearance is compared exactly. Motion is compared against the last frame
    actually drawn with a tolerance of MOTION_EPSILON CSS px: the book's damped
@@ -20,8 +21,9 @@
    origin), the camera's by its far plane. A skipped frame therefore differs
    from the one an unconditional redraw would paint only by vertices off by
    about 1e-5 CSS px (the book sits near the plane the camera maps 1:1 to
-   the screen) — a two-hundredth of the GPU's 1/256-pixel sub-pixel grid. The imperative frame logic (springs, physics, handoff
-   reporting) still runs every frame; only the redundant draws are skipped. */
+   the screen) — a two-hundredth of the GPU's 1/256-pixel sub-pixel grid.
+   The imperative frame logic (springs, physics, handoff reporting) still
+   runs every frame; only the redundant draws are skipped. */
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
