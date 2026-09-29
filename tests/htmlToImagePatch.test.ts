@@ -58,3 +58,48 @@ describe("page texture font metrics", () => {
     }
   });
 });
+
+describe("per-call includeStyleProperties", () => {
+  it("serializes only the properties each call names", async () => {
+    const svgImageElement = Object.getOwnPropertyDescriptor(globalThis, "SVGImageElement");
+    Object.defineProperty(globalThis, "SVGImageElement", { configurable: true, value: SVGElement });
+    const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+    const spy = vi.spyOn(window, "getComputedStyle").mockImplementation((element, pseudoElement) => {
+      if (pseudoElement) return document.createElement("span").style;
+      const style = nativeGetComputedStyle(element);
+      return new Proxy(style, {
+        get(target, property) {
+          if (property === "cssText") return "";
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+    });
+    const source = document.createElement("div");
+    source.className = "two-calls";
+    source.textContent = "two calls";
+    // A stylesheet rule, not inline: html-to-image clones inline styles verbatim.
+    const sheet = document.createElement("style");
+    sheet.textContent = ".two-calls{font-size:14.72px;letter-spacing:3px}";
+    document.head.append(sheet);
+    document.body.append(source);
+    const svgOf = async (props: string[]) => {
+      const url = await toSvg(source, { width: 160, height: 40, skipFonts: true, includeStyleProperties: props });
+      return decodeURIComponent(url.slice(url.indexOf(",") + 1));
+    };
+    try {
+      const first = await svgOf(["font-size"]);
+      const second = await svgOf(["letter-spacing"]);
+      expect(first).toContain("font-size: 14.72px");
+      expect(first).not.toContain("letter-spacing");
+      expect(second).toContain("letter-spacing: 3px");
+      expect(second).not.toContain("font-size: 14.72px");
+    } finally {
+      spy.mockRestore();
+      source.remove();
+      sheet.remove();
+      if (svgImageElement) Object.defineProperty(globalThis, "SVGImageElement", svgImageElement);
+      else Reflect.deleteProperty(globalThis, "SVGImageElement");
+    }
+  });
+});

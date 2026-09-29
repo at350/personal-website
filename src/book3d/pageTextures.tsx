@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { toCanvas } from "html-to-image";
 import { FACES, SPREADS } from "@/magazine/folio";
 import { PageFace, hasPageFace } from "@/magazine/PageFace";
+import { captureStyleProperties } from "./captureStyles";
 
 export const CAPTURE_W = 640;
 export const CAPTURE_H = (CAPTURE_W * 4) / 3;
@@ -137,11 +138,25 @@ export function canvasLooksBlank(canvas: HTMLCanvasElement): boolean {
   const width = canvas.width;
   const height = canvas.height;
   if (!width || !height) return true;
+  const stepX = Math.max(1, Math.floor(width / 8));
+  const stepY = Math.max(1, Math.floor(height / 8));
+  const grid = sampleGridThroughProbe(canvas, stepX, stepY);
+  if (grid) {
+    const columns = Math.ceil(width / stepX);
+    for (let y = 0, row = 0; y < height; y += stepY, row += 1) {
+      for (let x = 0, column = 0; x < width; x += stepX, column += 1) {
+        const offset = (row * columns + column) * 4;
+        if (grid[offset]! < 250 || grid[offset + 1]! < 250 || grid[offset + 2]! < 250) {
+          return false;
+        }
+        if (grid[offset + 3]! < 250) return false;
+      }
+    }
+    return true;
+  }
   try {
     const context = canvas.getContext("2d");
     if (!context || typeof context.getImageData !== "function") return false;
-    const stepX = Math.max(1, Math.floor(width / 8));
-    const stepY = Math.max(1, Math.floor(height / 8));
     for (let y = 0; y < height; y += stepY) {
       for (let x = 0; x < width; x += stepX) {
         const pixel = context.getImageData(x, y, 1, 1).data;
@@ -153,6 +168,34 @@ export function canvasLooksBlank(canvas: HTMLCanvasElement): boolean {
   } catch {
     // A tainted canvas still holds pixels; we just cannot inspect them.
     return false;
+  }
+}
+
+/** Copies the sample grid's pixels 1:1 into a tiny canvas and reads them back
+    once. Reading each sample straight off the page canvas cost a GPU
+    round-trip apiece — and after a few, Chrome moves the canvas to software,
+    which then slows its upload into WebGL. Returns null where OffscreenCanvas
+    is unavailable, and the caller samples the canvas directly as before. */
+function sampleGridThroughProbe(
+  canvas: HTMLCanvasElement,
+  stepX: number,
+  stepY: number,
+): Uint8ClampedArray | null {
+  if (typeof OffscreenCanvas === "undefined") return null;
+  try {
+    const columns = Math.ceil(canvas.width / stepX);
+    const rows = Math.ceil(canvas.height / stepY);
+    const probe = new OffscreenCanvas(columns, rows).getContext("2d");
+    if (!probe) return null;
+    probe.imageSmoothingEnabled = false;
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        probe.drawImage(canvas, column * stepX, row * stepY, 1, 1, column, row, 1, 1);
+      }
+    }
+    return probe.getImageData(0, 0, columns, rows).data;
+  } catch {
+    return null;
   }
 }
 
@@ -171,13 +214,17 @@ function capture(key: string, refresh = false): Promise<boolean> {
     await document.fonts.ready;
     await nextPaint();
     await settleImages(el);
+    // Only the properties anything on the page can set (captureStyles.ts);
+    // undefined falls back to html-to-image copying every property.
+    const includeStyleProperties = captureStyleProperties(el);
     const options = {
       pixelRatio: capturePixelRatio(),
       width: CAPTURE_W,
       height: CAPTURE_H,
       backgroundColor: "#ffffff",
       imagePlaceholder: IMAGE_PLACEHOLDER,
-    } as const;
+      ...(includeStyleProperties ? { includeStyleProperties } : {}),
+    };
 
     const rasterize = async () => {
       try {
