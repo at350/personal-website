@@ -99,9 +99,6 @@ function Plate({ project }: { project: Project }) {
         loading="lazy"
         decoding="async"
       />
-      <figcaption className="proj-feature__caption mono-label">
-        Conceptual study
-      </figcaption>
     </figure>
   );
 }

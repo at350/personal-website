@@ -19,8 +19,8 @@ export function ProjectTechnologyList({
         return (
           <li key={item} className="proj-tech__item mono-label">
             {logo && (
-              <span className="proj-tech__mark" aria-hidden>
-                <img src={logo} alt="" decoding="async" />
+              <span className="proj-tech__mark" data-technology={item} aria-hidden>
+                <img src={logo} alt="" width={24} height={24} decoding="async" />
               </span>
             )}
             <span>{item}</span>
