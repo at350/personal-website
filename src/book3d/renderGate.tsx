@@ -12,31 +12,50 @@
    and it draws when that changed too.
 
    Appearance is compared exactly. Motion is compared against the last frame
-   actually drawn with a tolerance of MOTION_EPSILON CSS px: the book's damped
-   springs creep toward rest for seconds in steps far below a pixel, and
-   their targets jitter at 1e-16, so exact equality would never let a
-   resting book stop drawing. The tolerance bounds how far a vertex moves,
-   not how far a number does: a mesh's matrix coefficients are recorded
-   scaled by three times its geometry's reach (its farthest vertex from its
-   origin), the camera's by its far plane. A skipped frame therefore differs
-   from the one an unconditional redraw would paint only by vertices off by
-   about 1e-5 CSS px (the book sits near the plane the camera maps 1:1 to
-   the screen) — a two-hundredth of the GPU's 1/256-pixel sub-pixel grid.
+   actually drawn with a tolerance of MOTION_EPSILON (1e-9) CSS px. It is
+   not zero because a converged spring keeps flipping the last bits of its
+   value (under 1e-11 px of vertex motion here, and it never adds up), so
+   exact equality would never let a resting book stop drawing. The
+   tolerance bounds how far a vertex moves, not how far a number does: a
+   mesh's matrix coefficients are recorded scaled by three times its
+   geometry's reach (its farthest vertex from its origin), the camera's by
+   three times its far plane. Every frame of a spring's sub-pixel tail that
+   moves anything further than that is drawn, so a skipped frame's vertices
+   lie within about 1e-8 CSS px of where an unconditional draw would put
+   them — thousands of times finer than the float32 coordinates the GPU
+   draws with.
    The imperative frame logic (springs, physics, handoff reporting) still
    runs every frame; only the redundant draws are skipped. */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 
-/** Motion tolerance: how far, in CSS px (world units), any vertex may be
-    from where an unconditional redraw would put it. */
-export const MOTION_EPSILON = 1e-5;
+/** Motion tolerance, in CSS px (world units): how far any one recorded
+    coefficient may have moved vertices since the last draw before a frame
+    is drawn. Over 100× the float noise measured on a resting book, and
+    far below what the GPU's float32 vertex math can resolve. */
+export const MOTION_EPSILON = 1e-9;
 /** Reach used for lights, whose placement moves light rather than vertices. */
 const LIGHT_REACH_PX = 1e4;
 
 const NONE = -1;
 const scratchColor = new THREE.Color();
+
+/** Stable numbers for objects three.js does not number itself (buffer
+    attributes and their interleaved storage), so swapping one buffer for
+    another of the same size and version still reads as a change. */
+const objectIds = new WeakMap<object, number>();
+let nextObjectId = 1;
+function objectId(value: object): number {
+  let id = objectIds.get(value);
+  if (id === undefined) {
+    id = nextObjectId;
+    nextObjectId += 1;
+    objectIds.set(value, id);
+  }
+  return id;
+}
 
 /** Uniform names three.js owns. The renderer refreshes them from material
     properties, lights, and the camera on every draw, so the properties that
@@ -213,6 +232,7 @@ function writeGeometry(out: SceneSignature, geometry: THREE.BufferGeometry) {
   out.push(geometry.id);
   const index = geometry.index;
   if (index) {
+    out.push(objectId(index));
     out.push(index.version);
     out.push(index.count);
   } else {
@@ -222,12 +242,19 @@ function writeGeometry(out: SceneSignature, geometry: THREE.BufferGeometry) {
     const attribute = geometry.attributes[name] as
       | THREE.BufferAttribute
       | THREE.InterleavedBufferAttribute;
-    out.push(
-      "isInterleavedBufferAttribute" in attribute
-        ? attribute.data.version
-        : attribute.version,
-    );
+    out.string(name);
+    out.push(objectId(attribute));
+    if ("isInterleavedBufferAttribute" in attribute) {
+      out.push(objectId(attribute.data));
+      out.push(attribute.data.version);
+      out.push(attribute.data.stride);
+      out.push(attribute.offset);
+    } else {
+      out.push(attribute.version);
+    }
     out.push(attribute.count);
+    out.push(attribute.itemSize);
+    out.push(attribute.normalized ? 1 : 0);
   }
   out.push(geometry.drawRange.start);
   out.push(geometry.drawRange.count);
@@ -252,23 +279,50 @@ function writeMatrix(out: SceneSignature, matrix: THREE.Matrix4, reach: number) 
 }
 
 /** How far a geometry's farthest vertex lies from its origin, re-measured
-    whenever its positions are re-uploaded. */
-const reaches = new WeakMap<
-  THREE.BufferGeometry,
-  { version: number; count: number; reach: number }
->();
+    whenever anything its position reads change: the attribute, the storage
+    it interleaves into, their layout, or an upload. */
+interface Reach {
+  position: object;
+  storage: object;
+  version: number;
+  count: number;
+  itemSize: number;
+  normalized: boolean;
+  offset: number;
+  stride: number;
+  reach: number;
+}
+const reaches = new WeakMap<THREE.BufferGeometry, Reach>();
 function geometryReach(geometry: THREE.BufferGeometry): number {
   const position = geometry.attributes.position as
     | THREE.BufferAttribute
     | THREE.InterleavedBufferAttribute
     | undefined;
   if (!position) return 0;
-  const version =
-    "isInterleavedBufferAttribute" in position
-      ? position.data.version
-      : position.version;
+  const interleaved = "isInterleavedBufferAttribute" in position;
+  const storage = interleaved ? position.data : position;
+  const layout = {
+    position,
+    storage,
+    version: storage.version,
+    count: position.count,
+    itemSize: position.itemSize,
+    normalized: position.normalized,
+    offset: interleaved ? position.offset : 0,
+    stride: interleaved ? position.data.stride : position.itemSize,
+  };
   const known = reaches.get(geometry);
-  if (known && known.version === version && known.count === position.count) {
+  if (
+    known &&
+    known.position === layout.position &&
+    known.storage === layout.storage &&
+    known.version === layout.version &&
+    known.count === layout.count &&
+    known.itemSize === layout.itemSize &&
+    known.normalized === layout.normalized &&
+    known.offset === layout.offset &&
+    known.stride === layout.stride
+  ) {
     return known.reach;
   }
   let farthest = 0;
@@ -280,7 +334,7 @@ function geometryReach(geometry: THREE.BufferGeometry): number {
     if (squared > farthest) farthest = squared;
   }
   const reach = Math.sqrt(farthest);
-  reaches.set(geometry, { version, count: position.count, reach });
+  reaches.set(geometry, { ...layout, reach });
   return reach;
 }
 
@@ -501,40 +555,40 @@ function store(frame: DrawnFrame, motion: number[], appearance: number[] | null)
   frame.appearanceLength = appearance ? appearance.length : -1;
 }
 
-/** Owns the canvas draw and renders only when the scene's inputs changed. A
-    positive useFrame priority tells R3F to leave rendering to this callback;
-    every other frame callback (priority ≤ 0) still runs first, every frame.
-    `always` restores an unconditional draw for continuously animated modes,
-    where there is never a frame to skip. */
-export function RenderOnChange({ always = false }: { always?: boolean }) {
-  const gl = useThree((state) => state.gl);
-  const motion = useRef(new SceneSignature());
-  const appearance = useRef(new SceneSignature());
-  const drawn = useRef<DrawnFrame>({
+/** What a frame draws with. */
+export interface GateFrame {
+  gl: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  camera: THREE.Camera;
+}
+
+/** Decides, frame by frame, whether the canvas needs drawing, and draws it. */
+export class RenderGate {
+  private readonly motion = new SceneSignature();
+  private readonly appearance = new SceneSignature();
+  private readonly drawn: DrawnFrame = {
     values: new Float64Array(0),
     motionLength: -1,
     appearanceLength: -1,
-  });
+  };
 
-  useEffect(() => {
-    // A restored context has lost its drawing buffer: draw on the next frame.
-    const canvas = gl.domElement;
-    const invalidate = () => {
-      drawn.current.motionLength = -1;
-    };
-    canvas.addEventListener("webglcontextrestored", invalidate);
-    return () => canvas.removeEventListener("webglcontextrestored", invalidate);
-  }, [gl]);
+  /** Draws on the next frame, whatever it records: after a context restore
+      the drawing buffer no longer holds the last frame drawn. */
+  invalidate() {
+    this.drawn.motionLength = -1;
+  }
 
-  useFrame((state) => {
-    const last = drawn.current;
+  /** Runs one frame; true when it drew. `always` draws unconditionally, for
+      continuously animated modes, where there is never a frame to skip. */
+  frame(state: GateFrame, always = false): boolean {
+    const last = this.drawn;
     if (always) {
       state.gl.render(state.scene, state.camera);
       last.motionLength = -1;
-      return;
+      return true;
     }
 
-    const moved = motion.current;
+    const moved = this.motion;
     recordSceneMotion(moved, state.gl, state.scene, state.camera);
     if (
       last.motionLength < 0 ||
@@ -548,10 +602,10 @@ export function RenderOnChange({ always = false }: { always?: boolean }) {
     ) {
       drawRecorded(state);
       store(last, moved.values, null);
-      return;
+      return true;
     }
 
-    const looks = appearance.current;
+    const looks = this.appearance;
     recordSceneAppearance(looks, state.gl, state.scene);
     if (
       last.appearanceLength < 0 ||
@@ -564,7 +618,29 @@ export function RenderOnChange({ always = false }: { always?: boolean }) {
     ) {
       drawRecorded(state);
       store(last, moved.values, looks.values);
+      return true;
     }
+    return false;
+  }
+}
+
+/** Owns the canvas draw and renders only when the scene's inputs changed. A
+    positive useFrame priority tells R3F to leave rendering to this callback;
+    every other frame callback (priority ≤ 0) still runs first, every frame.
+    `always` restores an unconditional draw for continuously animated modes. */
+export function RenderOnChange({ always = false }: { always?: boolean }) {
+  const gl = useThree((state) => state.gl);
+  const [gate] = useState(() => new RenderGate());
+
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const invalidate = () => gate.invalidate();
+    canvas.addEventListener("webglcontextrestored", invalidate);
+    return () => canvas.removeEventListener("webglcontextrestored", invalidate);
+  }, [gate, gl]);
+
+  useFrame((state) => {
+    gate.frame(state, always);
   }, 1);
 
   return null;
