@@ -277,26 +277,6 @@ export function createResidueTextureState(
   };
 }
 
-function sampleResidueRatio(field: BurnField, u: number, v: number) {
-  if (u < 0 || u > 1 || v < 0 || v > 1) return 0;
-  const x = u * (field.width - 1);
-  const y = v * (field.height - 1);
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const x1 = Math.min(field.width - 1, x0 + 1);
-  const y1 = Math.min(field.height - 1, y0 + 1);
-  const tx = x - x0;
-  const ty = y - y0;
-  const ratioAt = (sampleX: number, sampleY: number) => {
-    const index = sampleY * field.width + sampleX;
-    const capacity = field.capacity[index] ?? 0;
-    return capacity > 0 ? (field.residue[index] ?? 0) / capacity : 0;
-  };
-  const top = THREE.MathUtils.lerp(ratioAt(x0, y0), ratioAt(x1, y0), tx);
-  const bottom = THREE.MathUtils.lerp(ratioAt(x0, y1), ratioAt(x1, y1), tx);
-  return THREE.MathUtils.lerp(top, bottom, ty);
-}
-
 /** Radius, in deposit texels, of the drift of loose ash past the paper. */
 const RESIDUE_SKIRT_RADIUS = 9;
 /**
@@ -319,24 +299,38 @@ function blurResidueBuffer(
     const row = y * width;
     let total = 0;
     for (let x = -radius; x <= radius; x += 1) {
-      total += source[row + Math.min(width - 1, Math.max(0, x))] ?? 0;
+      const sampleX = x < 0 ? 0 : x >= width ? width - 1 : x;
+      total += source[row + sampleX] ?? 0;
     }
     for (let x = 0; x < width; x += 1) {
       scratch[row + x] = total / span;
-      const leaving = Math.min(width - 1, Math.max(0, x - radius));
-      const entering = Math.min(width - 1, Math.max(0, x + radius + 1));
+      const leavingX = x - radius;
+      const enteringX = x + radius + 1;
+      const leaving = leavingX < 0
+        ? 0
+        : leavingX >= width ? width - 1 : leavingX;
+      const entering = enteringX < 0
+        ? 0
+        : enteringX >= width ? width - 1 : enteringX;
       total += (source[row + entering] ?? 0) - (source[row + leaving] ?? 0);
     }
   }
   for (let x = 0; x < width; x += 1) {
     let total = 0;
     for (let y = -radius; y <= radius; y += 1) {
-      total += scratch[Math.min(height - 1, Math.max(0, y)) * width + x] ?? 0;
+      const sampleY = y < 0 ? 0 : y >= height ? height - 1 : y;
+      total += scratch[sampleY * width + x] ?? 0;
     }
     for (let y = 0; y < height; y += 1) {
       source[y * width + x] = total / span;
-      const leaving = Math.min(height - 1, Math.max(0, y - radius));
-      const entering = Math.min(height - 1, Math.max(0, y + radius + 1));
+      const leavingY = y - radius;
+      const enteringY = y + radius + 1;
+      const leaving = leavingY < 0
+        ? 0
+        : leavingY >= height ? height - 1 : leavingY;
+      const entering = enteringY < 0
+        ? 0
+        : enteringY >= height ? height - 1 : enteringY;
       total += (scratch[entering * width + x] ?? 0) -
         (scratch[leaving * width + x] ?? 0);
     }
@@ -364,6 +358,10 @@ export function updateResidueTextureState(
   state: ResidueTextureState,
   field: BurnField,
 ) {
+  const fieldWidth = field.width;
+  const fieldHeight = field.height;
+  const fieldCapacity = field.capacity;
+  const fieldResidue = field.residue;
   state.target.fill(0);
   for (let y = 0; y < state.height; y += 1) {
     const v = (y + 0.5) / state.height;
@@ -372,7 +370,40 @@ export function updateResidueTextureState(
       const u = (x + 0.5) / state.width;
       const sourceU = (u - 0.5) * RESIDUE_OVERSCAN_U + 0.5;
       const index = y * state.width + x;
-      const ratio = sampleResidueRatio(field, sourceU, sourceV);
+      let ratio = 0;
+      if (!(sourceU < 0 || sourceU > 1 || sourceV < 0 || sourceV > 1)) {
+        const sourceX = sourceU * (fieldWidth - 1);
+        const sourceY = sourceV * (fieldHeight - 1);
+        const x0 = Math.floor(sourceX);
+        const y0 = Math.floor(sourceY);
+        const x1 = Math.min(fieldWidth - 1, x0 + 1);
+        const y1 = Math.min(fieldHeight - 1, y0 + 1);
+        const tx = sourceX - x0;
+        const ty = sourceY - y0;
+        const index00 = y0 * fieldWidth + x0;
+        const index10 = y0 * fieldWidth + x1;
+        const index01 = y1 * fieldWidth + x0;
+        const index11 = y1 * fieldWidth + x1;
+        const capacity00 = fieldCapacity[index00] ?? 0;
+        const capacity10 = fieldCapacity[index10] ?? 0;
+        const capacity01 = fieldCapacity[index01] ?? 0;
+        const capacity11 = fieldCapacity[index11] ?? 0;
+        const ratio00 = capacity00 > 0
+          ? (fieldResidue[index00] ?? 0) / capacity00
+          : 0;
+        const ratio10 = capacity10 > 0
+          ? (fieldResidue[index10] ?? 0) / capacity10
+          : 0;
+        const ratio01 = capacity01 > 0
+          ? (fieldResidue[index01] ?? 0) / capacity01
+          : 0;
+        const ratio11 = capacity11 > 0
+          ? (fieldResidue[index11] ?? 0) / capacity11
+          : 0;
+        const top = THREE.MathUtils.lerp(ratio00, ratio10, tx);
+        const bottom = THREE.MathUtils.lerp(ratio01, ratio11, tx);
+        ratio = THREE.MathUtils.lerp(top, bottom, ty);
+      }
       state.target[index] = THREE.MathUtils.clamp(
         ratio / RESIDUE_YIELD_PER_LAYER,
         0,
@@ -381,22 +412,46 @@ export function updateResidueTextureState(
     }
   }
 
-  for (let y = 0; y < state.height; y += 1) {
-    for (let x = 0; x < state.width; x += 1) {
-      const index = y * state.width + x;
-      let weighted = (state.target[index] ?? 0) * 0.56;
-      let strongest = state.target[index] ?? 0;
-      for (let oy = -1; oy <= 1; oy += 1) {
-        const sy = Math.min(state.height - 1, Math.max(0, y + oy));
-        for (let ox = -1; ox <= 1; ox += 1) {
-          if (ox === 0 && oy === 0) continue;
-          const sx = Math.min(state.width - 1, Math.max(0, x + ox));
-          const sample = state.target[sy * state.width + sx] ?? 0;
-          weighted += sample * (ox === 0 || oy === 0 ? 0.055 : 0.0275);
-          strongest = Math.max(strongest, sample);
-        }
-      }
-      state.scratch[index] = Math.max(weighted, strongest * 0.62);
+  const { width, height, target, scratch } = state;
+  for (let y = 0; y < height; y += 1) {
+    const row = y * width;
+    const previousRow = y === 0 ? row : row - width;
+    const nextRow = y + 1 === height ? row : row + width;
+    for (let x = 0; x < width; x += 1) {
+      const index = row + x;
+      const previousX = x === 0 ? 0 : x - 1;
+      const nextX = x + 1 === width ? x : x + 1;
+      let weighted = (target[index] ?? 0) * 0.56;
+      let strongest = target[index] ?? 0;
+
+      // Keep the original 3×3 traversal and arithmetic order, but collapse
+      // repeated min/max coordinate clamps into the three row and column
+      // choices shared by all eight neighbours.
+      let sample = target[previousRow + previousX] ?? 0;
+      weighted += sample * 0.0275;
+      strongest = Math.max(strongest, sample);
+      sample = target[previousRow + x] ?? 0;
+      weighted += sample * 0.055;
+      strongest = Math.max(strongest, sample);
+      sample = target[previousRow + nextX] ?? 0;
+      weighted += sample * 0.0275;
+      strongest = Math.max(strongest, sample);
+      sample = target[row + previousX] ?? 0;
+      weighted += sample * 0.055;
+      strongest = Math.max(strongest, sample);
+      sample = target[row + nextX] ?? 0;
+      weighted += sample * 0.055;
+      strongest = Math.max(strongest, sample);
+      sample = target[nextRow + previousX] ?? 0;
+      weighted += sample * 0.0275;
+      strongest = Math.max(strongest, sample);
+      sample = target[nextRow + x] ?? 0;
+      weighted += sample * 0.055;
+      strongest = Math.max(strongest, sample);
+      sample = target[nextRow + nextX] ?? 0;
+      weighted += sample * 0.0275;
+      strongest = Math.max(strongest, sample);
+      scratch[index] = Math.max(weighted, strongest * 0.62);
     }
   }
 
@@ -409,14 +464,18 @@ export function updateResidueTextureState(
     RESIDUE_SKIRT_RADIUS,
   );
 
+  let bytesChanged = false;
   for (let index = 0; index < state.density.length; index += 1) {
     const prior = state.density[index] ?? 0;
     const drifted = (state.skirt[index] ?? 0) * RESIDUE_SKIRT_GAIN;
     // Settled ash is persistent. It does not fade or fall off the screen.
     const next = Math.max(prior, state.scratch[index] ?? 0, drifted);
     state.density[index] = next;
-    state.bytes[index] = Math.round(THREE.MathUtils.clamp(next, 0, 1) * 255);
+    const byte = Math.round(THREE.MathUtils.clamp(next, 0, 1) * 255);
+    if (state.bytes[index] !== byte) bytesChanged = true;
+    state.bytes[index] = byte;
   }
+  return bytesChanged;
 }
 
 export function makeSettledAshGeometry(count: number) {
@@ -1251,8 +1310,9 @@ export function IgniteDebris({
     // needs no reconstruction and no re-upload at all.
     if (field.burnedFuel === lastResidueFuel.current) return;
     lastResidueFuel.current = field.burnedFuel;
-    updateResidueTextureState(residueState, field);
-    residueTextureRef.current.needsUpdate = true;
+    if (updateResidueTextureState(residueState, field)) {
+      residueTextureRef.current.needsUpdate = true;
+    }
   });
 
   useEffect(() => () => {

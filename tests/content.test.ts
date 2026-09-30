@@ -1,6 +1,7 @@
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { z } from "zod/mini";
 import { about, contact, dispatches, projects, resume, siteMeta } from "@/lib/content";
 import {
   AboutSchema,
@@ -15,10 +16,10 @@ describe("content integrity", () => {
   it("all content passes its schema", () => {
     SiteMetaSchema.parse(siteMeta);
     AboutSchema.parse(about);
-    ProjectSchema.array().min(1).parse(projects);
+    z.parse(z.array(ProjectSchema).check(z.minLength(1)), projects);
     ResumeSchema.parse(resume);
     ContactSchema.parse(contact);
-    DispatchSchema.array().min(2).parse(dispatches);
+    z.parse(z.array(DispatchSchema).check(z.minLength(2)), dispatches);
   });
 
   it("every resume entry carries a margin note (the hover-aside requirement)", () => {

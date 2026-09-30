@@ -7,7 +7,7 @@ const packageJson = JSON.parse(
 
 if (packageJson.version !== "1.11.13") {
   throw new Error(
-    `Review the exact-font patch before using html-to-image ${packageJson.version}.`,
+    `Review the html-to-image patches before using html-to-image ${packageJson.version}.`,
   );
 }
 
@@ -49,6 +49,75 @@ const patches = [
             var value = sourceStyle.getPropertyValue(name);
 `,
   },
+  // A capture that names the computed properties to copy must get exactly
+  // those, on that call. Upstream kept the first call's list for the rest of
+  // the session, so a later capture could never name more (see
+  // src/book3d/captureStyles.ts). Calls that name none still share the
+  // cached full list, as before.
+  {
+    file: "src/util.ts",
+    before: `export function getStyleProperties(options: Options = {}): string[] {
+  if (styleProps) {
+    return styleProps
+  }
+
+  if (options.includeStyleProperties) {
+    styleProps = options.includeStyleProperties
+    return styleProps
+  }
+`,
+    after: `export function getStyleProperties(options: Options = {}): string[] {
+  if (options.includeStyleProperties) {
+    return options.includeStyleProperties
+  }
+
+  if (styleProps) {
+    return styleProps
+  }
+`,
+  },
+  {
+    file: "es/util.js",
+    before: `export function getStyleProperties(options = {}) {
+    if (styleProps) {
+        return styleProps;
+    }
+    if (options.includeStyleProperties) {
+        styleProps = options.includeStyleProperties;
+        return styleProps;
+    }
+`,
+    after: `export function getStyleProperties(options = {}) {
+    if (options.includeStyleProperties) {
+        return options.includeStyleProperties;
+    }
+    if (styleProps) {
+        return styleProps;
+    }
+`,
+  },
+  {
+    file: "lib/util.js",
+    before: `function getStyleProperties(options) {
+    if (options === void 0) { options = {}; }
+    if (styleProps) {
+        return styleProps;
+    }
+    if (options.includeStyleProperties) {
+        styleProps = options.includeStyleProperties;
+        return styleProps;
+    }
+`,
+    after: `function getStyleProperties(options) {
+    if (options === void 0) { options = {}; }
+    if (options.includeStyleProperties) {
+        return options.includeStyleProperties;
+    }
+    if (styleProps) {
+        return styleProps;
+    }
+`,
+  },
 ];
 
 let changed = false;
@@ -57,7 +126,7 @@ for (const patch of patches) {
   const source = await readFile(path, "utf8");
   if (source.includes(patch.after)) continue;
   if (!source.includes(patch.before)) {
-    throw new Error(`Could not apply exact-font patch to ${patch.file}.`);
+    throw new Error(`Could not apply an html-to-image patch to ${patch.file}.`);
   }
   await writeFile(path, source.replace(patch.before, patch.after));
   changed = true;
@@ -65,6 +134,6 @@ for (const patch of patches) {
 
 console.log(
   changed
-    ? "Patched html-to-image to preserve exact font sizes."
-    : "html-to-image exact-font patch already applied.",
+    ? "Patched html-to-image: exact font sizes, per-call style properties."
+    : "html-to-image patches already applied.",
 );

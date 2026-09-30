@@ -168,6 +168,64 @@ present, X's own API otherwise. The name doubles as the `source` its items
 carry and carry-forward reclaims a failed feed by matching it, so a second
 `x` would double-count every post and restore the wrong half after a failure.
 
+## Performance
+
+`scripts/bench/` benchmarks the production build the way a visitor meets
+it. It drives full **Chrome for Testing** headless (real GPU WebGL; the
+`chrome-headless-shell` build falls back to software and must not be used)
+through scripted scenarios, serving `dist/` gzipped and cacheable like
+GitHub Pages, from a cold browser profile every run. Install the browser once:
+
+```bash
+npx @puppeteer/browsers install chrome@stable --path ~/.cache/puppeteer
+# or point CHROME_PATH at any Chrome/Chromium executable
+```
+
+```bash
+npm run build
+npm run bench -- --label mine --runs 3 --cpu 1,4     # → bench-results/mine.json
+node scripts/bench/summarize.mjs bench-results/mine.json
+```
+
+| Scenario | What it measures |
+|---|---|
+| `load` | cold load of `/` until the entry gate opens: FCP, LCP, capture span, book ready, blocking time, bytes |
+| `idle` | the flat book at rest under the live DOM, then the breathing display pose: canvas redraws/s, renderer and GPU-process CPU |
+| `turns`, `riffle`, `drag` | six arrow turns, End/Home jumps, three fore-edge drags: frame p95/p99, janky frames, main-thread ms per frame |
+| `ignite`, `drift` | eight seconds of each mode under a moving pointer (drift also times the landing) |
+| `mobile` | the 390×844 touch reader's load |
+
+`--cpu 4` throttles the renderer to approximate a mid-range laptop; most of
+the regressions worth catching only show there.
+
+**Comparing two builds.** Build each into its own folder, then run an
+interleaved A/B, which alternates which build goes first each round so the
+machine's drift lands on both sides:
+
+```bash
+npm run bench:ab -- ../baseline-dist dist --rounds 3
+```
+
+**Finding the cause.** `scripts/bench/profile.mjs` traces one scenario and
+prints the main thread's top self-time functions and event mix; profile an
+unminified build (`npx vite build --minify false --outDir …`) for readable
+names. Treat its attribution as a lead, not a verdict: confirm a suspected
+hot spot with a direct A/B before optimizing it.
+
+**Invariants the fast paths rely on** (each is pinned by a test):
+
+- `src/book3d/paperPhysics.ts` is bit-identical to its pre-optimization
+  version (`tests/fixtures/paperPhysicsReference.ts`,
+  `tests/paperPhysicsParity.test.ts`). Physics changes update both.
+- `src/book3d/renderGate.tsx` skips a WebGL draw only when nothing the draw
+  reads has changed. State a draw depends on must live where the gate
+  records it: object transforms and visibility, geometry and texture
+  versions, material properties, shader uniforms (`material.uniforms`, or an
+  injected program's `userData.<name>.uniforms`).
+- `src/book3d/captureStyles.ts` copies only the computed properties some
+  author rule, inline style, or UA rule can set. Verify capture changes
+  pixel-for-pixel against a full copy before shipping them.
+
 ## Type
 
 Set in **Zodiak** (Indian Type Foundry, via Fontshare), **Tanker**

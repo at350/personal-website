@@ -1,4 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
+import { z } from "zod/mini";
 import { MediaItemSchema, type MediaItem } from "./types";
 
 /**
@@ -193,7 +194,7 @@ function rssItems(xml: string): XmlNode[] {
 /** Validate candidates one by one; drop (never throw on) invalid items. */
 function validateItems(candidates: unknown[]): MediaItem[] {
   return candidates.flatMap((candidate) => {
-    const result = MediaItemSchema.safeParse(candidate);
+    const result = z.safeParse(MediaItemSchema, candidate);
     return result.success ? [result.data] : [];
   });
 }
@@ -298,7 +299,7 @@ function bookRating(value: unknown): number | undefined {
  */
 function bookYear(value: unknown): number | undefined {
   const year = numOf(value);
-  return year !== undefined && MediaItemSchema.shape.year.safeParse(year).success
+  return year !== undefined && z.safeParse(MediaItemSchema.shape.year, year).success
     ? year
     : undefined;
 }

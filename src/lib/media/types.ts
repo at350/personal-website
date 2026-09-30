@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/mini";
 
 export const MediaSourceSchema = z.enum([
   "local",
@@ -21,26 +21,51 @@ export const MediaKindSchema = z.enum([
   "link",
 ]);
 
-const safeLink = z.string().trim().max(2_048).refine((value) => {
-  if (value.startsWith("/") && !value.startsWith("//")) return true;
+const safeLink = z.string().check(
+  z.trim(),
+  z.maxLength(2_048),
+  z.refine((value) => {
+    if (value.startsWith("/") && !value.startsWith("//")) return true;
 
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-}, "Expected an http(s) URL or a root-relative path");
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  }, "Expected an http(s) URL or a root-relative path"),
+);
+
+const trimmedString = (minimum: number, maximum: number) =>
+  z.string().check(
+    z.trim(),
+    z.minLength(minimum),
+    z.maxLength(maximum),
+  );
+
+const boundedInteger = (minimum: number, maximum: number) =>
+  z.number().check(
+    z.int(),
+    z.minimum(minimum),
+    z.maximum(maximum),
+  );
+
+const positiveBoundedInteger = (maximum: number) =>
+  z.number().check(
+    z.int(),
+    z.positive(),
+    z.maximum(maximum),
+  );
 
 export const MediaImageSchema = z.object({
   src: safeLink,
-  alt: z.string().trim().min(1).max(240),
-  width: z.number().int().positive().max(20_000).optional(),
-  height: z.number().int().positive().max(20_000).optional(),
+  alt: trimmedString(1, 240),
+  width: z.optional(positiveBoundedInteger(20_000)),
+  height: z.optional(positiveBoundedInteger(20_000)),
 });
 
 export const MediaRelatedLinkSchema = z.object({
-  label: z.string().trim().min(1).max(160),
+  label: trimmedString(1, 160),
   url: safeLink,
 });
 
@@ -52,39 +77,39 @@ export const MediaRelatedLinkSchema = z.object({
  * accidentally presented as the same claim.
  */
 export const MediaItemSchema = z.object({
-  id: z.string().trim().min(1).max(180),
+  id: trimmedString(1, 180),
   source: MediaSourceSchema,
   kind: MediaKindSchema,
-  title: z.string().trim().min(1).max(200),
-  excerpt: z.string().trim().min(1).max(500).optional(),
-  note: z.string().trim().min(1).max(500).optional(),
-  url: safeLink.optional(),
-  author: z.string().trim().min(1).max(120).optional(),
-  publishedAt: z.string().datetime({ offset: true }).optional(),
+  title: trimmedString(1, 200),
+  excerpt: z.optional(trimmedString(1, 500)),
+  note: z.optional(trimmedString(1, 500)),
+  url: z.optional(safeLink),
+  author: z.optional(trimmedString(1, 120)),
+  publishedAt: z.optional(z.iso.datetime({ offset: true })),
   /**
    * When the thing itself happened, as opposed to when the entry was posted.
    * Letterboxd logs both: a diary entry published today can record a film
    * watched last week, so film plates print this and the sort keeps using
    * `publishedAt` (the shared activity axis across every source).
    */
-  watchedAt: z.string().datetime({ offset: true }).optional(),
+  watchedAt: z.optional(z.iso.datetime({ offset: true })),
   /**
    * The same distinction for a book. Goodreads stamps a shelf entry with
    * the day it was posted and, separately, the day the book was finished;
    * book plates print the finish, and a title still on the
    * currently-reading shelf has none yet.
    */
-  readAt: z.string().datetime({ offset: true }).optional(),
-  image: MediaImageSchema.optional(),
-  relatedLinks: z.array(MediaRelatedLinkSchema).max(4).default([]),
-  tags: z.array(z.string().trim().min(1).max(48)).max(12).default([]),
-  rating: z.number().min(0).max(5).optional(),
-  year: z.number().int().min(1888).max(2200).optional(),
+  readAt: z.optional(z.iso.datetime({ offset: true })),
+  image: z.optional(MediaImageSchema),
+  relatedLinks: z._default(z.array(MediaRelatedLinkSchema).check(z.maxLength(4)), []),
+  tags: z._default(z.array(trimmedString(1, 48)).check(z.maxLength(12)), []),
+  rating: z.optional(z.number().check(z.minimum(0), z.maximum(5))),
+  year: z.optional(boundedInteger(1888, 2200)),
   /** Letterboxd marks a repeat viewing; printed as a mark on the plate. */
-  isRewatch: z.boolean().default(false),
+  isRewatch: z._default(z.boolean(), false),
   /** Goodreads' currently-reading shelf: an open book, not a finished one. */
-  isReading: z.boolean().default(false),
-  isFallback: z.boolean().default(false),
+  isReading: z._default(z.boolean(), false),
+  isFallback: z._default(z.boolean(), false),
 });
 
 export const MediaFeedStateSchema = z.enum([
@@ -96,12 +121,12 @@ export const MediaFeedStateSchema = z.enum([
 
 export const MediaFeedReportSchema = z.object({
   state: MediaFeedStateSchema,
-  itemCount: z.number().int().nonnegative(),
+  itemCount: z.number().check(z.int(), z.nonnegative()),
 });
 
 export const MediaApiResponseSchema = z.object({
   items: z.array(MediaItemSchema),
-  generatedAt: z.string().datetime({ offset: true }),
+  generatedAt: z.iso.datetime({ offset: true }),
   degraded: z.boolean(),
   feeds: z.object({
     x: MediaFeedReportSchema,
@@ -119,4 +144,3 @@ export type MediaItem = z.infer<typeof MediaItemSchema>;
 export type MediaFeedState = z.infer<typeof MediaFeedStateSchema>;
 export type MediaFeedReport = z.infer<typeof MediaFeedReportSchema>;
 export type MediaApiResponse = z.infer<typeof MediaApiResponseSchema>;
-

@@ -1,4 +1,12 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+} from "react";
 import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import {
   bookLocationForSpread,
@@ -7,10 +15,31 @@ import {
 } from "./magazine/folio";
 
 /* The WebGL book (three.js and friends) loads only when the book is shown —
-   reader-mode visitors never pay for it. */
+   reader-mode visitors never pay for it. The Ignite and Drift cursors ride in
+   the same chunk: they only ever draw over the book, which cannot open before
+   that chunk arrives, so they need no request of their own — a mode switch
+   renders its cursor in the same commit, online or off — and phones and the
+   reader never download them. */
+interface ModeCursors {
+  IgniteCursor: ComponentType;
+  DriftCursor: ComponentType;
+}
+let modeCursors: ModeCursors | null = null;
+const modeCursorListeners = new Set<() => void>();
 const BookStage = lazy(() =>
-  import("./book3d/BookStage").then((m) => ({ default: m.BookStage })),
+  import("./book3d/BookStage").then((m) => {
+    modeCursors = { IgniteCursor: m.IgniteCursor, DriftCursor: m.DriftCursor };
+    modeCursorListeners.forEach((listener) => listener());
+    return { default: m.BookStage };
+  }),
 );
+const subscribeModeCursors = (listener: () => void) => {
+  modeCursorListeners.add(listener);
+  return () => {
+    modeCursorListeners.delete(listener);
+  };
+};
+const readModeCursors = () => modeCursors;
 /* The Blaze fire background (WebGL) loads only once Ignite is chosen. */
 const Blaze = lazy(() =>
   import("./components/canvasui/Blaze").then((m) => ({ default: m.Blaze })),
@@ -30,8 +59,11 @@ import {
   ExperienceDock,
   type ExperienceMode,
 } from "./components/ExperienceDock";
-import { IgniteCursor } from "./components/IgniteCursor";
-import { DriftCursor } from "./components/DriftCursor";
+/* The mode cursors live in the book's chunk, but their stylesheets stay in
+   the entry CSS, exactly where the cursors' static imports used to put them:
+   a stylesheet inserted when a chunk arrives would reorder the cascade. */
+import "./styles/ignite.css";
+import "./styles/drift.css";
 
 function IssueView() {
   const location = useLocation();
@@ -104,6 +136,11 @@ function BookView() {
   const target = spreadForBookLocation(location.pathname, location.state);
   const [experienceMode, setExperienceMode] =
     useState<ExperienceMode>("read");
+  const cursors = useSyncExternalStore(
+    subscribeModeCursors,
+    readModeCursors,
+    readModeCursors,
+  );
 
   const onSettled = useCallback(
     (index: number) => {
@@ -151,8 +188,8 @@ function BookView() {
           </div>
         </Suspense>
       ) : null}
-      {experienceMode === "ignite" ? <IgniteCursor /> : null}
-      {experienceMode === "drift" ? <DriftCursor /> : null}
+      {experienceMode === "ignite" && cursors ? <cursors.IgniteCursor /> : null}
+      {experienceMode === "drift" && cursors ? <cursors.DriftCursor /> : null}
       <ExperienceDock
         mode={experienceMode}
         onModeChange={setExperienceMode}
