@@ -348,13 +348,18 @@ const scenarios = {
     const { page } = ctx;
     await openBook(ctx);
     await hoverBook(page);
+    // 4-9 s after the flatten: its springs are still finishing their
+    // sub-pixel tails, which the render gate draws.
     await sleep(4000);
     const flat = await measureWindow(ctx, () => sleep(5000));
+    // 12-17 s: settled.
+    await sleep(3000);
+    const settled = await measureWindow(ctx, () => sleep(5000));
     // Pointer leaves the book: the display stance breathes.
     await page.mouse.move(1420, 30, { steps: 4 });
     await sleep(4000);
     const posed = await measureWindow(ctx, () => sleep(5000));
-    return { flat, posed };
+    return { flat, settled, posed };
   },
 
   async turns(ctx) {
