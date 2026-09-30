@@ -27,7 +27,12 @@ function expectSame(a: V[], b: V[], ea: number, eb: number, ctx: string) {
   if (!Object.is(ea, eb)) throw new Error(`${ctx}: energy ${ea} vs ${eb}`);
 }
 
-describe("paper solver parity with the pre-optimization reference", () => {
+// Each case replays 640 frames through both solvers, and the frozen
+// reference is the slow original. On the shared GitHub runner the 594×792
+// case took ten seconds, past vitest's five-second default, and took the
+// deploy down with it. The budget below is for that runner, not a licence
+// for either solver to get slower.
+describe("paper solver parity with the pre-optimization reference", { timeout: 60_000 }, () => {
   const sizes: [number, number, number, number][] = [
     [594, 792, 28, 16],
     [300, 400, 5, 3],
