@@ -257,10 +257,14 @@
   line-height: 1;
 }
 
+/* Explicit dimensions prevent tall SVGs from imposing their intrinsic height
+   on the grid cell (Firecrawl's source viewBox is 50 × 72). */
 .proj-tech__mark img {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: var(--mark-size);
+  height: var(--mark-size);
+  min-width: 0;
+  min-height: 0;
   object-fit: contain;
   filter: brightness(0);
   transform: scale(var(--mark-scale, 1));
