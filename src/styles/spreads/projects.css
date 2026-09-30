@@ -87,13 +87,6 @@
   letter-spacing: 0.08em;
 }
 
-.proj-count__caption {
-  margin-top: 2cqh;
-  color: var(--paper);
-  opacity: 0.65;
-  font-size: max(11px, 1.35cqw);
-}
-
 /* ————— p.9 · the index ————— */
 
 .proj-index {
@@ -255,16 +248,12 @@
 }
 
 .proj-tech__mark {
-  width: 1.08em;
-  height: 1.08em;
-  flex: 0 0 1.08em;
+  --mark-size: clamp(12px, 1.6cqw, 14px);
+  width: var(--mark-size);
+  height: var(--mark-size);
+  flex: 0 0 var(--mark-size);
   display: grid;
   place-items: center;
-  color: var(--ink-2);
-  font-family: var(--font-mono);
-  font-size: 1em;
-  font-weight: 700;
-  letter-spacing: -0.08em;
   line-height: 1;
 }
 
@@ -274,6 +263,14 @@
   height: 100%;
   object-fit: contain;
   filter: brightness(0);
+  transform: scale(var(--mark-scale, 1));
+}
+
+/* Dense silhouettes need less ink than open line marks at the same size.
+   Optical adjustments stay inside a fixed box, so labels always align. */
+.proj-tech__mark:is([data-technology="TypeScript"], [data-technology="Next.js"],
+  [data-technology="Mapbox"], [data-technology="FastAPI"]) {
+  --mark-scale: 0.88;
 }
 
 .proj-index__recognition {
@@ -342,7 +339,7 @@
   margin-left: -8cqw;
   width: calc(100% + 8cqw);
   border-left: 0;
-  aspect-ratio: 16 / 10;
+  height: 28cqh;
 }
 
 /* p.11, mirrored: the plate sits low and runs off the other fore-edge. */
@@ -358,16 +355,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.proj-feature__caption {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  padding: 0.5em 0.8em;
-  background: var(--paper);
-  color: var(--ink-2);
-  font-size: max(11px, 1.35cqw);
 }
 
 .proj-feature__head {
@@ -456,7 +443,11 @@
   margin-top: auto;
 }
 
+/* Keep the scroll viewport itself clear of both running head and folio. */
 .proj-feature:is([data-mode="book"], [data-mode="single"]) {
+  inset-block-start: max(8cqh, calc(var(--page-pad) * 0.45 + 28px));
+  inset-block-end: max(8cqh, calc(var(--page-pad) * 0.45 + 32px));
+  padding-block: 0 2cqh;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;

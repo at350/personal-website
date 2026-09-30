@@ -64,7 +64,7 @@ export const projects: readonly Project[] = [
     id: "peel",
     image: {
       src: "/images/projects/editorial/peel-study.webp",
-      alt: "Conceptual Peel study with a white capsule, connected evidence cards, and a translucent red strip.",
+      alt: "Peel artwork with a white capsule, connected evidence cards, and a translucent red strip.",
     },
     name: "Peel",
     discipline: "AI evidence retrieval",
@@ -85,7 +85,7 @@ export const projects: readonly Project[] = [
     id: "turfiq",
     image: {
       src: "/images/projects/editorial/turfiq-study.webp",
-      alt: "Conceptual TurfIQ study with layered topographic terrain, a soil sensor, and a red maintenance route.",
+      alt: "TurfIQ artwork with layered topographic terrain, a soil sensor, and a red maintenance route.",
     },
     name: "TurfIQ",
     discipline: "Field operations",
@@ -108,7 +108,7 @@ export const projects: readonly Project[] = [
     year: "2026",
     image: {
       src: "/images/projects/editorial/greenchain-study.webp",
-      alt: "Conceptual GreenChain study with black paper nodes, taut threads, white platforms, and one red route through the network.",
+      alt: "GreenChain artwork with black paper nodes, taut threads, white platforms, and one red route through the network.",
     },
     summary:
       "A supply-chain sustainability prototype that researches suppliers, estimates emissions, and maps their relationships.",
@@ -128,7 +128,7 @@ export const projects: readonly Project[] = [
     year: "2026",
     image: {
       src: "/images/projects/editorial/architec-study.webp",
-      alt: "Conceptual Architec study with layered architectural planes, a black building volume, and a red translucent energy plane.",
+      alt: "Architec artwork with layered architectural planes, a black building volume, and a red translucent energy plane.",
     },
     summary:
       "An energy-audit prototype that turns commercial-building utility bills into ranked upgrades, projected savings, and payback estimates.",
@@ -144,7 +144,7 @@ export const projects: readonly Project[] = [
     id: "arrival",
     image: {
       src: "/images/projects/editorial/arrival-study.webp",
-      alt: "Conceptual Arrival study with financial documents passing through a translucent red gateway toward a black credit pass.",
+      alt: "Arrival artwork with financial documents passing through a translucent red gateway toward a black credit pass.",
     },
     name: "Arrival",
     discipline: "Financial access",
@@ -167,7 +167,7 @@ export const projects: readonly Project[] = [
     year: "2025",
     image: {
       src: "/images/projects/editorial/terrablade-study.webp",
-      alt: "Conceptual TerraBlade study with a pale clay slab, black guide rails, and a broad red pulling grip.",
+      alt: "TerraBlade artwork with a pale clay slab, black guide rails, and a broad red pulling grip.",
     },
     summary:
       "An accessible clay slab-forming device built with Envision Unlimited that halved forming time for artists with physical disabilities.",
@@ -182,7 +182,7 @@ export const projects: readonly Project[] = [
     year: "2026",
     image: {
       src: "/images/projects/editorial/vox-vera-study.webp",
-      alt: "Conceptual Vox Vera study with black paper channels and white tokens converging on a red crop frame.",
+      alt: "Vox Vera artwork with black paper channels and white tokens converging on a red crop frame.",
     },
     summary:
       "A Lambda Strategy client project recommending acquisition channels and audience segments for Vox Vera.",

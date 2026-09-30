@@ -48,9 +48,6 @@ function Count() {
           </li>
         ))}
       </ol>
-      <p className="proj-count__caption mono-label">
-        Images are conceptual studies.
-      </p>
     </div>
   );
 }
