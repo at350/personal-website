@@ -51,3 +51,15 @@ Non-obvious notes:
   retired by editing `main`'s `live.json` — delete the branch instead
   (`git push origin --delete media-snapshot`) and the next refresh rebuilds
   from `main`'s baseline.
+- Pictures wider than their slot can show get a right-sized WebP sibling and
+  the original stays beside it: `<hash>.w640.webp` for media thumbnails
+  (written by `refresh-media`, or `npm run refresh-media -- --right-size-only`
+  for the baseline on `main` with no network), `<name>.w480.webp` /
+  `.w720.webp` for the project artwork shown only as an opener tile
+  (`node scripts/right-size-project-tiles.mjs`; add `--force` after replacing
+  an artwork file, or `tests/rightSizedAssets.test.ts` fails). A sibling is
+  never rewritten once it exists. `sharp` does the resizing and ships a
+  prebuilt binary, so a plain `npm install` covers it. To check a change to
+  the pictures, run `scripts/bench/image-audit.mjs` (bytes and sizes) and
+  `scripts/bench/image-parity.mjs` (before/after crops from two dev servers)
+  and look at the crops; a resize legitimately scores under 0.99 there.
