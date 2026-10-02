@@ -47,7 +47,11 @@ npm run lint
   `src/lib/content.ts`; the count, expandable archive, and technology marks all
   update from that entry. Include its full
   `detail`, stack, optional image/links, and set `featureOrder` only when it
-  should occupy one of the two editorial feature pages. Brand marks resolve in
+  should occupy one of the two editorial feature pages. A project without
+  `featureOrder` shows its artwork only as a small opener tile, so its `image`
+  points at a right-sized sibling (`arrival-study.w480.webp`) made by
+  `node scripts/right-size-project-tiles.mjs`; after replacing an artwork
+  file, run it with `--force`. Brand marks resolve in
   `src/lib/technology-icons.ts`; uncatalogued tools and methods receive a
   monochrome typographic mark automatically.
 - **Media library** — `src/lib/media/`: a verified seed merged with
@@ -76,6 +80,24 @@ beside the letterboxd username as `DEFAULT_GOODREADS_USER_ID` — and an
 open book lands with a **READING** mark until it moves to the read shelf.
 The X and LinkedIn lanes cost money per call, so they ride a slower clock;
 see [Social posts](#social-posts) below.
+
+**Oversized pictures get a right-sized sibling.** Feeds hand over photos far
+larger than a plate can show — a 2040-px LinkedIn picture lands in a box
+166 CSS px wide — and the desktop book downloads every page's images before
+it opens. After mirroring, the script writes a 640-px WebP beside any image
+wider than that (`<hash>.w640.webp` next to `<hash>.jpg`) and points the item
+at it. 640 px is the plate's largest footprint on any display measured, so
+nothing is ever upscaled; images already within it (letterboxd posters,
+Goodreads covers) are left exactly as they are, and every original stays on
+disk. A sibling is written once and never rewritten, so a `sharp` upgrade
+cannot churn the published snapshot; it is remade only when its source
+changes. No item is ever published pointing at a file that is not there: a
+sibling that has gone missing falls back to its original, and a picture with
+nothing left behind it is dropped from its item, with a warning, until the
+feed hands it over again. `npm run refresh-media -- --right-size-only` does
+just these steps for the snapshot on disk, asking no feed — that is how
+`main`'s baseline gets its siblings. The rules live in
+`scripts/lib/right-size.mjs`.
 
 The snapshot never lands on `main`. It lives on the **`media-snapshot`**
 branch as a single commit with no parent that holds only `live.json` and
@@ -205,6 +227,17 @@ machine's drift lands on both sides:
 ```bash
 npm run bench:ab -- ../baseline-dist dist --rounds 3
 ```
+
+**Pictures.** `node scripts/bench/image-audit.mjs` lists every image the
+book downloads before it opens, with its bytes, its slot, and its `fill`: how
+its pixels compare with the slot's largest footprint. Over 2× wants a
+right-sized sibling; under 1× is upscaled on the largest displays.
+`scripts/bench/image-parity.mjs` compares the pictures of two checkouts as the
+site draws them — the book's own textures and the resting page — and writes
+before/after crops with an SSIM score for each. Read the crops: a re-encode
+should score 0.99 and up, but a resize will not, because Chrome and Firefox
+shrink a large image with a cheap filter and a right-sized file comes out
+smoother (jagged lettering scores 0.8 against its smooth self).
 
 **Finding the cause.** `scripts/bench/profile.mjs` traces one scenario and
 prints the main thread's top self-time functions and event mix; profile an
