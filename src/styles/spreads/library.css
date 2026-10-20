@@ -411,8 +411,8 @@ a.media-plate:focus-visible .media-plate__title {
 /* The capture farm rasterizes each face into the page texture the book shows
    while paper is turning. A column mid-flight rasterizes badly — the drifting
    layer is still compositing, and its thumbnails come out blank — so the farm
-   gets the wall standing still. The visible spread is real DOM and keeps
-   moving; only the frozen copy behind a page turn is held. */
+   gets the wall standing still, set at whatever offset the book last held
+   the live wall at (mosaicDrift.ts) so the texture matches what was showing. */
 [data-capture-key] .media-col__track {
   animation: none;
   will-change: auto;

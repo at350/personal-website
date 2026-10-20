@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 import { Link } from "react-router";
 import type { MediaImage, MediaItem, MediaKind, MediaSource } from "@/lib/media/types";
 import { withBasePath } from "@/lib/basePath";
 import { distinctExcerpt } from "@/lib/copy";
+import { registerMosaicTrack } from "./mosaicDrift";
 import "@/styles/spreads/library.css";
 
 /* ————— Shared filter store —————
@@ -140,6 +148,7 @@ export function MediaWall({ items, page }: MediaWallProps) {
             column={column}
             columnCount={columnCount}
             page={page}
+            driftKey={`${filter}:${page}:${column}`}
           />
         ),
       )}
@@ -174,9 +183,17 @@ interface MediaColumnProps {
   column: number;
   columnCount: number;
   page: "verso" | "recto";
+  /** The column's place on the shared drift clock (mosaicDrift.ts). */
+  driftKey: string;
 }
 
-function MediaColumn({ plates, column, columnCount, page }: MediaColumnProps) {
+function MediaColumn({
+  plates,
+  column,
+  columnCount,
+  page,
+  driftKey,
+}: MediaColumnProps) {
   const columnRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLUListElement>(null);
   /* Loop until measured: an unlaid-out wall — jsdom, the prerender, a pane
@@ -203,6 +220,21 @@ function MediaColumn({ plates, column, columnCount, page }: MediaColumnProps) {
     observer.observe(track);
     return () => observer.disconnect();
   }, []);
+
+  /* A looping column keeps time with the book (mosaicDrift.ts): the live copy
+     pauses and resumes on its clock, the capture farm's copy is set to the
+     offset the live one was held at. Layout effect, so a live column mounting
+     while the book holds the drift never paints a frame from loop start. */
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (!loops || !track) return;
+    return registerMosaicTrack(
+      track,
+      driftKey,
+      column % 2 === 1,
+      track.closest("[data-capture-key]") !== null,
+    );
+  }, [column, driftKey, loops]);
 
   return (
     <div
