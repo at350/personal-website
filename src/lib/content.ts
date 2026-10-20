@@ -202,7 +202,7 @@ export const resume = {
       institution: "Northwestern University",
       program: "Industrial Engineering and Artificial Intelligence",
       location: "Evanston, Illinois",
-      details: ["Undergraduate studies", "GPA 3.98 / 4.00"],
+      details: ["Class of 2029", "GPA 3.98 / 4.00"],
     },
   ],
   entries: [
@@ -368,7 +368,7 @@ export const resume = {
       summary:
         "Led reporting, editing, and production for a 65-member student newsroom.",
       highlights: [
-        "Required factual claims to trace to named primary sources.",
+        "Instituted a rule that every factual claim trace to a named primary source.",
       ],
       marginalia: {
         label: "Production-night inventory",
@@ -394,10 +394,27 @@ export const resume = {
       },
     },
     {
+      id: "uc-santa-barbara",
+      kind: "research",
+      organization: "University of California, Santa Barbara",
+      role: "Student Researcher, Spiking Neural Networks",
+      dates: "Jul 2024 to Aug 2024",
+      summary:
+        "Studied neuromorphic learning systems.",
+      highlights: [
+        "Investigated backpropagation through spiking networks.",
+      ],
+      marginalia: {
+        label: "A different clock",
+        ariaLabel: "Read a personal note about the University of California Santa Barbara research",
+        text: "the research explored learning in networks that communicate through spikes.",
+      },
+    },
+    {
       id: "uc-merced",
       kind: "research",
       organization: "University of California, Merced",
-      role: "Undergraduate Researcher, Computer Vision",
+      role: "Student Researcher, Computer Vision",
       dates: "May 2023 to Apr 2024",
       summary:
         "Researched crop nutrient detection from drone imagery with Ross Greer.",
@@ -410,23 +427,6 @@ export const resume = {
         text: "my first paper started with drone photos of winter crops.",
       },
     },
-    {
-      id: "uc-santa-barbara",
-      kind: "research",
-      organization: "University of California, Santa Barbara",
-      role: "Undergraduate Researcher, Spiking Neural Networks",
-      dates: "Jul 2024 to Aug 2024",
-      summary:
-        "Studied spiking neural networks and neuromorphic learning systems.",
-      highlights: [
-        "Investigated backpropagation in spiking neural networks.",
-      ],
-      marginalia: {
-        label: "A different clock",
-        ariaLabel: "Read a personal note about the University of California Santa Barbara research",
-        text: "the research explored learning in networks that communicate through spikes.",
-      },
-    },
   ],
   recognition: [
     {
@@ -437,7 +437,7 @@ export const resume = {
     },
     {
       title: "Public Forum National Champion",
-      issuer: "National Speech & Debate Association",
+      issuer: "NSDA",
       year: "2025",
       note: "",
     },
