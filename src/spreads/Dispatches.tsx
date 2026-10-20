@@ -29,14 +29,12 @@ function DispatchIndex() {
   );
 }
 
-/* Recto (p. 17): one line, then paper. */
+/* Recto (p. 17): one line, a red hairline, then paper. */
 function DispatchCredo() {
   return (
     <div className="dispatches" data-face="recto">
       <p className="dispatches__credo">Read slowly enough to disagree.</p>
-      <span className="dispatches__asterisk" aria-hidden>
-        &#10035;
-      </span>
+      <span className="dispatches__rule" aria-hidden />
     </div>
   );
 }

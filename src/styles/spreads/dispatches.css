@@ -134,10 +134,11 @@
   max-width: 24ch;
 }
 
-.dispatches__asterisk {
-  color: var(--red);
-  font-size: clamp(12px, 2.6cqw, 19px);
-  line-height: 1;
+.dispatches__rule {
+  width: 3em;
+  height: 1px;
+  background: var(--red);
+  font-size: clamp(13px, 2.8cqw, 20px);
 }
 
 @media (prefers-reduced-motion: reduce) {
