@@ -32,6 +32,12 @@ import {
 import { settleOverlay } from "./overlayReadiness";
 import { useLibraryFilter } from "@/components/MediaWall";
 import {
+  holdMosaicDrift,
+  mosaicDriftAdvanced,
+  releaseMosaicDrift,
+  resetMosaicDrift,
+} from "@/components/mosaicDrift";
+import {
   usePersistentInteraction,
   type PersistentInteractionSpread,
 } from "@/magazine/persistent-interactions";
@@ -214,6 +220,53 @@ export function BookStage({
   const driftLocked = driftRequested || driftStage !== "idle";
   const modeLocked = igniteActive || driftLocked;
   const textureRefreshesPending = useRef(0);
+  const trackTextureRefresh = useCallback((refresh: Promise<boolean>) => {
+    textureRefreshesPending.current += 1;
+    queueMicrotask(() => setTextureRefreshPending(true));
+    void refresh.finally(() => {
+      textureRefreshesPending.current = Math.max(
+        0,
+        textureRefreshesPending.current - 1,
+      );
+      setTextureRefreshPending(textureRefreshesPending.current > 0);
+    });
+  }, []);
+
+  /* The library wall drifts as live DOM while its textures stand still
+     (mosaicDrift.ts). The book owns that clock: the wall starts at the
+     printed position the entry gate captured, and before the canvas takes
+     the stage from a drifted wall, the wall is held and the spread
+     recaptured at the held offset — or the page tilts or turns with every
+     column snapped back to where it began. */
+  const librarySpread = useMemo(
+    () => SPREADS.findIndex((def) => def.id === "library"),
+    [],
+  );
+  useLayoutEffect(() => {
+    resetMosaicDrift(true);
+    return () => resetMosaicDrift(false);
+  }, []);
+  /** A spread whose textures show exactly what its live page shows. */
+  const spreadReady = useCallback(
+    (spread: number) =>
+      isSpreadTextureFresh(spread) &&
+      !(spread === librarySpread && mosaicDriftAdvanced()),
+    [librarySpread],
+  );
+  const holdLibraryDrift = useCallback(() => {
+    if (librarySpread < 0 || !mosaicDriftAdvanced()) return;
+    holdMosaicDrift();
+    trackTextureRefresh(refreshSpreadTextures(librarySpread));
+  }, [librarySpread, trackTextureRefresh]);
+  /** A drag that began on a drifted wall, waiting for its recapture. */
+  const pendingDrag = useRef<{
+    edge: "fore" | "back";
+    x: number;
+    y: number;
+    pointerId: number;
+    cancel: () => void;
+  } | null>(null);
+
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const tapQueue = useRef<ArrowDirection[]>([]);
@@ -397,7 +450,11 @@ export function BookStage({
     (to: number) => {
       if (modeLocked) return false;
       if (launchingTurn.current) return false;
-      if (!isSpreadTextureFresh(currentSpread)) return false;
+      if (!spreadReady(currentSpread)) {
+        // Callers retry once `busy` clears with the recapture.
+        holdLibraryDrift();
+        return false;
+      }
       launchingTurn.current = true;
       motion.turnPose = motion.pose;
       motion.poseTarget = motion.turnPose;
@@ -409,7 +466,7 @@ export function BookStage({
       dispatch({ type: "TURN", to });
       return true;
     },
-    [currentSpread, modeLocked, motion],
+    [currentSpread, holdLibraryDrift, modeLocked, motion, spreadReady],
   );
   const onTextureProgress = useCallback((progress: TextureProgress) => {
     setTextureProgress(progress);
@@ -464,10 +521,10 @@ export function BookStage({
         ? motion.turnPose
         : touchOnly
           ? 1
-          : hoverRef.current
+          : hoverRef.current || !spreadReady(state.current)
             ? 1
             : 0;
-  }, [dispatch, modeLocked, motion, pw, state, touchOnly]);
+  }, [dispatch, modeLocked, motion, pw, spreadReady, state, touchOnly]);
 
   // The overlay pre-renders the landing spread the moment a turn knows its
   // destination. Its images then fetch and decode — and its entrance motion
@@ -667,21 +724,6 @@ export function BookStage({
   const libraryFilter = useLibraryFilter();
   const featuresInteraction = usePersistentInteraction("features");
   const resumeInteraction = usePersistentInteraction("resume");
-  const librarySpread = useMemo(
-    () => SPREADS.findIndex((def) => def.id === "library"),
-    [],
-  );
-  const trackTextureRefresh = useCallback((refresh: Promise<boolean>) => {
-    textureRefreshesPending.current += 1;
-    queueMicrotask(() => setTextureRefreshPending(true));
-    void refresh.finally(() => {
-      textureRefreshesPending.current = Math.max(
-        0,
-        textureRefreshesPending.current - 1,
-      );
-      setTextureRefreshPending(textureRefreshesPending.current > 0);
-    });
-  }, []);
   const seenFilter = useRef(libraryFilter);
   useEffect(() => {
     if (seenFilter.current === libraryFilter) return;
@@ -834,16 +876,51 @@ export function BookStage({
     [busy, modeLocked, motion, ph, pw],
   );
 
+  /* Paper can only lift once the spread's textures match its live page. On a
+     drifted library the press holds the wall and recaptures first; the drag
+     then begins from where it was pressed, provided the pointer is still
+     down. */
+  const startDrag = useCallback(
+    (edge: "fore" | "back", x: number, y: number, pointerId: number) => {
+      if (spreadReady(currentSpread)) {
+        beginDrag(edge, x, y, pointerId);
+        return;
+      }
+      if (currentSpread !== librarySpread || !mosaicDriftAdvanced()) return;
+      pendingDrag.current?.cancel();
+      const release = (ev: PointerEvent) => {
+        if (ev.pointerId === pointerId) cancel();
+      };
+      const cancel = () => {
+        window.removeEventListener("pointerup", release);
+        window.removeEventListener("pointercancel", release);
+        if (pendingDrag.current?.pointerId === pointerId) pendingDrag.current = null;
+      };
+      window.addEventListener("pointerup", release);
+      window.addEventListener("pointercancel", release);
+      pendingDrag.current = { edge, x, y, pointerId, cancel };
+      holdLibraryDrift();
+    },
+    [beginDrag, currentSpread, holdLibraryDrift, librarySpread, spreadReady],
+  );
+  useEffect(() => {
+    const drag = pendingDrag.current;
+    if (!drag || busy || textureRefreshesPending.current > 0) return;
+    drag.cancel();
+    if (!modeLocked && spreadReady(currentSpread)) {
+      beginDrag(drag.edge, drag.x, drag.y, drag.pointerId);
+    }
+  }, [beginDrag, busy, currentSpread, modeLocked, spreadReady]);
+
   const onEdgeDown = useCallback(
     (edge: "fore" | "back") => (e: React.PointerEvent) => {
       e.preventDefault();
       if (modeLocked) return;
       if (busy) return;
       const { clientX, clientY, pointerId } = e;
-      if (!isSpreadTextureFresh(currentSpread)) return;
-      beginDrag(edge, clientX, clientY, pointerId);
+      startDrag(edge, clientX, clientY, pointerId);
     },
-    [beginDrag, busy, currentSpread, modeLocked],
+    [busy, modeLocked, startDrag],
   );
 
   // Grab anywhere on or near the book — posed mesh and live DOM alike: a
@@ -900,8 +977,7 @@ export function BookStage({
             },
             { capture: true, once: true },
           );
-          if (!isSpreadTextureFresh(state.current)) return;
-          beginDrag(edge, downX, downY, pointerId);
+          startDrag(edge, downX, downY, pointerId);
         }
       };
       const cleanup = () => {
@@ -914,11 +990,11 @@ export function BookStage({
       window.addEventListener("pointercancel", cleanup);
     },
     [
-      beginDrag,
       busy,
       modeLocked,
       motion,
       pointerFrame,
+      startDrag,
       state,
       texturesReady,
     ],
@@ -933,8 +1009,36 @@ export function BookStage({
     }
     if (modeLocked) return 1;
     if (touchOnly) return 1;
-    return hoverRef.current ? 1 : 0;
-  }, [modeLocked, motion, state.riffle, touchOnly]);
+    if (hoverRef.current) return 1;
+    // The pointer has left a drifted library: stay flat, live, until the
+    // texture the tilt will show has caught up with the wall.
+    if (!spreadReady(currentSpread)) {
+      holdLibraryDrift();
+      return 1;
+    }
+    return 0;
+  }, [
+    currentSpread,
+    holdLibraryDrift,
+    modeLocked,
+    motion,
+    spreadReady,
+    state.riffle,
+    touchOnly,
+  ]);
+
+  // A recapture that held the pose (above) or a turn (launchTurn) has landed:
+  // let the pose go where the pointer now wants it.
+  useEffect(() => {
+    if (textureRefreshPending) return;
+    motion.poseTarget = desiredPose();
+  }, [desiredPose, motion, textureRefreshPending]);
+
+  // Ignite and drift both hand the page to the canvas; their ready latches
+  // wait on `spreadReady`, so a drifted wall is held and recaptured first.
+  useEffect(() => {
+    if (modeLocked) holdLibraryDrift();
+  }, [holdLibraryDrift, modeLocked]);
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -979,6 +1083,7 @@ export function BookStage({
         if (
           !igniteReadyRef.current &&
           !busy &&
+          spreadReady(currentSpread) &&
           handoff > 0.985
         ) {
           igniteReadyRef.current = true;
@@ -1000,6 +1105,7 @@ export function BookStage({
         driftStageRef.current === "flattening" &&
         !driftAdvanceRef.current &&
         !busy &&
+        spreadReady(currentSpread) &&
         handoff > 0.985
       ) {
         driftAdvanceRef.current = true;
@@ -1023,11 +1129,41 @@ export function BookStage({
       el.style.opacity = String(shown);
       el.style.visibility = shown < 0.02 ? "hidden" : "visible";
       el.style.pointerEvents = shown > 0.98 ? "auto" : "none";
+      // The live library is on stage and staying there: let its wall move on
+      // from where the textures hold it. Anything about to hand the page back
+      // to the canvas — a pointer leaving, a turn waiting on the recapture, a
+      // mode — keeps it held.
+      if (
+        shown > 0.98 &&
+        currentSpread === librarySpread &&
+        (touchOnly || hoverRef.current) &&
+        textureRefreshesPending.current === 0 &&
+        !motion.dragging &&
+        motion.leaf === null &&
+        pendingDrag.current === null &&
+        pendingTarget.current === null &&
+        tapQueue.current.length === 0 &&
+        !launchingTurn.current &&
+        !igniteActive &&
+        !driftRequestedRef.current &&
+        driftStageRef.current === "idle"
+      ) {
+        releaseMosaicDrift();
+      }
     };
     return () => {
       motion.onPose = null;
     };
-  }, [busy, driftRequested, igniteActive, motion]);
+  }, [
+    busy,
+    currentSpread,
+    driftRequested,
+    igniteActive,
+    librarySpread,
+    motion,
+    spreadReady,
+    touchOnly,
+  ]);
 
   // Deliberate absolute jumps (TOC, Home/End) keep their latest destination.
   const goAbsolute = useCallback(
@@ -1061,7 +1197,13 @@ export function BookStage({
         return false;
       }
       const to = Math.min(Math.max(currentSpread + offset, 0), TOTAL - 1);
-      return to !== currentSpread && launchTurn(to);
+      if (to === currentSpread) return false;
+      if (launchTurn(to)) return true;
+      // Deferred behind a library recapture: a quick tap is released long
+      // before it lands, so the turn waits in the tap queue instead.
+      tapQueue.current.push(offset);
+      wakeTapDrain();
+      return true;
     },
     [busy, currentSpread, modeLocked, launchTurn, texturesReady],
   );
