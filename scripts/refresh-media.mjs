@@ -8,6 +8,12 @@
 // merges this snapshot with the hand-verified seed at load time (seed wins on
 // id collisions — see src/lib/media/store.ts). Always exits 0 (cron-safe).
 //
+// Thumbnails are mirrored into public/media/thumbs/, and any wider than its
+// plate can show gets a right-sized WebP sibling the item points at instead
+// (scripts/lib/right-size.mjs). `--right-size-only` does just that last step
+// for the snapshot already on disk, asking no feed: it is how the offline
+// baseline on main gets its siblings.
+//
 // NOTE: the tiny normalizers below INTENTIONALLY duplicate the logic in
 // src/lib/media/normalize.ts. That module is the source of truth for the app,
 // but it is TypeScript and this script must run under plain `node` (20+)
@@ -32,7 +38,7 @@
 //   X_BEARER_TOKEN + X_USER_ID X API v2 recent posts (fallback, only used
 //                              when ANYAPI_KEY is absent)
 
-import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import process from "node:process";
@@ -753,8 +759,20 @@ async function attachXMedia(items) {
 // image same-origin: the live wall, the captured textures, and the deployed
 // site all read the same local file. Failures keep the remote URL — a broken
 // mirror must never lose an item.
+//
+// A mirrored file is named for its source, `<hash>.<ext>`. An image wider
+// than its plate can ever show gets a right-sized sibling, `<hash>.w640.webp`
+// (see rightSizeThumbnails), and the item points at that; the original stays
+// beside it.
 
 const THUMB_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"]);
+/** The hash every file mirrored from one source starts with. */
+const THUMB_HASH = /^[0-9a-f]{12}(?=\.)/;
+/** A right-sized sibling: `<hash>.w<width>.webp`. */
+const THUMB_VARIANT = /^[0-9a-f]{12}\.w\d+\.webp$/;
+/** A plate's image box is this wide, in CSS px, in the 640-px page layout
+    (.media-plate__media, library.css); its height follows the image. */
+const THUMB_SLOT_CSS_WIDTH = 166;
 
 function thumbFileName(src) {
   const hash = createHash("sha1").update(src).digest("hex").slice(0, 12);
@@ -770,10 +788,10 @@ function thumbFileName(src) {
   return `${hash}${extension}`;
 }
 
-async function mirrorThumbnails(items) {
+async function mirrorThumbnails(items, dir = THUMBS_DIR_URL) {
   const remote = items.filter((item) => /^https?:\/\//.test(item.image?.src ?? ""));
   if (remote.length === 0) return { mirrored: 0, kept: 0 };
-  await mkdir(THUMBS_DIR_URL, { recursive: true });
+  await mkdir(dir, { recursive: true });
 
   let mirrored = 0;
   for (const item of remote) {
@@ -783,7 +801,14 @@ async function mirrorThumbnails(items) {
       const response = await fetchWithTimeout(source);
       const bytes = Buffer.from(await response.arrayBuffer());
       if (bytes.length === 0) throw new Error("empty body");
-      await writeFile(new URL(fileName, THUMBS_DIR_URL), bytes);
+      const target = new URL(fileName, dir);
+      const existing = await readFile(target).catch(() => null);
+      if (!existing?.equals(bytes)) {
+        await writeFile(target, bytes);
+        // The source changed under the same URL: its right-sized sibling was
+        // made from the old picture and has to be made again.
+        if (existing) await dropVariants(fileName, dir);
+      }
       item.image.src = `${THUMBS_PUBLIC_PATH}${fileName}`;
       mirrored += 1;
     } catch (error) {
@@ -794,25 +819,171 @@ async function mirrorThumbnails(items) {
     }
   }
 
-  // Prune only files nothing in the new snapshot points at. This reads the
-  // final srcs rather than just this run's downloads, because an item carried
-  // forward from the previous snapshot already holds a local path and must
-  // keep the file behind it.
-  const wanted = new Set(
+  return { mirrored, kept: remote.length - mirrored };
+}
+
+async function dropVariants(fileName, dir) {
+  const hash = THUMB_HASH.exec(fileName)?.[0];
+  if (!hash) return;
+  for (const file of await readdir(dir)) {
+    if (file.startsWith(`${hash}.`) && THUMB_VARIANT.test(file)) {
+      await unlink(new URL(file, dir));
+    }
+  }
+}
+
+// --- right-sized thumbnails -------------------------------------------------
+//
+// Feeds hand over photos far larger than a plate: a 2040-px LinkedIn picture
+// lands in a box 166 CSS px wide, and the book downloads every page's images
+// before it opens. Each mirrored image wider than the plate's largest
+// footprint gets a WebP sibling at that width, and the item points at it;
+// everything else is left exactly as it is. scripts/lib/right-size.mjs holds
+// the rules. Like the mirror, this never loses an item: whatever goes wrong
+// for one image, it keeps the file it already had. repairThumbnails runs
+// first, so every item starts on a file that exists.
+
+/** The mirrored original a right-sized sibling was made from, if it is there. */
+async function originalOf(variant, dir) {
+  const hash = THUMB_HASH.exec(variant)?.[0];
+  try {
+    return (await readdir(dir)).find(
+      (file) => file.startsWith(`${hash}.`) && !THUMB_VARIANT.test(file),
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/** Whether a mirrored file is there. Only "no such file" counts as missing:
+    any other failure throws, so a passing I/O error cannot cost a picture. */
+async function thumbExists(fileName, dir) {
+  try {
+    await stat(new URL(fileName, dir));
+    return true;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+/**
+ * Leaves every item on a file that exists, so a snapshot can never be
+ * published pointing at nothing — a broken picture on the page, and a deploy
+ * that fails its own checks until someone repairs the branch by hand.
+ *
+ * A right-sized sibling that has gone missing (dropped because its source
+ * changed, or lost) falls back to the original beside it; rightSizeThumbnails
+ * then makes the sibling again. A file with nothing left to fall back to
+ * costs the item its picture and nothing else: the item stays, and a feed
+ * that hands the picture over again mirrors it afresh.
+ */
+async function repairThumbnails(items, dir = THUMBS_DIR_URL) {
+  let restored = 0;
+  let dropped = 0;
+  for (const item of items) {
+    const src = item.image?.src ?? "";
+    if (!src.startsWith(THUMBS_PUBLIC_PATH)) continue;
+    const fileName = src.slice(THUMBS_PUBLIC_PATH.length);
+    try {
+      if (await thumbExists(fileName, dir)) continue;
+      const original = THUMB_VARIANT.test(fileName)
+        ? await originalOf(fileName, dir)
+        : undefined;
+      if (original) {
+        item.image.src = `${THUMBS_PUBLIC_PATH}${original}`;
+        restored += 1;
+        continue;
+      }
+      console.warn(
+        `refresh-media: ${fileName} is missing and there is nothing to make ` +
+          `it from; "${item.title ?? item.id}" goes without its picture ` +
+          "until its feed hands it over again.",
+      );
+      delete item.image;
+      dropped += 1;
+    } catch (error) {
+      console.warn(
+        `refresh-media: could not check ${fileName} ` +
+          `(${error?.message ?? error}); leaving it as it is.`,
+      );
+    }
+  }
+  return { restored, dropped };
+}
+
+async function rightSizeThumbnails(items, dir = THUMBS_DIR_URL) {
+  const local = items.filter((item) =>
+    (item.image?.src ?? "").startsWith(THUMBS_PUBLIC_PATH),
+  );
+  if (local.length === 0) return { sized: 0, written: 0 };
+
+  let lib;
+  try {
+    lib = await import("./lib/right-size.mjs");
+  } catch (error) {
+    console.warn(
+      `refresh-media: right-sizing unavailable (${error?.message ?? error}); ` +
+        "thumbnails keep their mirrored files.",
+    );
+    return { sized: 0, written: 0 };
+  }
+  const box = { width: lib.footprintPixels(THUMB_SLOT_CSS_WIDTH) };
+
+  let sized = 0;
+  let written = 0;
+  for (const item of local) {
+    const fileName = item.image.src.slice(THUMBS_PUBLIC_PATH.length);
+    if (THUMB_VARIANT.test(fileName)) {
+      // Already right-sized, and repairThumbnails has seen the file is there.
+      sized += 1;
+      continue;
+    }
+    try {
+      const result = await lib.rightSize({ dir, fileName, box });
+      if (!result.fileName) continue;
+      item.image.src = `${THUMBS_PUBLIC_PATH}${result.fileName}`;
+      sized += 1;
+      if (result.written) written += 1;
+    } catch (error) {
+      console.warn(
+        `refresh-media: right-size failed for ${fileName} ` +
+          `(${error?.message ?? error}); keeping the mirrored file.`,
+      );
+    }
+  }
+  return { sized, written };
+}
+
+/**
+ * Deletes mirrored files the new snapshot has no use for. A file stays when
+ * an item points at it, or when it is the original a pointed-at sibling was
+ * made from — so an original outlives the right-sized file that replaced it
+ * on the page, while a sibling nothing points at any more (an old width) goes.
+ * This reads the final srcs rather than just this run's downloads, because
+ * an item carried forward from the previous snapshot already holds a local
+ * path and must keep the files behind it.
+ */
+async function pruneThumbnails(items, dir = THUMBS_DIR_URL) {
+  const used = new Set(
     items
       .map((item) => item.image?.src ?? "")
       .filter((src) => src.startsWith(THUMBS_PUBLIC_PATH))
       .map((src) => src.slice(THUMBS_PUBLIC_PATH.length)),
   );
+  const sources = new Set(
+    [...used].map((file) => THUMB_HASH.exec(file)?.[0]).filter(Boolean),
+  );
+  const keep = (file) =>
+    used.has(file) ||
+    (!THUMB_VARIANT.test(file) && sources.has(THUMB_HASH.exec(file)?.[0]));
   try {
-    for (const file of await readdir(THUMBS_DIR_URL)) {
-      if (!wanted.has(file)) await unlink(new URL(file, THUMBS_DIR_URL));
+    for (const file of await readdir(dir)) {
+      if (!keep(file)) await unlink(new URL(file, dir));
     }
   } catch {
     /* pruning is best-effort */
   }
-
-  return { mirrored, kept: remote.length - mirrored };
 }
 
 // --- change detection --------------------------------------------------------
@@ -965,10 +1136,14 @@ async function main() {
   }
 
   const deduped = [...new Map(items.map((item) => [item.id, item])).values()];
-  // Mirror before comparing: the previous snapshot already points at local
-  // thumbs, and a fresh item only matches it once its src has been rewritten
-  // to the same local path. Re-mirroring identical images is idempotent.
+  // Mirror and right-size before comparing: the previous snapshot already
+  // points at local files, and a fresh item only matches it once its src has
+  // been rewritten to the same one. Both steps are idempotent for identical
+  // images.
   const thumbs = await mirrorThumbnails(deduped);
+  await repairThumbnails(deduped);
+  const sized = await rightSizeThumbnails(deduped);
+  await pruneThumbnails(deduped);
   if (snapshotUnchanged(previous, deduped)) {
     console.log(
       `refresh-media: unchanged — ${deduped.length} item(s) from ` +
@@ -982,7 +1157,45 @@ async function main() {
   console.log(
     `refresh-media: wrote ${deduped.length} item(s) from ` +
       `${succeeded}/${feeds.length} feed(s) to src/lib/media/live.json ` +
-      `(${thumbs.mirrored} thumb(s) mirrored${thumbs.kept ? `, ${thumbs.kept} remote` : ""})`,
+      `(${thumbs.mirrored} thumb(s) mirrored${thumbs.kept ? `, ${thumbs.kept} remote` : ""}; ` +
+      `${sized.sized} right-sized, ${sized.written} new)`,
+  );
+}
+
+/**
+ * Right-sizes the thumbnails the snapshot on disk already mirrors, without
+ * asking any feed. `generatedAt` is left alone: nothing was fetched.
+ */
+async function rightSizeOnly() {
+  let snapshot;
+  try {
+    snapshot = JSON.parse(await readFile(LIVE_JSON_URL, "utf8"));
+  } catch {
+    snapshot = undefined;
+  }
+  const previous = Array.isArray(snapshot?.items) ? snapshot.items : [];
+  if (previous.length === 0) {
+    console.log("refresh-media: no snapshot items on disk; nothing to right-size.");
+    return;
+  }
+  const items = structuredClone(previous);
+  await repairThumbnails(items);
+  const sized = await rightSizeThumbnails(items);
+  await pruneThumbnails(items);
+  if (snapshotUnchanged(previous, items)) {
+    console.log(
+      `refresh-media: right-size only — ${sized.sized} of ${items.length} ` +
+        "item(s) already point at right-sized thumbs; live.json untouched.",
+    );
+    return;
+  }
+  await writeFile(
+    LIVE_JSON_URL,
+    `${JSON.stringify({ ...snapshot, items }, null, 2)}\n`,
+  );
+  console.log(
+    `refresh-media: right-size only — ${sized.sized} item(s) point at ` +
+      `right-sized thumbs (${sized.written} new); wrote src/lib/media/live.json.`,
   );
 }
 
@@ -993,14 +1206,15 @@ async function main() {
 // normalize.ts — without kicking off a live refresh on import.
 // `node scripts/refresh-media.mjs` is unaffected.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
+  const run = process.argv.includes("--right-size-only") ? rightSizeOnly : main;
+  run().catch((error) => {
     console.warn(
       `refresh-media: unexpected failure (${error?.message ?? error})`,
     );
   });
 }
 
-// Exported for the parity test only; the script's real interface is the CLI.
+// Exported for the tests only; the script's real interface is the CLI.
 export {
   anyapiDue,
   assertRssBody,
@@ -1010,6 +1224,10 @@ export {
   fromGoodreadsRss,
   fromLetterboxdRss,
   isRssDocument,
+  mirrorThumbnails,
+  pruneThumbnails,
+  repairThumbnails,
+  rightSizeThumbnails,
   snapshotUnchanged,
   xMediaFromSyndication,
 };

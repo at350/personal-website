@@ -107,7 +107,7 @@ export const projects: readonly Project[] = [
     discipline: "Supply chains",
     year: "2026",
     image: {
-      src: "/images/projects/editorial/greenchain-study.webp",
+      src: "/images/projects/editorial/greenchain-study.w720.webp",
       alt: "GreenChain artwork with black paper nodes, taut threads, white platforms, and one red route through the network.",
     },
     summary:
@@ -127,7 +127,7 @@ export const projects: readonly Project[] = [
     discipline: "Energy systems",
     year: "2026",
     image: {
-      src: "/images/projects/editorial/architec-study.webp",
+      src: "/images/projects/editorial/architec-study.w720.webp",
       alt: "Architec artwork with layered architectural planes, a black building volume, and a red translucent energy plane.",
     },
     summary:
@@ -143,7 +143,7 @@ export const projects: readonly Project[] = [
   {
     id: "arrival",
     image: {
-      src: "/images/projects/editorial/arrival-study.webp",
+      src: "/images/projects/editorial/arrival-study.w480.webp",
       alt: "Arrival artwork with financial documents passing through a translucent red gateway toward a black credit pass.",
     },
     name: "Arrival",
@@ -166,7 +166,7 @@ export const projects: readonly Project[] = [
     discipline: "Accessible product design",
     year: "2025",
     image: {
-      src: "/images/projects/editorial/terrablade-study.webp",
+      src: "/images/projects/editorial/terrablade-study.w720.webp",
       alt: "TerraBlade artwork with a pale clay slab, black guide rails, and a broad red pulling grip.",
     },
     summary:
@@ -181,7 +181,7 @@ export const projects: readonly Project[] = [
     discipline: "Go-to-market strategy",
     year: "2026",
     image: {
-      src: "/images/projects/editorial/vox-vera-study.webp",
+      src: "/images/projects/editorial/vox-vera-study.w720.webp",
       alt: "Vox Vera artwork with black paper channels and white tokens converging on a red crop frame.",
     },
     summary:
