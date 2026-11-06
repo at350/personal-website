@@ -62,13 +62,6 @@ function SpreadWord({ face, mode }: SpreadFaceProps) {
   return (
     <header className="resume2__head">
       {face === "verso" ? (
-        <p className="resume2__legend">
-          <span className="resume2__legend-mark" aria-hidden>
-          </span>{" "}
-          notes 01-{String(readingOrder.length).padStart(2, "0")} live in the margins
-        </p>
-      ) : null}
-      {face === "verso" ? (
         <h2 className="resume2__word">RESUME</h2>
       ) : (
         <span className="resume2__word" aria-hidden>
