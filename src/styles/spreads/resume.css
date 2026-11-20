@@ -66,18 +66,6 @@
   gap: max(6px, 0.8cqh);
 }
 
-.resume2__legend {
-  font-family: var(--font-mono);
-  font-size: max(11px, 1.5cqw);
-  letter-spacing: 0.08em;
-  color: var(--ink-3);
-  padding-bottom: 0.6em;
-}
-
-.resume2__legend-mark {
-  color: var(--red);
-}
-
 /* ————— Group furniture ————— */
 
 .resume2__label {
