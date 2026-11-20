@@ -15,6 +15,13 @@ import pythonLogo from "simple-icons/icons/python.svg";
 import reactLogo from "simple-icons/icons/react.svg";
 import threeLogo from "simple-icons/icons/threedotjs.svg";
 import typeScriptLogo from "simple-icons/icons/typescript.svg";
+import langChainLogo from "simple-icons/icons/langchain.svg";
+import claudeLogo from "simple-icons/icons/claude.svg";
+import openCvLogo from "simple-icons/icons/opencv.svg";
+import pipecatLogo from "simple-icons/icons/pipecat.svg";
+import nvidiaLogo from "simple-icons/icons/nvidia.svg";
+// Over Vite's 4 KB inline limit; forced inline like every other mark.
+import raspberryPiLogo from "simple-icons/icons/raspberrypi.svg?inline";
 
 /** Local brand assets work offline and during page texture capture.
  * Methods and labels without a suitable mark render as text, without fake initials.
@@ -25,6 +32,12 @@ const TECHNOLOGY_LOGOS: Readonly<Record<string, string>> = {
   Supabase: supabaseLogo,
   Hono: honoLogo,
   LangGraph: langGraphLogo,
+  LangChain: langChainLogo,
+  Claude: claudeLogo,
+  OpenCV: openCvLogo,
+  Pipecat: pipecatLogo,
+  Nemotron: nvidiaLogo,
+  "Raspberry Pi": raspberryPiLogo,
   Prisma: prismaLogo,
   "OpenAI Vision": openAiLogo,
   Firecrawl: firecrawlLogo,

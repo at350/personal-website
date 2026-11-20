@@ -10,7 +10,8 @@ describe("project technology marks", () => {
   it.each([
     "React", "TypeScript", "Python", "FastAPI", "Elasticsearch", "Firecrawl",
     "Supabase", "OpenAI Vision", "Hono", "LangGraph", "Prisma", "Mapbox",
-    "Next.js", "Gemini", "Three.js", "Fusion 360",
+    "Next.js", "Gemini", "Three.js", "Fusion 360", "LangChain", "Claude",
+    "OpenCV", "Pipecat", "Nemotron", "Raspberry Pi",
   ])("resolves a bundled brand mark for %s", (label) => {
     expect(technologyLogo(label)).toMatch(/^data:image\/svg\+xml/);
   });

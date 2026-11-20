@@ -28,7 +28,7 @@ export const about = {
     "Hi, I'm Alan. I learned to make things in a student newsroom, long before I thought of software as the medium.",
   paragraphs: [
     "Reporting taught me to ask one more question before writing. Debate taught me to find the weakest assumption before someone else did. Those habits still shape how I approach software, research, and early-stage teams.",
-    "At Northwestern, I study Industrial Engineering and Artificial Intelligence. I build software and AI automations at WingRep, develop evaluation workflows at Meritus Labs, and research computational pathology through FORGE at Northwestern Medicine.",
+    "At Northwestern, I study Industrial Engineering and Artificial Intelligence. I develop evaluation workflows at Meritus Labs and build an internal clinical chatbot at AbbVie, after building AI automations at WingRep and researching computational pathology through FORGE at Northwestern Medicine.",
   ],
   pullQuote: "I just want to make things that work.",
   notes: [
@@ -102,6 +102,85 @@ export const projects: readonly Project[] = [
     ],
   },
   {
+    id: "lucid",
+    name: "Lucid",
+    discipline: "Medical screening",
+    year: "2026",
+    image: {
+      src: "/images/projects/editorial/lucid-study.webp",
+      alt: "Lucid artwork with a contoured white dome, a black sensor wand, and a translucent red disc.",
+    },
+    summary:
+      "A handheld brain-bleed screener prototype that reads tissue conductivity as it sweeps across a patient's head.",
+    detail:
+      "I built the software. A lead agent proposes possible bleeds, subagents test each one on a physics model of the head, and a skeptic agent challenges every finding before a person approves it. I also built the live bleed-map dashboard. A teammate led the idea and the science.",
+    stack: ["Python", "LangChain", "LangGraph", "Claude", "pyEIT"],
+    recognition:
+      "HackPrinceton Fall 2026: Best Overall Hack, Best Use of Deep Agents, Best Physical AI Hack, and 2nd in Best Practical AI Innovation.",
+    links: [
+      { kind: "devpost", label: "Devpost", href: "https://devpost.com/software/lucid-k078qt" },
+    ],
+  },
+  {
+    id: "handoff",
+    name: "Handoff",
+    discipline: "Emergency response",
+    year: "2026",
+    image: {
+      src: "/images/projects/editorial/handoff-study.webp",
+      alt: "Handoff artwork with folded white paper, a black relay block, and a translucent red pulse strip.",
+    },
+    summary:
+      "A voice-and-vision assistant for paramedics that keeps one live incident record from the ambulance to the hospital.",
+    detail:
+      "I built the voice agent and its grounding checks, the hospital dashboard, and the demo controls. I also modeled the 3D-printed mount, enclosure, and finger clip, and planned the Raspberry Pi vitals hardware.",
+    stack: ["Python", "Pipecat", "Nemotron", "SpacetimeDB", "Raspberry Pi"],
+    recognition: "Honorable mention in the SpacetimeDB track at HackUTD 2026.",
+    links: [
+      { kind: "github", label: "Team repository", href: "https://github.com/rishi-golla/hackutd26" },
+    ],
+  },
+  {
+    id: "freightline",
+    name: "FreightLine",
+    discipline: "Freight finance",
+    year: "2026",
+    image: {
+      src: "/images/projects/editorial/freightline-study.webp",
+      alt: "FreightLine artwork with fanned white ledger sheets, black column marks, and a translucent red strip.",
+    },
+    summary:
+      "An autonomous back office for freight brokers, where nine AI agents settle, audit, and bill loads under deterministic accounting rules.",
+    detail:
+      "I built the brokerage agents' A2A wiring and live inbox, the SpacetimeDB backend that holds cases and the audit trail, and the Next.js finance console. A teammate built document intake and personal-data scrubbing.",
+    stack: ["Python", "Next.js", "SpacetimeDB", "A2A protocol", "Apify"],
+    recognition: "Won Apify's First Customer track at Cal Hacks 13.0.",
+    links: [
+      { kind: "github", label: "Team repository", href: "https://github.com/rishi-golla/calhacks-26" },
+      { kind: "devpost", label: "Devpost", href: "https://devpost.com/software/tbd-i18cf9" },
+    ],
+  },
+  {
+    id: "traycer",
+    name: "Traycer",
+    discipline: "Food waste",
+    year: "2026",
+    image: {
+      src: "/images/projects/editorial/traycer-study.webp",
+      alt: "Traycer artwork with a white compartment tray, black paper remnants, and a translucent red frame.",
+    },
+    summary:
+      "A food-waste tool that reads returned dining-hall trays with a phone camera and shows leftovers as estimated cost, carbon, and water.",
+    detail:
+      "I built the vision service and fine-tuned YOLO-World on synthetic tray images, raising food precision from 34% to 96% and recall from 50% to 79% on a synthetic test set. I also built the camera, review, and dashboard site.",
+    stack: ["Python", "FastAPI", "YOLO-World", "OpenCV", "SpacetimeDB"],
+    recognition: "2nd place in the SpacetimeDB and Notability tracks at MHacks 2026.",
+    links: [
+      { kind: "prototype", label: "Live site", href: "https://trayitforward.tech" },
+      { kind: "github", label: "Team repository", href: "https://github.com/anton-3/traycer" },
+    ],
+  },
+  {
     id: "greenchain",
     name: "GreenChain",
     discipline: "Supply chains",
@@ -115,7 +194,7 @@ export const projects: readonly Project[] = [
     detail:
       "I built supplier-research workflows using a multi-agent system. Our team combined that research with an XGBoost emissions model and a Three.js globe to compare suppliers.",
     stack: ["TypeScript", "Python", "Multi-agent systems", "XGBoost", "Three.js"],
-    recognition: "Won three sponsor tracks at HackPrinceton.",
+    recognition: "Won three sponsor tracks at HackPrinceton Spring 2026.",
     links: [
       { kind: "github", label: "Team repository", href: "https://github.com/thejustjim/hackprinceton2026" },
       { kind: "devpost", label: "Devpost", href: "https://devpost.com/software/greenchain-1xglhu" },
@@ -202,10 +281,42 @@ export const resume = {
       institution: "Northwestern University",
       program: "Industrial Engineering and Artificial Intelligence",
       location: "Evanston, Illinois",
-      details: ["Class of 2029", "GPA 3.98 / 4.00"],
+      details: ["GPA 3.98 / 4.00"],
     },
   ],
   entries: [
+    {
+      id: "abbvie",
+      kind: "current",
+      organization: "AbbVie",
+      role: "Jr. Business Systems Analyst",
+      dates: "Sep 2026 to Present",
+      summary:
+        "Building an internal clinical chatbot as its sole engineer.",
+      highlights: [],
+      marginalia: {
+        label: "First, the rules",
+        ariaLabel: "Read a personal note about AbbVie",
+        text: "i cleared its data-access rules with the security and i.t. teams before the first release.",
+      },
+    },
+    {
+      id: "wingrep",
+      kind: "experience",
+      organization: "WingRep",
+      role: "GTM Engineering Intern",
+      dates: "May 2026 to Sep 2026",
+      summary:
+        "Built AI automations and Salesforce integrations for a revenue-intelligence startup.",
+      highlights: [
+        "Shipped customer-facing Salesforce workflows and automated account research.",
+      ],
+      marginalia: {
+        label: "From the call sheet",
+        ariaLabel: "Read a personal note about WingRep",
+        text: "weekly demos turned sales feedback into the next sprint's work.",
+      },
+    },
     {
       id: "ember-studios",
       kind: "experience",
@@ -221,23 +332,6 @@ export const resume = {
         label: "A note from the build",
         ariaLabel: "Read a personal note about Ember Studios",
         text: "the work is nda'd. the question of what makes a machine conversation worth keeping is not.",
-      },
-    },
-    {
-      id: "wingrep",
-      kind: "current",
-      organization: "WingRep",
-      role: "GTM Engineering Intern",
-      dates: "May 2026 to Present",
-      summary:
-        "Building AI automations and Salesforce integrations for a revenue-intelligence startup.",
-      highlights: [
-        "Shipped customer-facing Salesforce workflows and automated account research.",
-      ],
-      marginalia: {
-        label: "From the call sheet",
-        ariaLabel: "Read a personal note about WingRep",
-        text: "weekly demos turn sales feedback into the next sprint's work.",
       },
     },
     {
@@ -262,16 +356,31 @@ export const resume = {
       kind: "research",
       organization: "Northwestern Medicine / NNCI",
       role: "Data Science Researcher, FORGE Research Cohort",
-      dates: "Jun 2026 to Present",
+      dates: "Jun 2026 to Sep 2026",
       summary:
-        "Developing models to predict colorectal-cancer molecular markers from tissue images.",
+        "Developed models to predict colorectal-cancer molecular markers from tissue images.",
       highlights: [
-        "Reviews model attention heat maps with pathologists.",
+        "Reviewed model attention heat maps with pathologists.",
       ],
       marginalia: {
         label: "At slide scale",
         ariaLabel: "Read a personal note about the FORGE Research Cohort",
-        text: "the model combines thousands of image tiles into a slide-level prediction.",
+        text: "the model combined thousands of image tiles into a slide-level prediction.",
+      },
+    },
+    {
+      id: "copilot-ambassador",
+      kind: "leadership",
+      organization: "Microsoft",
+      role: "Copilot Student Ambassador",
+      dates: "Fall 2026 to Present",
+      summary:
+        "Selected as one of two Northwestern ambassadors for Microsoft's Fall 2026 Copilot program.",
+      highlights: [],
+      marginalia: {
+        label: "First proposals",
+        ariaLabel: "Read a personal note about the Copilot Student Ambassador program",
+        text: "i proposed two campus events: a copilot tabling day and a hands-on demo for coursework.",
       },
     },
     {
@@ -344,19 +453,17 @@ export const resume = {
     },
     {
       id: "lambda-strategy",
-      kind: "experience",
+      kind: "current",
       organization: "Lambda Strategy",
-      role: "Consultant, Vox Vera client project",
-      dates: "Jan 2026 to Mar 2026",
+      role: "Consultant, then Project Lead",
+      dates: "Jan 2026 to Present",
       summary:
-        "Analyzed LinkedIn and SEO data to recommend acquisition channels for Vox Vera.",
-      highlights: [
-        "Developed recommendations for legal, corporate, and academic audiences.",
-      ],
+        "Leading a four-person team for a life-sciences client.",
+      highlights: [],
       marginalia: {
-        label: "What survived",
-        ariaLabel: "Read a personal note about the Vox Vera client project",
-        text: "the client strategy drew on more than 1,000 marketing data points.",
+        label: "Before this",
+        ariaLabel: "Read a personal note about Lambda Strategy",
+        text: "first came vox vera: an acquisition strategy drawn from more than 1,000 marketing data points.",
       },
     },
     {
@@ -417,9 +524,9 @@ export const resume = {
       role: "Student Researcher, Computer Vision",
       dates: "May 2023 to Apr 2024",
       summary:
-        "Researched crop nutrient detection from drone imagery with Ross Greer.",
+        "Researched crop nutrient detection from drone imagery.",
       highlights: [
-        "Published computer-vision research at CONF-CDS 2024.",
+        "Published the work at CONF-CDS 2024.",
       ],
       marginalia: {
         label: "First paper",
@@ -442,10 +549,10 @@ export const resume = {
       note: "",
     },
     {
-      title: "Six-time hackathon winner",
-      issuer: "Collegiate hackathons",
-      year: "2026",
-      note: "HackMIT 2026: 1st Place Grand Prize with Peel.",
+      title: "Nine-time hackathon winner",
+      issuer: "Hackathons",
+      year: "2022–2026",
+      note: "HackMIT Grand Prize (Peel); HackPrinceton Best Overall (Lucid).",
     },
   ],
 } satisfies ResumeContent;

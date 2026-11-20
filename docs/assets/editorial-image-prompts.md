@@ -1,6 +1,6 @@
 # Editorial image prompt set
 
-These eleven assets were generated as one art-directed family for Issue No. 01.
+These fifteen assets were generated as one art-directed family for Issue No. 01.
 They use the site's print palette: bright white paper, near-black ink, and one
 signal red. The final files are WebP exports in `public/images/`.
 
@@ -135,3 +135,46 @@ registration offsets, edge depth, and a delicate crease shadow. All marks stay
 completely illegible.
 
 Output: `public/images/editorial/index-resume.webp`
+
+## Lucid study
+
+Horizontal 3:2 conceptual editorial still life on seamless bright white. An
+abstract white paper hemisphere carries fine near-black concentric contour
+rings, with a small near-black wand and coil beside it. One translucent
+signal-red disc marks a single region of the dome. Oblique camera, hard gallery
+light, crisp shadows, and tactile paper fibers. No anatomy, brain, skull, face,
+medical cross, or screen.
+
+Output: `public/images/projects/editorial/lucid-study.webp`
+
+## FreightLine study
+
+Horizontal 3:2 conceptual editorial still life on seamless bright white. A
+fanned stack of white ledger sheets and settlement slips carries abstract
+near-black column blocks and rules. One broad translucent signal-red acetate
+strip passes through the stack. Oblique top-down camera, hard gallery light,
+crisp shadows, and tactile paper fibers. No beads or cubes on a string, thread
+networks, trucks, maps, money, or literal shipping containers.
+
+Output: `public/images/projects/editorial/freightline-study.webp`
+
+## Traycer study
+
+Horizontal 3:2 conceptual editorial still life on seamless bright white. A
+bright-white molded paper tray with distinct compartments holds a few bold
+near-black paper remnants. One thin translucent signal-red rectangular acetate
+frame marks the center compartment. Center the subject with clean white margin
+for a square crop. Hard gallery light, crisp shadows, and tactile paper fibers.
+No gray pulp, doubled red frame or shadow, food photography, cutlery, or screens.
+
+Output: `public/images/projects/editorial/traycer-study.webp`
+
+## Handoff study
+
+Horizontal 3:2 conceptual editorial still life on seamless bright white. Two
+white paper stations carry folded white strips, with a small near-black relay
+block and one translucent signal-red pulse-line strip bridging the gap. Oblique
+camera, hard gallery light, crisp shadows, and tactile paper fibers. No people,
+ambulances, medical crosses, or hearts.
+
+Output: `public/images/projects/editorial/handoff-study.webp`
