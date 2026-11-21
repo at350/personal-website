@@ -428,7 +428,7 @@ export function SinglePageView({
   return (
     <main className="single" data-busy={busy || undefined}>
       <header className="single__chrome single__chrome--top">
-        <p className="mono-label single__mast">ALAN TAI / NO. 01</p>
+        <p className="mono-label single__mast">ALAN TAI / ISSUE 01</p>
         <button
           type="button"
           className="mono-label single__toc-open"

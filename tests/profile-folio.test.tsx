@@ -21,7 +21,7 @@ describe("profile recto furniture", () => {
     const folio = container.querySelector<HTMLElement>(".folio--recto");
 
     expect(poster).not.toBeNull();
-    expect(folio?.textContent?.replace(/\s+/g, " ").trim()).toBe("NO. 01 / 07");
+    expect(folio?.textContent?.replace(/\s+/g, " ").trim()).toBe("ISSUE 01 / 07");
     expect(folio?.querySelector(".folio__page")?.textContent).toBe("07");
     expect(container.querySelector(".running-head--recto")?.textContent).toBe("NEWS");
     expect(container.textContent).not.toContain("selected curiosities");

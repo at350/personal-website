@@ -31,7 +31,7 @@ export function ReaderView({
   return (
     <main className="reader">
       <header className="reader__mast">
-        <p className="mono-label">ALAN TAI / NO. 01</p>
+        <p className="mono-label">ALAN TAI / ISSUE 01</p>
         {onOpenPages || canOpenBook ? (
           <div className="reader__modes">
             {onOpenPages ? (
@@ -78,7 +78,7 @@ export function ReaderView({
 
       <footer className="reader__foot">
         <Link to="/" className="mono-label">
-          ALAN TAI / NO. 01 / 2026
+          ALAN TAI / ISSUE 01 / 2026
         </Link>
       </footer>
     </main>
