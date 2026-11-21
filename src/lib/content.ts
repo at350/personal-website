@@ -23,7 +23,7 @@ export const siteMeta = {
 
 export const about = {
   eyebrow: "Notes from the editor",
-  heading: "I like systems with people still visible inside them.",
+  heading: "I build software for the people closest to the problem.",
   lede:
     "Hi, I'm Alan. I learned to make things in a student newsroom, long before I thought of software as the medium.",
   paragraphs: [
@@ -292,12 +292,14 @@ export const resume = {
       role: "Jr. Business Systems Analyst",
       dates: "Sep 2026 to Present",
       summary:
-        "Building an internal clinical chatbot as its sole engineer.",
-      highlights: [],
+        "Building an internal clinical chatbot as its sole engineer, through AbbVie's IR Academic Partnerships program.",
+      highlights: [
+        "Cleared its data-access rules with IT and Security ahead of rollout to 40 clinicians.",
+      ],
       marginalia: {
-        label: "First, the rules",
+        label: "From the backlog",
         ariaLabel: "Read a personal note about AbbVie",
-        text: "i cleared its data-access rules with the security and i.t. teams before the first release.",
+        text: "six clinician feedback sessions became the ranked backlog for the next releases.",
       },
     },
     {
@@ -442,11 +444,13 @@ export const resume = {
       dates: "Jan 2026 to Present",
       summary:
         "Leading a four-person team for a life-sciences client.",
-      highlights: [],
+      highlights: [
+        "Earlier, recommended acquisition channels to Vox Vera for legal, corporate, and academic audiences.",
+      ],
       marginalia: {
-        label: "Before this",
+        label: "What survived",
         ariaLabel: "Read a personal note about Lambda Strategy",
-        text: "first came vox vera: an acquisition strategy drawn from more than 1,000 marketing data points.",
+        text: "the vox vera strategy drew on more than 1,000 marketing data points.",
       },
     },
     {
@@ -509,7 +513,7 @@ export const resume = {
       summary:
         "Researched crop nutrient detection from drone imagery.",
       highlights: [
-        "Published the work at CONF-CDS 2024.",
+        "Published the work as a sole-author paper at CONF-CDS 2024.",
       ],
       marginalia: {
         label: "First paper",
