@@ -28,7 +28,7 @@ export const about = {
     "Hi, I'm Alan. I learned to make things in a student newsroom, long before I thought of software as the medium.",
   paragraphs: [
     "Reporting taught me to ask one more question before writing. Debate taught me to find the weakest assumption before someone else did. Those habits still shape how I approach software, research, and early-stage teams.",
-    "At Northwestern, I study Industrial Engineering and Artificial Intelligence. I develop evaluation workflows at Meritus Labs and build an internal clinical chatbot at AbbVie, after building AI automations at WingRep and researching computational pathology through FORGE at Northwestern Medicine.",
+    "At Northwestern, I study Industrial Engineering and Artificial Intelligence. I build an internal clinical chatbot at AbbVie and lead a client team at Lambda Strategy, after building AI automations at WingRep and researching computational pathology through FORGE at Northwestern Medicine.",
   ],
   pullQuote: "I just want to make things that work.",
   notes: [
@@ -332,23 +332,6 @@ export const resume = {
         label: "A note from the build",
         ariaLabel: "Read a personal note about Ember Studios",
         text: "the work is nda'd. the question of what makes a machine conversation worth keeping is not.",
-      },
-    },
-    {
-      id: "meritus-labs",
-      kind: "current",
-      organization: "Meritus Labs",
-      role: "Co-Founder",
-      dates: "Apr 2026 to Present",
-      summary:
-        "Developing AI evaluation workflows with pilot teams, informed by customer discovery.",
-      highlights: [
-        "Built integrations that connect evaluation workflows to client tools.",
-      ],
-      marginalia: {
-        label: "Margin status",
-        ariaLabel: "Read a personal note about Meritus Labs",
-        text: "discovery led to pilots; the work now includes evaluation and integration.",
       },
     },
     {
