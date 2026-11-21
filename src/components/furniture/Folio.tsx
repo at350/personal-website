@@ -5,7 +5,7 @@ interface FolioProps {
   side: "verso" | "recto";
 }
 
-/** Mirrored magazine folios. Verso: `04 — ALAN TAI`; recto: `NO. 01 — 05`. */
+/** Mirrored magazine folios. Verso: `04 — ALAN TAI`; recto: `ISSUE 01 — 05`. */
 export function Folio({ page, side }: FolioProps) {
   if (page === null) return null;
   const number = String(page).padStart(2, "0");
@@ -17,7 +17,7 @@ export function Folio({ page, side }: FolioProps) {
         </>
       ) : (
         <>
-          NO. 01 / <span className="folio__page">{number}</span>
+          ISSUE 01 / <span className="folio__page">{number}</span>
         </>
       )}
     </p>
