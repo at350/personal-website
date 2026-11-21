@@ -14,7 +14,6 @@
 
 .proj-count__word {
   margin-top: 8cqh;
-  margin-left: -8cqw; /* the page's grid-break: the numeral hits the raw fore-edge */
   font-family: var(--font-condensed);
   font-weight: 400;
   font-size: 42cqw;
@@ -42,13 +41,13 @@
   margin-top: auto;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 2.2cqh 2cqw;
+  gap: 1.6cqh 2cqw;
 }
 
 .proj-count__plate {
   min-width: 0;
   display: grid;
-  grid-template-rows: 15cqh auto;
+  grid-template-rows: 12cqh auto;
   gap: 0.8cqh;
 }
 
@@ -112,12 +111,20 @@
   border-top: 1px solid var(--hairline);
 }
 
-/* A fixed page box scrolls its archive internally; the reader's paper
+/* The book's fixed page box scrolls its archive internally; the single page
+   scrolls as a whole, so its paper fades track the list; the reader's paper
    grows instead. */
 .proj-index:is([data-mode="book"], [data-mode="single"]) .proj-index__list {
-  min-height: 0;
   margin-left: -3.2cqw;
   padding-left: 3.2cqw;
+}
+
+.proj-index[data-mode="single"] .proj-index__list {
+  flex: none;
+}
+
+.proj-index[data-mode="book"] .proj-index__list {
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -134,7 +141,7 @@
   grid-template-columns: 7cqw minmax(0, 1fr) auto 2.2cqw;
   column-gap: 2.4cqw;
   align-items: baseline;
-  padding: 1.9cqh 0;
+  padding: 1.3cqh 0;
   text-align: left;
 }
 
@@ -143,7 +150,7 @@
   margin-left: -3.2cqw;
   font-family: var(--font-condensed);
   letter-spacing: -0.004em;
-  font-size: 6cqw;
+  font-size: 5cqw;
   line-height: 1;
   color: var(--ink-3);
   font-feature-settings: "lnum" 1;
@@ -542,9 +549,14 @@
    until the two printed through each other ("TerraBlade" over "ACCESSIBLE").
    Stack them instead: name on its own line, discipline and year beneath it. */
 @container (max-width: 520px) {
+  .proj-index {
+    padding-top: 7cqh;
+  }
+
   .proj-index__row {
     grid-template-columns: 7cqw minmax(0, 1fr) auto;
     row-gap: 2px;
+    padding: 1.1cqh 0;
   }
 
   .proj-index__no {
