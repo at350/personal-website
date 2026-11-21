@@ -292,7 +292,7 @@ export const resume = {
       role: "Jr. Business Systems Analyst",
       dates: "Sep 2026 to Present",
       summary:
-        "Building an internal clinical chatbot as its sole engineer, through AbbVie's IR Academic Partnerships program.",
+        "Building an internal clinical chatbot as its sole engineer.",
       highlights: [
         "Cleared its data-access rules with IT and Security ahead of rollout to 40 clinicians.",
       ],
